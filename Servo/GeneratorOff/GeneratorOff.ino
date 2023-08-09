@@ -6,14 +6,18 @@
  * Tutorial page: https://arduinogetstarted.com/tutorials/arduino-button-servo-motor
  */
 
-#include "Constants.h"
 #include <Servo.h>
 #include <math.h>
 #include <ezButton.h>
 #include <EEPROM.h>
 
+#include "Constants.h"
+
+//EEPROM
+const int EEPROM_ANGLE_ADDR = 10;
+
 // variables will change:
-Servo servo; // create servo object to control a servo
+Servo servo;                        // create servo object to control a servo
 int angle = INITIAL_ANGLE;          // the current angle of servo motor
 
 ezButton generatorOffBtn(GENERATOR_OFF_BTN_PIN); 
@@ -43,10 +47,10 @@ void setup()
 void loop() 
 {
     //Serial.println("Button loop started");
-    generatorOffBtn.loop(); // MUST call the loop() function first
-    initialPosBtn.loop(); // MUST call the loop() function first
-    rotateRightBtn.loop(); // MUST call the loop() function first
-    rotateLeftBtn.loop(); // MUST call the loop() function first
+    generatorOffBtn.loop();   // MUST call the loop() function first
+    initialPosBtn.loop();     // MUST call the loop() function first
+    rotateRightBtn.loop();    // MUST call the loop() function first
+    rotateLeftBtn.loop();     // MUST call the loop() function first
     //Serial.println("Button loop ended");
     
     //Serial.println("Button is pressed check");
