@@ -1,0 +1,6 @@
+There are 3 major chips on the board. Atmega 328, esp8266 and the USB converter CH340. Every device has one RX and one TX pin. But you need sometimes connect the Atmega to esp8266, sometimes connect the Atmega to computer over USB and sometimes connect the esp8266 to computer. The first 6 switches are in pairs (RX and TX) for connecting two of the 3 devices.
+
+1,2 ON all others OFF connect esp8266 to Atmega. no connection to computer.
+3,4 ON all others OFF connects Atmega to computer over USB. no connection to esp8266
+5,6 ON all others OFF connects esp8266 to computer over USB. no connection to Atmega
+The switch 7 sets io 0 of esp8266 LOW which puts esp8266 to flashing mode at reboot. So you turn it ON with connection of esp8266 to USB (computer) to upload sketch to esp8266.
