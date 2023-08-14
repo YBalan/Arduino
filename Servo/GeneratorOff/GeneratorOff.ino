@@ -16,6 +16,9 @@
 //EEPROM
 const int EEPROM_SETTINGS_ADDR = 10;
 
+//DebounceTime
+const int DebounceTime = 100;
+
 // variables will change:
 Servo servo;                        // create servo object to control a servo
 Servo servo2;
@@ -32,20 +35,24 @@ ezButton initialPosBtn(INITIAL_POS_BTN_PIN);
 ezButton rotateRightBtn(ROTATE_RIGHT_BTN_PIN);
 ezButton rotateLeftBtn(ROTATE_LEFT_BTN_PIN);
 
+int debugButtonFromSerial = 0;
+
 void setup() 
 {  
     Serial.begin(9600);                // initialize serial
     Serial.println();
     Serial.println();
-    Serial.println("!!!! START !!!!");
+    Serial.println("!!!! START fuck !!!!");
 
-    generatorOffBtn.setDebounceTime(50); 
-    generatorOffRemoteBtn.setDebounceTime(50); 
-    initialPosBtn.setDebounceTime(50); 
-    rotateRightBtn.setDebounceTime(50); 
-    rotateLeftBtn.setDebounceTime(50); 
+    generatorOffBtn.setDebounceTime(DebounceTime); 
+    generatorOffRemoteBtn.setDebounceTime(DebounceTime); 
+    initialPosBtn.setDebounceTime(DebounceTime); 
+    rotateRightBtn.setDebounceTime(DebounceTime); 
+    rotateLeftBtn.setDebounceTime(DebounceTime); 
 
     EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
+
+    CheckAngles();
 
     AttachServos();
 
@@ -59,43 +66,62 @@ void setup()
 void loop() 
 {
     //Serial.println("Button loop started");
-    generatorOffBtn.loop();   // MUST call the loop() function first
+    generatorOffBtn.loop();         // MUST call the loop() function first
     generatorOffRemoteBtn.loop();   // MUST call the loop() function first
-    initialPosBtn.loop();     // MUST call the loop() function first
-    rotateRightBtn.loop();    // MUST call the loop() function first
-    rotateLeftBtn.loop();     // MUST call the loop() function first
+    initialPosBtn.loop();           // MUST call the loop() function first
+    rotateRightBtn.loop();          // MUST call the loop() function first
+    rotateLeftBtn.loop();           // MUST call the loop() function first
     //Serial.println("Button loop ended");
     
     //Serial.println("Button is pressed check");
-    if(generatorOffBtn.isPressed()) 
+    if(generatorOffBtn.isPressed() || debugButtonFromSerial == 4) 
     {
       Serial.println("The ""generatorOffBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY);    
+      GeneratorOff(ROTATE_DELAY);
+      debugButtonFromSerial = 0; 
     }
 
-    if(generatorOffRemoteBtn.isPressed()) 
+    if(generatorOffRemoteBtn.isPressed() || debugButtonFromSerial == 5) 
     {
       Serial.println("The ""generatorOffRemoteBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY);    
+      GeneratorOff(ROTATE_DELAY);
+      debugButtonFromSerial = 0;
     }
 
-    if(initialPosBtn.isPressed()) 
+    if(initialPosBtn.isPressed() || debugButtonFromSerial == 3) 
     {
       Serial.println("The ""initialPosfBtn"" is pressed");
       InitialPosition();
+      debugButtonFromSerial = 0;
     }
 
-    if(rotateRightBtn.isPressed()) 
-    {
-      Serial.println("The ""rotateRightBtn"" is pressed");
-      RotateRight();
-    }
-
-    if(rotateLeftBtn.isPressed()) 
+    if(rotateLeftBtn.isPressed() || debugButtonFromSerial == 2) 
     {
       Serial.println("The ""rotateLeftBtn"" is pressed");
       RotateLeft();
+      debugButtonFromSerial = 0;
     }
+
+    if(rotateRightBtn.isPressed() || debugButtonFromSerial == 1) 
+    {
+      Serial.println("The ""rotateRightBtn"" is pressed");
+      RotateRight();
+      debugButtonFromSerial = 0;
+    }   
+
+    //debugButtonFromSerial = Serial.readString().toInt();
+}
+
+void CheckAngles()
+{
+  if(settings.angle < START_ANGLE || settings.angle > END_ANGLE)
+  {
+    settings.angle = INITIAL_ANGLE;
+  }
+  if(settings.angle2 < START_2_ANGLE || settings.angle2 > END_2_ANGLE)
+  {
+    settings.angle2 = INITIAL_2_ANGLE;
+  }
 }
 
 void GeneratorOff(int rotateDelay)
@@ -122,8 +148,8 @@ void GeneratorOff(int rotateDelay)
 
     servo.write(GENERATOR_OFF_ANGLE);
     servo2.write(GENERATOR_OFF_2_ANGLE);
-
     PrintServosStatus();
+    
     DetachServos();
     SaveSettings();
 }
@@ -151,8 +177,8 @@ void RotateLeft()
     }
 
     {
-      int rotate2 = settings.angle2 - ROTATE_ANGLE;
-      settings.angle2 = rotate2 <= START_ANGLE ? START_ANGLE : rotate2;
+      int rotate2 = settings.angle2 - ROTATE_ANGLE;      
+      settings.angle2 = rotate2 <= END_2_ANGLE ? END_2_ANGLE : rotate2;
       servo2.write(settings.angle2);      
     }
 
@@ -162,7 +188,7 @@ void RotateLeft()
 }
 
 void RotateRight()
-{    
+{   
     AttachServos();
     //Serial.print("Servo started "); Serial.println(angle);
     {
@@ -172,8 +198,8 @@ void RotateRight()
     }
 
     {
-      int rotate2 = settings.angle2 + ROTATE_ANGLE;
-      settings.angle2 = rotate2 >= END_ANGLE ? END_ANGLE : rotate2;
+      int rotate2 = settings.angle2 + ROTATE_ANGLE;      
+      settings.angle2 = rotate2 >= START_2_ANGLE ? START_2_ANGLE : rotate2;
       servo2.write(settings.angle2);
     }
 
