@@ -3,7 +3,7 @@
  *
  * This example code is in the private domain
  *
- * Tutorial page: https://arduinogetstarted.com/tutorials/arduino-button-servo-motor
+ * Tutorial page: https://arduinogetstarted.com/tutorials/arduino-button-servo-motor https://arduinogetstarted.com/tutorials/arduino-servo-motor
  */
 
 #include <Servo.h>
@@ -17,7 +17,7 @@
 const int EEPROM_SETTINGS_ADDR = 10;
 
 //DebounceTime
-const int DebounceTime = 100;
+const int DebounceTime = 25;
 
 // variables will change:
 Servo servo;                        // create servo object to control a servo
@@ -40,9 +40,10 @@ int debugButtonFromSerial = 0;
 void setup() 
 {  
     Serial.begin(9600);                // initialize serial
+     
     Serial.println();
     Serial.println();
-    Serial.println("!!!! START fuck !!!!");
+    Serial.println("!!!! START fuck 1 !!!!");
 
     generatorOffBtn.setDebounceTime(DebounceTime); 
     generatorOffRemoteBtn.setDebounceTime(DebounceTime); 
@@ -52,7 +53,14 @@ void setup()
 
     EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
 
-    CheckAngles();
+    Serial.print("EEPROM: ");
+    PrintServosStatus();
+
+    if(CorrectAngles())
+    {
+      Serial.print("Correct: ");
+      PrintServosStatus();
+    }
 
     AttachServos();
 
@@ -61,6 +69,7 @@ void setup()
 
     PrintServosStatus();
     DetachServos();
+    SaveSettings();
 }
 
 void loop() 
@@ -109,19 +118,27 @@ void loop()
       debugButtonFromSerial = 0;
     }   
 
-    //debugButtonFromSerial = Serial.readString().toInt();
+    if(Serial.available() > 0)
+    {
+      debugButtonFromSerial = Serial.readString().toInt();
+    }
 }
 
-void CheckAngles()
+bool CorrectAngles()
 {
+  bool res = false;
   if(settings.angle < START_ANGLE || settings.angle > END_ANGLE)
   {
     settings.angle = INITIAL_ANGLE;
+    res = true;
   }
-  if(settings.angle2 < START_2_ANGLE || settings.angle2 > END_2_ANGLE)
+  if(settings.angle2 < END_2_ANGLE || settings.angle2 > START_2_ANGLE )
   {
     settings.angle2 = INITIAL_2_ANGLE;
+    res = true;
   }
+
+  return res;
 }
 
 void GeneratorOff(int rotateDelay)
@@ -148,8 +165,8 @@ void GeneratorOff(int rotateDelay)
 
     servo.write(GENERATOR_OFF_ANGLE);
     servo2.write(GENERATOR_OFF_2_ANGLE);
+
     PrintServosStatus();
-    
     DetachServos();
     SaveSettings();
 }
