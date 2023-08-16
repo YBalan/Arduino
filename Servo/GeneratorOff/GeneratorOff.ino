@@ -86,14 +86,14 @@ void loop()
     if(generatorOffBtn.isPressed() || debugButtonFromSerial == 4) 
     {
       Serial.println("The ""generatorOffBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY);
+      GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);
       debugButtonFromSerial = 0; 
     }
 
     if(generatorOffRemoteBtn.isPressed() || debugButtonFromSerial == 5) 
     {
       Serial.println("The ""generatorOffRemoteBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY);
+      GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */true);
       debugButtonFromSerial = 0;
     }
 
@@ -141,9 +141,12 @@ bool CorrectAngles()
   return res;
 }
 
-void GeneratorOff(int rotateDelay)
+void GeneratorOff(int rotateDelay, bool returnToPrevState)
 {
     AttachServos();
+
+    Settings prevState = settings;
+
     //Serial.print("Servo started "); Serial.println(angle);
     if(delay > 0)
     {
@@ -165,6 +168,16 @@ void GeneratorOff(int rotateDelay)
 
     servo.write(GENERATOR_OFF_ANGLE);
     servo2.write(GENERATOR_OFF_2_ANGLE);
+
+    PrintServosStatus();
+
+    if(returnToPrevState)
+    {      
+      delay(10000);
+      Serial.println("Return to previous state...");
+      servo.write(prevState.angle);
+      servo2.write(prevState.angle2);
+    }
 
     PrintServosStatus();
     DetachServos();

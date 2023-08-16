@@ -4,11 +4,11 @@
 // constants won't change
 
 //Angles
-const int GENERATOR_OFF_ANGLE = 0;
-const int GENERATOR_OFF_2_ANGLE = 180;
+const int GENERATOR_OFF_ANGLE = 0; //Up
+const int GENERATOR_OFF_2_ANGLE = 180; //Up
 
-const int INITIAL_ANGLE = 130; //70;
-const int INITIAL_2_ANGLE = 50; //110;
+const int INITIAL_ANGLE = 130; //Down //70; Center
+const int INITIAL_2_ANGLE = 50; //Down //110; Center
 
 const int START_ANGLE = 0;
 const int END_ANGLE = 130;
