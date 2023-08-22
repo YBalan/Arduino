@@ -17,7 +17,7 @@
 const int EEPROM_SETTINGS_ADDR = 10;
 
 //DebounceTime
-const int DebounceTime = 25;
+const int DebounceTime = 50;
 
 // variables will change:
 Servo servo;                        // create servo object to control a servo
@@ -43,13 +43,13 @@ void setup()
      
     Serial.println();
     Serial.println();
-    Serial.println("!!!! START fuck 1 !!!!");
+    Serial.println("!!!! START fuck 111 !!!!");
 
-    generatorOffBtn.setDebounceTime(DebounceTime); 
-    generatorOffRemoteBtn.setDebounceTime(DebounceTime); 
-    initialPosBtn.setDebounceTime(DebounceTime); 
-    rotateRightBtn.setDebounceTime(DebounceTime); 
-    rotateLeftBtn.setDebounceTime(DebounceTime); 
+    generatorOffBtn.setDebounceTime(DebounceTime);
+    generatorOffRemoteBtn.setDebounceTime(DebounceTime);
+    initialPosBtn.setDebounceTime(DebounceTime);
+    rotateRightBtn.setDebounceTime(DebounceTime);
+    rotateLeftBtn.setDebounceTime(DebounceTime);
 
     EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
 
@@ -87,13 +87,15 @@ void loop()
     {
       Serial.println("The ""generatorOffBtn"" is pressed");
       GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);
-      debugButtonFromSerial = 0; 
+      generatorOffBtn.resetCount();
+      debugButtonFromSerial = 0;
     }
 
     if(generatorOffRemoteBtn.isPressed() || debugButtonFromSerial == 5) 
     {
       Serial.println("The ""generatorOffRemoteBtn"" is pressed");
       GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */true);
+      generatorOffRemoteBtn.resetCount();
       debugButtonFromSerial = 0;
     }
 
@@ -101,6 +103,7 @@ void loop()
     {
       Serial.println("The ""initialPosfBtn"" is pressed");
       InitialPosition();
+      initialPosBtn.resetCount();
       debugButtonFromSerial = 0;
     }
 
@@ -108,6 +111,7 @@ void loop()
     {
       Serial.println("The ""rotateLeftBtn"" is pressed");
       RotateLeft();
+      rotateLeftBtn.resetCount();
       debugButtonFromSerial = 0;
     }
 
@@ -115,6 +119,7 @@ void loop()
     {
       Serial.println("The ""rotateRightBtn"" is pressed");
       RotateRight();
+      rotateRightBtn.resetCount();
       debugButtonFromSerial = 0;
     }   
 
@@ -170,6 +175,7 @@ void GeneratorOff(int rotateDelay, bool returnToPrevState)
     servo2.write(GENERATOR_OFF_2_ANGLE);
 
     PrintServosStatus();
+    SaveSettings();
 
     if(returnToPrevState)
     {      
@@ -177,7 +183,9 @@ void GeneratorOff(int rotateDelay, bool returnToPrevState)
       Serial.println("Return to previous state...");
       servo.write(prevState.angle);
       servo2.write(prevState.angle2);
-    }
+
+      settings = prevState;
+    }    
 
     PrintServosStatus();
     DetachServos();
@@ -269,6 +277,7 @@ void PrintServosStatus()
 
 void SaveSettings()
 {
+  Serial.println("Save Settings...");
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
 }
 
