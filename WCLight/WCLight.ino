@@ -55,10 +55,12 @@ void setup()
   BathBtn.setDebounceTime(DebounceTime);
   OffBtn.setDebounceTime(DebounceTime);
 
+  pinMode(WC_SW_PIN, INPUT_PULLUP);
   pinMode(WC_SW_PIN, OUTPUT);
+  pinMode(BATH_SW_PIN, INPUT_PULLUP);
   pinMode(BATH_SW_PIN, OUTPUT);
 
-  EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
+  //EEPROM.get(EEPROM_SETTINGS_ADDR, settings);  
   
   Serial.print("EEPROM: ");
   PrintStatus();
@@ -72,7 +74,7 @@ void loop()
   BathBtn.loop();
   OffBtn.loop();
 
-  if(OffBtn.isPressed())
+  if(OffBtn.isPressed() || debugButtonFromSerial == 1 || debugButtonFromSerial == OFF_BTN_PIN)
   {
     debugButtonFromSerial = 0;
     Serial.println("The ""OffBtn"" is pressed: ");
@@ -81,7 +83,7 @@ void loop()
     PrintStatus();
   }
 
-  if(WCBtn.isPressed() || debugButtonFromSerial == 1)
+  if(WCBtn.isPressed() || debugButtonFromSerial == WC_IN_PIN)
   {
     debugButtonFromSerial = 0;
     Serial.print("The ""WCBtn"" is pressed: "); Serial.println(WCBtn.getCount());
@@ -98,15 +100,16 @@ void loop()
     else
     {
       settings.WCCounter++;
-    }   
+    }
 
     WCBtn.resetCount();
     PrintStatus();    
     
   }
 
-  if(WCBtn.isReleased())
+  if(WCBtn.isReleased() || debugButtonFromSerial == -WC_IN_PIN)
   {
+    debugButtonFromSerial = 0;
     Serial.print("The ""WCBtn"" is released: "); Serial.println(WCBtn.getCount());
 
     settings.WCCounter++;
@@ -124,30 +127,48 @@ void loop()
     PrintStatus();
   }
 
-  if(BathBtn.isPressed() || debugButtonFromSerial == 2)
+  if(BathBtn.isPressed() || debugButtonFromSerial == BATH_IN_PIN)
   {
     debugButtonFromSerial = 0;
     Serial.print("The ""BathBtn"" is pressed: "); Serial.println(BathBtn.getCount());
         
-    if(settings.BathCounter++ >= 1)
+    if(settings.BathCounter == 0)
     {
       settings.BathState = settings.BathState == OFF ? ON : OFF;
+
       settings.BathCounter = 0;
 
       SaveSettings();
       Switch();
-    }   
+    }
+    else
+    {
+      settings.BathCounter++;
+    }
     
     BathBtn.resetCount();
     PrintStatus();
   }
 
-  // if(BathBtn.isReleased())
-  // {
-  //   Serial.print("The ""BathBtn"" is released: "); Serial.println(BathBtn.getCount());    
-  //   settings.BathCounter++;
-  //   PrintStatus();
-  // }
+  if(BathBtn.isReleased() || debugButtonFromSerial == -BATH_IN_PIN)
+  {
+    debugButtonFromSerial = 0;
+    Serial.print("The ""BathBtn"" is released: "); Serial.println(BathBtn.getCount());
+
+    settings.BathCounter++;
+
+    if(settings.BathCounter >= 3 || settings.BathCounter == 0)
+    {
+      settings.BathState = settings.BathState == OFF ? ON : OFF;
+      
+      settings.BathCounter = 0;
+
+      SaveSettings();
+      Switch();      
+    } 
+
+    PrintStatus();
+  }
 
   if(Serial.available() > 0)
   {
@@ -177,6 +198,6 @@ char * GetStatus(int state)
 
 void SaveSettings()
 {
-  Serial.println("Save Settings...");
-  EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
+  //Serial.println("Save Settings...");
+  //EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
 }
