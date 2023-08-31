@@ -7,6 +7,8 @@ enum PumpState
   ON = 0,
   OFF = 1,  
   CALIBRATING = 2,
+  MANUAL_ON = 3,
+  MANUAL_OFF = 4,
 };
 
 #endif

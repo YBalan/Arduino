@@ -14,8 +14,7 @@ struct Button
   }
 
 private:
-
-  ezButton _btn = -1;
+  ezButton _btn;
   unsigned long _startTicks = 0;
 
 public:
@@ -34,15 +33,29 @@ public:
   const bool isReleased()
   {
      if(_btn.isReleased())
-     {       
-       return true;
+     {      
+      return true;
      }
      return false;
   }
 
+  bool WaitUntilReleased()
+  {
+    while(true)
+    {
+      _btn.loop();
+      if(isReleased())
+      {
+        break;
+      }
+    }
+  }
+
   const unsigned long getTicks() { return millis() - _startTicks; }
 
-  const bool isLongPress(){ return getTicks() >= LongPressValue; }
+  const bool isLongPress(){ auto res = _startTicks != 0 && getTicks() >= LongPressValue; return res; }
+
+  void resetTimer(){ _startTicks = 0; }
 
   const int getCount(){ return _btn.getCount(); }
 
@@ -50,7 +63,9 @@ public:
 
   void resetCount(){ _btn.resetCount(); }
 
-  short getStateRaw(){ return _btn.getStateRaw(); }
+  //const short &getStateRaw(){ return _btn.getStateRaw(); }
+
+  const short &getState(){ return _btn.getState(); }
 };
 
 #endif
