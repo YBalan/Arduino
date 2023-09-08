@@ -1,7 +1,6 @@
 #ifndef Button_h
 #define Button_h
 
-#include "Shares.h"
 #include <ezButton.h>
 
 struct Button
@@ -55,7 +54,7 @@ public:
 
   const bool isLongPress(){ auto res = _startTicks != 0 && getTicks() >= LongPressValue; return res; }
 
-  void resetTimer(){ _startTicks = 0; }
+  void resetTicks(){ _startTicks = 0; }
 
   const int getCount(){ return _btn.getCount(); }
 
@@ -65,7 +64,7 @@ public:
 
   //const short &getStateRaw(){ return _btn.getStateRaw(); }
 
-  const short &getState(){ return _btn.getState(); }
+  const short getState(){ return _btn.getState(); }
 };
 
 #endif
