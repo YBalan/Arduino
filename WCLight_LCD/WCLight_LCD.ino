@@ -33,7 +33,10 @@ enum StatPage
 {
   Counts = 0,
   Max = 1,
-  Avg = 2,
+  Min = 2,
+  Avg = 3,
+  Med = 4,
+  Filled = 5,
   End,
 };
 
@@ -97,9 +100,10 @@ void setup()
   Switch(); 
   
   PrintToSerial(millis(), "", "");
-  PrintStatistics(Counts);
-  PrintStatistics(Max);
-  PrintStatistics(Avg);
+
+  #ifdef DEBUG
+  PrintStatisticDataAll();  
+  #endif
 
   ClearRow(0);
   ClearRow(1);
@@ -211,9 +215,7 @@ void loop()
     }
 
     Backlight();
-
     Switch();
-
     PrintStatus();    
   }
 
@@ -227,9 +229,7 @@ void loop()
     }
 
     Backlight();
-
-    Switch();
-    
+    Switch();    
     PrintStatus();
   }
 
@@ -237,12 +237,13 @@ void loop()
   {    
     Serial.println("The ""BathBtn"" is pressed: ");
         
-    btLight.Pressed();
+    if(btLight.Pressed())
+    {
+      SaveSettings();
+    }
 
     Backlight();
-
-    Switch();
-    SaveSettings();
+    Switch();    
     PrintStatus();
   }
 
@@ -250,12 +251,13 @@ void loop()
   {    
     Serial.println("The ""BathBtn"" is released: ");
 
-    btLight.Released();
+    if(btLight.Released())
+    {
+      SaveSettings();
+    }
 
     Backlight();
-
-    Switch();
-    SaveSettings();
+    Switch();    
     PrintStatus();
   }
 
@@ -267,16 +269,20 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 1)
   {
     PrintToSerial(millis(), "", "");
+    PrintStatisticDataAll();
   }
 
   if(debugButtonFromSerial == 2)
   {    
-    ResetTime();    
+    ResetTime();
+    SaveSettings();
   }
 
   if(debugButtonFromSerial == 3)
   {    
-    ResetStatistic();    
+    ResetStatistic();
+    PrintStatisticDataAll();
+    SaveSettings();
   }
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == -1)
@@ -384,12 +390,34 @@ void PrintStatistics(const StatPage &page)
       sprintf(btBuff, "B:Max:%s", Light::HumanizeShortTime(btLight.statistic.Max, buff2));
       break;
     }
+    case Min:
+    {
+      char buff1[10];
+      char buff2[10];
+      sprintf(wcBuff, "W:Min:%s", Light::HumanizeShortTime(wcLight.statistic.Min, buff1));
+      sprintf(btBuff, "B:Min:%s", Light::HumanizeShortTime(btLight.statistic.Min, buff2));
+      break;
+    }
     case Avg:
     {
       char buff1[10];
       char buff2[10];
       sprintf(wcBuff, "W:Avg:%s", Light::HumanizeShortTime(wcLight.statistic.Avg, buff1));
       sprintf(btBuff, "B:Avg:%s", Light::HumanizeShortTime(btLight.statistic.Avg, buff2));
+      break;
+    }
+    case Med:
+    {
+      char buff1[10];
+      char buff2[10];
+      sprintf(wcBuff, "W:Med:%s", Light::HumanizeShortTime(wcLight.statistic.Med, buff1));
+      sprintf(btBuff, "B:Med:%s", Light::HumanizeShortTime(btLight.statistic.Med, buff2));
+      break;
+    }
+    case Filled:
+    {      
+      sprintf(wcBuff, "W:Filled:%d/%d", wcLight.statistic.GetFilledCount(), STATISTIC_DATA_LENGHT);
+      sprintf(btBuff, "B:Filled:%d/%d", btLight.statistic.GetFilledCount(), STATISTIC_DATA_LENGHT);
       break;
     }
     case End:
@@ -407,6 +435,20 @@ void PrintStatistics(const StatPage &page)
 
   Serial.println(wcBuff);
   Serial.println(btBuff);  
+}
+
+void PrintStatisticDataAll()
+{
+  PrintStatistics(Counts);
+  PrintStatistics(Max);
+  PrintStatistics(Min);
+  PrintStatistics(Avg);
+  PrintStatistics(Med);
+  PrintStatistics(Filled);
+  wcLight.statistic.PrintData();
+  Serial.println();
+  btLight.statistic.PrintData();  
+  Serial.println();
 }
 
 void PrintToSerial(const unsigned long &current, const char *wcBuff, const char *btBuff)
@@ -443,9 +485,9 @@ void SaveSettings()
   offset += sizeof(Light::Settings);
 
   EEPROM.put(offset, wcLight.statistic);  
-  offset += sizeof(Light::Statistic);
+  offset += sizeof(Statistic);
   EEPROM.put(offset, btLight.statistic);
-  offset += sizeof(Light::Statistic);  
+  offset += sizeof(Statistic);  
 }
 
 void LoadSettings()
@@ -459,9 +501,9 @@ void LoadSettings()
   offset += sizeof(Light::Settings);  
 
   EEPROM.get(offset, wcLight.statistic);  
-  offset += sizeof(Light::Statistic);
+  offset += sizeof(Statistic);
   EEPROM.get(offset, btLight.statistic);
-  offset += sizeof(Light::Statistic);  
+  offset += sizeof(Statistic);  
 
   if(wcLight.settings.Count <= -1 || wcLight.settings.Counter <= -1 || btLight.settings.Count <= -1 || btLight.settings.Counter <= -1)
   {

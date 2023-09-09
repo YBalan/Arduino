@@ -1,6 +1,8 @@
 #ifndef Light_h
 #define Light_h
 
+#include "Statistic.h"
+
 // #define WeekMillis 604800000lu
 // #define DayMillis 86400000lu
 // #define HoursMillis 3600000lu
@@ -14,7 +16,7 @@
 #define OFF HIGH
 #define ON LOW
 
-#define IGNORE_LESS_THEN_SEC 30
+#define IGNORE_LESS_THEN_SEC 20
 
 class Light
 {
@@ -44,13 +46,7 @@ public:
 
   } settings;
 
-  struct Statistic
-  {
-    unsigned long Max = 0;
-    unsigned long Avg = 0;
-
-    void reset() {Max = 0; Avg = 0;}    
-  } statistic;
+  Statistic statistic;
 
 private:
   unsigned long _startTicks = 0;
@@ -96,9 +92,10 @@ public:
       unsigned long lastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;
       
       if(lastTime > IGNORE_LESS_THEN_SEC)
-      {
-        statistic.Max = lastTime > settings.LastTime ? lastTime : settings.LastTime;
-        statistic.Avg = statistic.Avg > 0 ? ceil((statistic.Avg + lastTime) / 2) : lastTime;
+      { 
+        statistic.Max = lastTime > statistic.Max ? lastTime : statistic.Max;
+        statistic.Min = lastTime < statistic.Min || statistic.Min == 0 ? lastTime : statistic.Min;
+        statistic.Calc(lastTime);        
         settings.LastTime = lastTime;
       }
 
