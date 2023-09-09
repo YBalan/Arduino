@@ -1,14 +1,12 @@
 
 #include <EEPROM.h>
 #include <avr/wdt.h>
-//#include <arduino-timer.h>
+
 #include <LiquidCrystal_I2C.h>
 #include "../../Shares/Button.h"
-
-
 #include "Light.h"
 
-//#define DEBUG
+#define RELEASE
 
 #define WC_IN_PIN 13
 #define WC_SW_PIN 3 /*White*/
@@ -29,20 +27,27 @@
 //DebounceTime
 #define DebounceTime 50
 
+const unsigned long ULONG_MAX = 0UL - 1UL;
+
+enum StatPage
+{
+  Counts = 0,
+  Max = 1,
+  Avg = 2,
+  End,
+};
+
+short currentPage = End;
+
 Light wcLight;
 Light btLight;
 
 ezButton WCBtn(WC_IN_PIN);
 ezButton BathBtn(BATH_IN_PIN);
-ezButton BacklightBtn(BACKLIGHT_PIN);
+Button BacklightBtn(BACKLIGHT_PIN);
 Button ResetBtn(RESET_BTN_PIN);
 
-//auto lcdPrintTimer = timer_create_default();
-
 unsigned long backlightStart = 0;
-
-bool UpdateStatus = false;
-bool BackLight = false;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 bool wcPressed = false;
@@ -85,17 +90,22 @@ void setup()
 
   LoadSettings(); 
 
-  wcLight.HandleState(/*fromStart:*/true);
-  btLight.HandleState(/*fromStart:*/true);
+  wcLight.CalculateTimeAndStatistics(/*fromStart:*/true);
+  btLight.CalculateTimeAndStatistics(/*fromStart:*/true);
 
   Backlight();
-  Switch();
+  Switch(); 
+  
+  PrintToSerial(millis(), "", "");
+  PrintStatistics(Counts);
+  PrintStatistics(Max);
+  PrintStatistics(Avg);
+
   ClearRow(0);
   ClearRow(1);
-  PrintStatus();  
+  PrintStatus();
 
-  EnableWatchDog();
-  //lcdPrintTimer.every(2000, PrintStatus);
+  EnableWatchDog();  
 }
 
 void EnableWatchDog()
@@ -109,9 +119,7 @@ void loop()
   WCBtn.loop();
   BathBtn.loop();
   ResetBtn.loop();
-  BacklightBtn.loop();
-
-  //lcdPrintTimer.tick();
+  BacklightBtn.loop();  
 
   if(!(millis() % SHOW_STATUS_DELAY))
   {      
@@ -127,10 +135,32 @@ void loop()
   if(BacklightBtn.isPressed() || IsDebugPressed(BACKLIGHT_PIN, BKLPressed))
   {
     Serial.println("The ""BacklightBtn"" is pressed: ");
-    if(backlightStart == 0)
+    //if(backlightStart == 0)
     {
       Backlight();
     }
+    
+    Serial.print("Current page before: "); Serial.println(currentPage);
+    if(currentPage >= Counts && currentPage < End)
+    {
+      currentPage += 1;
+      PrintStatistics(currentPage);
+    }
+    else
+    {
+      PrintStatus();
+    }
+    Serial.print("Current page after: "); Serial.println(currentPage);
+  }
+
+  if(BacklightBtn.isReleased() || IsDebugPressed(BACKLIGHT_PIN, BKLPressed))
+  {
+    if(BacklightBtn.isLongPress())
+    {
+      BacklightBtn.resetTicks();
+      currentPage = Counts;
+      PrintStatistics(currentPage);
+    }     
   }
 
   if(ResetBtn.isPressed() || IsDebugPressed(RESET_BTN_PIN, RSTPressed))
@@ -142,11 +172,12 @@ void loop()
     #ifdef DEBUG
     WCPressed = false;
     BTPressed = false;
+    BKLPressed = false;
     #endif
 
     Backlight(); 
     Switch();
-    PrintStatus();
+    PrintStatus(true);
     SaveSettings();
   }
 
@@ -157,12 +188,15 @@ void loop()
     {
       ResetBtn.resetTicks();
       Serial.println("The ""ResetBtn"" is long pressed: ");
+      Serial.println("Reset Time...");
+      ResetTime();
+
       Serial.println("Reset Statistic...");
       ResetStatistic();
 
       Backlight();
       Switch();
-      PrintStatus();
+      PrintStatus(true);
       SaveSettings();
     }
   }
@@ -171,12 +205,15 @@ void loop()
   {    
     Serial.println("The ""WCBtn"" is pressed: ");
     
-    wcLight.Pressed();
+    if(wcLight.Pressed())
+    {
+       SaveSettings();
+    }
 
     Backlight();
 
     Switch();
-    SaveSettings();
+
     PrintStatus();    
   }
 
@@ -184,12 +221,15 @@ void loop()
   {    
     Serial.println("The ""WCBtn"" is released: ");
 
-    wcLight.Released();
+    if(wcLight.Released())
+    {
+      SaveSettings();
+    }
 
     Backlight();
 
     Switch();
-    SaveSettings();
+    
     PrintStatus();
   }
 
@@ -224,6 +264,20 @@ void loop()
 
 void HandleDebugSerialCommands()
 {  
+  if(debugButtonFromSerial == 1)
+  {
+    PrintToSerial(millis(), "", "");
+  }
+
+  if(debugButtonFromSerial == 2)
+  {    
+    ResetTime();    
+  }
+
+  if(debugButtonFromSerial == 3)
+  {    
+    ResetStatistic();    
+  }
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == -1)
   {
@@ -251,12 +305,17 @@ void ResetState()
   btLight.resetState();
 }
 
+void ResetTime()
+{
+  wcLight.resetTime();
+  btLight.resetTime();
+}
+
 void ResetStatistic()
 {
   wcLight.resetStatistic();
   btLight.resetStatistic();
 }
-
 
 void PrintStatus(){PrintStatus(false);}
 void PrintStatus(const bool &fromTimer)
@@ -264,8 +323,7 @@ void PrintStatus(const bool &fromTimer)
   auto wcStart = wcLight.GetStartTicks();
   auto btStart = btLight.GetStartTicks();
 
-  UpdateStatus = wcStart > 0 || btStart > 0;
-  if(UpdateStatus || !fromTimer)
+  if((wcStart > 0 || btStart > 0) || !fromTimer)
   {
     unsigned long current = 0;
 
@@ -273,7 +331,7 @@ void PrintStatus(const bool &fromTimer)
     char btBuff[20];
 
     sprintf(wcBuff, "%s:%s|%s", wcLight.settings.State == ON ? "W" : "w", wcLight.GetTotalTime(), wcLight.GetLastTime(current));
-    sprintf(btBuff, "%s:%s|%s", btLight.settings.State == ON ? "B" : "b",btLight.GetTotalTime(), btLight.GetLastTime(current));
+    sprintf(btBuff, "%s:%s|%s", btLight.settings.State == ON ? "B" : "b", btLight.GetTotalTime(), btLight.GetLastTime(current));
 
     if(!fromTimer)
     {
@@ -302,13 +360,62 @@ void PrintStatus(const bool &fromTimer)
 
     #ifdef DEBUG
     current = millis();
-    char buffer[100];
-    sprintf(buffer, "WC:[%s][%d][%s]{c:%d}(time:%lu) BT:[%s][%d][%s]{c:%d}(time:%lu)"
-          , wcLight.GetStatus(), wcLight.settings.Count, wcBuff, wcLight.settings.Counter, current - wcLight.GetStartTicks()
-          , btLight.GetStatus(), btLight.settings.Count, btBuff, btLight.settings.Counter, current - btLight.GetStartTicks());
-    Serial.println(buffer);
+    PrintToSerial(current, wcBuff, btBuff);
     #endif
   }
+}
+
+void PrintStatistics(const StatPage &page)
+{
+  char wcBuff[20];
+  char btBuff[20];
+
+  switch(page)
+  {
+    case Counts:
+      sprintf(wcBuff, "W:Visits:%d", wcLight.settings.Count);
+      sprintf(btBuff, "B:Visits:%d", btLight.settings.Count);
+    break;
+    case Max:
+    {
+      char buff1[10];
+      char buff2[10];
+      sprintf(wcBuff, "W:Max:%s", Light::HumanizeShortTime(wcLight.statistic.Max, buff1));
+      sprintf(btBuff, "B:Max:%s", Light::HumanizeShortTime(btLight.statistic.Max, buff2));
+      break;
+    }
+    case Avg:
+    {
+      char buff1[10];
+      char buff2[10];
+      sprintf(wcBuff, "W:Avg:%s", Light::HumanizeShortTime(wcLight.statistic.Avg, buff1));
+      sprintf(btBuff, "B:Avg:%s", Light::HumanizeShortTime(btLight.statistic.Avg, buff2));
+      break;
+    }
+    case End:
+      PrintStatus();
+      return;    
+    default:
+      PrintStatus();
+      return;
+  }
+
+  ClearRow(0);
+  lcd.print(wcBuff);
+  ClearRow(1);
+  lcd.print(btBuff);
+
+  Serial.println(wcBuff);
+  Serial.println(btBuff);  
+}
+
+void PrintToSerial(const unsigned long &current, const char *wcBuff, const char *btBuff)
+{
+  char buffer[100];
+  sprintf(buffer, "WC:[%s][%d][%s]{c:%d}(time:%lu) BT:[%s][%d][%s]{c:%d}(time:%lu)"
+        , wcLight.GetStatus(), wcLight.settings.Count, wcBuff, wcLight.settings.Counter, current - wcLight.GetStartTicks()
+        , btLight.GetStatus(), btLight.settings.Count, btBuff, btLight.settings.Counter, current - btLight.GetStartTicks());
+  Serial.println(buffer);
 }
 
 void ClearRow(const short &row)
@@ -327,26 +434,56 @@ void Backlight()
 void SaveSettings()
 {
   Serial.println("Save Settings...");
-  EEPROM.put(EEPROM_SETTINGS_ADDR, wcLight.settings);
-  EEPROM.put(EEPROM_SETTINGS_ADDR + sizeof(Light::Settings), btLight.settings);
+
+  short offset = EEPROM_SETTINGS_ADDR;
+  
+  EEPROM.put(offset, wcLight.settings);  
+  offset += sizeof(Light::Settings);
+  EEPROM.put(offset, btLight.settings);
+  offset += sizeof(Light::Settings);
+
+  EEPROM.put(offset, wcLight.statistic);  
+  offset += sizeof(Light::Statistic);
+  EEPROM.put(offset, btLight.statistic);
+  offset += sizeof(Light::Statistic);  
 }
 
 void LoadSettings()
 {
   Serial.println("Load Settings...");
-  EEPROM.get(EEPROM_SETTINGS_ADDR, wcLight.settings);
-  EEPROM.get(EEPROM_SETTINGS_ADDR + sizeof(Light::Settings), btLight.settings);
+
+  short offset = EEPROM_SETTINGS_ADDR;  
+  EEPROM.get(offset, wcLight.settings);  
+  offset += sizeof(Light::Settings);  
+  EEPROM.get(offset, btLight.settings);  
+  offset += sizeof(Light::Settings);  
+
+  EEPROM.get(offset, wcLight.statistic);  
+  offset += sizeof(Light::Statistic);
+  EEPROM.get(offset, btLight.statistic);
+  offset += sizeof(Light::Statistic);  
 
   if(wcLight.settings.Count <= -1 || wcLight.settings.Counter <= -1 || btLight.settings.Count <= -1 || btLight.settings.Counter <= -1)
   {
     Serial.println("Settings corrupted...");
 
     wcLight.resetState();
-    wcLight.resetStatistic();
+    wcLight.resetTime();
 
     btLight.resetState();
-    btLight.resetStatistic();
+    btLight.resetTime();
   }  
+
+  if(wcLight.statistic.Max == ULONG_MAX || wcLight.statistic.Avg == ULONG_MAX)
+  {
+    Serial.println("WC Statistic corrupted...");
+    wcLight.resetStatistic();
+  }
+  if(btLight.statistic.Max == ULONG_MAX || btLight.statistic.Avg == ULONG_MAX)
+  {
+    Serial.println("BT Statistic corrupted...");
+    btLight.resetStatistic();
+  }
 }
 
 const bool IsDebugPressed(const short &value, bool &pressedState)

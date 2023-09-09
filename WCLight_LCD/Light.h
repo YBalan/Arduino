@@ -14,6 +14,8 @@
 #define OFF HIGH
 #define ON LOW
 
+#define IGNORE_LESS_THEN_SEC 30
+
 class Light
 {
 public:
@@ -33,7 +35,7 @@ public:
         Counter = 0;      
       }
 
-      void resetStatistic()
+      void resetTime()
       {
         Count = 0;      
         LastTime = 0;      
@@ -41,6 +43,14 @@ public:
       }
 
   } settings;
+
+  struct Statistic
+  {
+    unsigned long Max = 0;
+    unsigned long Avg = 0;
+
+    void reset() {Max = 0; Avg = 0;}    
+  } statistic;
 
 private:
   unsigned long _startTicks = 0;
@@ -70,10 +80,11 @@ public:
   }  
 
   void resetState() { settings.resetState(); _startTicks = 0; }
-  void resetStatistic() { settings.resetStatistic(); }
+  void resetTime() { settings.resetTime(); }
+  void resetStatistic() { statistic.reset(); }
 
-  void HandleState(){HandleState(false);}
-  void HandleState(const bool &fromStart)
+  void CalculateTimeAndStatistics(){CalculateTimeAndStatistics(false);}
+  void CalculateTimeAndStatistics(const bool &fromStart)
   {
     if(settings.State == ON)
     {
@@ -82,10 +93,18 @@ public:
     }
     if(settings.State == OFF)
     {    
-      settings.LastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;      
+      unsigned long lastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;
+      
+      if(lastTime > IGNORE_LESS_THEN_SEC)
+      {
+        statistic.Max = lastTime > settings.LastTime ? lastTime : settings.LastTime;
+        statistic.Avg = statistic.Avg > 0 ? ceil((statistic.Avg + lastTime) / 2) : lastTime;
+        settings.LastTime = lastTime;
+      }
+
       if(!fromStart)
       {
-        settings.TotalTime += settings.LastTime;
+        settings.TotalTime += lastTime;
       }
       _startTicks = 0;     
     }
@@ -93,25 +112,30 @@ public:
     HumanizeTotalTime(settings.TotalTime, _totalTimeStatus);
   }
 
-  void Pressed()
+  const bool Pressed()
   {
+    bool switched = false;
     if(settings.Counter == 0)
     {
       settings.State = settings.State == OFF ? ON : OFF;
       
       settings.Counter = 0;
 
-      HandleState();
+      CalculateTimeAndStatistics();
+
+      switched = true;
     } 
     else
     {
       settings.Counter++;
     }
-    
+    return switched;
   }
 
-  void Released()
+  const bool Released()
   {
+    bool switched = false;
+
     settings.Counter++;
 
     if(settings.Counter >= 3 || settings.Counter == 0)
@@ -120,25 +144,14 @@ public:
       
       settings.Counter = 0;
 
-      HandleState();
-    }
+      CalculateTimeAndStatistics();
 
-    // settings.Counter++; 
-
-    // if(settings.Counter == 1 || settings.Counter >= 2)
-    // {
-    //   settings.State = settings.State == OFF ? ON : OFF;      
-    // }    
-
-    // if(settings.Counter >= 2)
-    // {
-    //   settings.Counter = 0;
-    // }   
-
-    // HandleState();    
+      switched = true;
+    } 
+    return switched;  
   }
 
-private:
+public:
   static const char * HumanizeShortTime(const unsigned long &timeSec, char *buff){return HumanizeTime(timeSec, buff, true);}
   static const char * HumanizeTotalTime(const unsigned long &timeSec, char *buff){return HumanizeTime(timeSec, buff, false);}
   static const char * HumanizeTime(const unsigned long &timeSec, char *buff, const bool &shortTime)
