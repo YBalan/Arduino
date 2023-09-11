@@ -3,20 +3,30 @@
 
 #include "PumpState.h"
 
+#define NO_WATER_CODE               "NOW"
+#define TIMEOUT_CODE                "TOT"
+#define CALIBRATING_REQUIRED_CODE   "CAL"
+
+#define SENSOR_LOST_CODE            "LOS"
+#define SENSOR_NOT_USED_CODE        "NOS"
+#define SENSOR_MAX_VALUE_CODE       "Dry"
+#define SENSOR_MIN_VALUE_CODE       "Wet"
+
+
 const bool DoNotUseEnoughLevel = true;
 
-const short DefaultWatchDogForPumpInSecs = 10;
-const int DefaultWatchDogForPump = 10;//1000 * 2 * DefaultWatchDogForPumpInSecs;
+const unsigned short DefaultWatchDogForPumpInSecs = 10;
+const unsigned short DefaultWatchDogForPump = 10;//1000 * 2 * DefaultWatchDogForPumpInSecs;
 
-const short DefaultWateringRequiredLevel = 800;
-const short DefaultWateringEnoughLevel = DoNotUseEnoughLevel ? 300 : 300;
+#define DEFAULT_WATERING_REQUIRED_LEVEL 800
+const unsigned short DefaultWateringEnoughLevel = DoNotUseEnoughLevel ? 300 : 300;
 
-const unsigned long AdditionalTimeout = DoNotUseEnoughLevel ? 0 : 2000; //TODO: define watchdog additional time
+const unsigned short AdditionalTimeout = DoNotUseEnoughLevel ? 0 : 2000; //TODO: define watchdog additional time
 
 const unsigned long ULONG_MAX = 0UL - 1UL;
-const short SensorMaxValue = 1023;
+#define SENSOR_VALUE_MAX 1023
 
-const short DefaultSensorNotChangedCount = 3;
+#define SENSOR_DOES_NOT_CHANGED_ATTEMPTS 3
 const short SensorChangesLevel = 10;
 
 struct Pump
@@ -29,14 +39,14 @@ public:
     short WateringRequired = -1;
     short WateringEnough = -1;
 
-    short PumpState = OFF;
-    short SensorNotChangedCount = 0;
+    unsigned short PumpState = OFF;
+    unsigned short SensorNotChangedCount = 0;
 
     void resetSettings()
     {
       WatchDog = DefaultWatchDogForPump;
       Count = 0;
-      WateringRequired = DefaultWateringRequiredLevel;
+      WateringRequired = DEFAULT_WATERING_REQUIRED_LEVEL;
       WateringEnough = DefaultWateringEnoughLevel;      
     }
     void resetState()
@@ -116,6 +126,8 @@ public:
       Settings.WatchDog = time + AdditionalTimeout; //TODO: define watchdog additional time      
       Settings.WateringRequired = _sensorValueStart;
       Settings.WateringEnough = DoNotUseEnoughLevel ? DefaultWateringEnoughLevel : _sensorValueEnd;
+      Settings.Count = 0;
+      Settings.SensorNotChangedCount = 0;
     }
 
     Settings.PumpState = HandleSensorState(state);
@@ -147,8 +159,8 @@ public:
     if(isSensorUsed() && isOff())
     {
       return DoNotUseEnoughLevel 
-        ? _sensorValue > Settings.WateringRequired && _sensorValue < SensorMaxValue
-        : _sensorValue > Settings.WateringRequired && _sensorValue < SensorMaxValue;
+        ? _sensorValue > Settings.WateringRequired && _sensorValue < SENSOR_VALUE_MAX
+        : _sensorValue > Settings.WateringRequired && _sensorValue < SENSOR_VALUE_MAX;
     }
     return false;
   }
@@ -163,7 +175,7 @@ public:
     if(isSensorUsed() && isOn())
     {
       return 
-      _sensorValue == SensorMaxValue ||
+      _sensorValue == SENSOR_VALUE_MAX ||
       _sensorValue <= Settings.WateringEnough && _sensorValue > 0;
     }
 
@@ -173,7 +185,7 @@ public:
   const bool isSensorUsed() const
   {
     return DoNotUseEnoughLevel 
-        ? Settings.WateringRequired > 0 && Settings.WateringRequired <= SensorMaxValue
+        ? Settings.WateringRequired > 0 && Settings.WateringRequired < SENSOR_VALUE_MAX
         : Settings.WateringEnough < Settings.WateringRequired;
   }
 
@@ -205,6 +217,56 @@ public:
     }
     Serial.println();
   }
+    
+  const char * const GetShortStatus(const bool &hasWater, char *buff) const
+  {
+    char sensorValueBuff[5] = SENSOR_LOST_CODE;
+    char statusBuff[5] = TIMEOUT_CODE;
+    bool showCount = true;
+    
+    if(_sensorValue < SENSOR_VALUE_MAX && _sensorValue >= 0)
+    {
+      if(_sensorValue >= (1023 - SensorChangesLevel))
+      {
+        sprintf(sensorValueBuff, SENSOR_MAX_VALUE_CODE);
+      }
+      else if(_sensorValue <= (0 + SensorChangesLevel))
+      {
+        sprintf(sensorValueBuff, SENSOR_MIN_VALUE_CODE);
+      }
+      else
+      {
+        sprintf(sensorValueBuff, "%d", ToPct(_sensorValue));
+      }
+    }    
+
+    if(Settings.PumpState != TIMEOUT_OFF)  
+    {
+      if(Settings.WatchDog == DefaultWatchDogForPumpInSecs)
+      {
+        sprintf(statusBuff, CALIBRATING_REQUIRED_CODE);
+        showCount = false;
+      }
+      else
+      {
+        showCount = isSensorUsed();
+        if(!hasWater)
+        {
+          sprintf(statusBuff, NO_WATER_CODE);
+        }
+        else
+        {            
+          showCount ? sprintf(statusBuff, "%d", ToPct(Settings.WateringRequired)) : sprintf(statusBuff, SENSOR_NOT_USED_CODE);          
+        }
+      }
+    }
+
+    showCount 
+      ? sprintf(buff, "%s/%s:%d", sensorValueBuff, statusBuff, Settings.Count)
+      : sprintf(buff, "%s/%s", sensorValueBuff, statusBuff);
+    
+    return buff;
+  }
 
 private:
   const PumpState HandleSensorState(const PumpState &state)
@@ -220,13 +282,20 @@ private:
         Settings.SensorNotChangedCount = 0;
       }
 
-      if(Settings.SensorNotChangedCount >= DefaultSensorNotChangedCount)
+      if(Settings.SensorNotChangedCount >= SENSOR_DOES_NOT_CHANGED_ATTEMPTS)
       {        
         return SENSOR_OFF;
       }
     }
     
     return state;
+  }
+
+public:
+  static const short ToPct(const short &value)
+  {
+    //map(value, fromLow, fromHigh, toLow, toHigh)
+    return map(value, 0, 1022, 0, 99);
   }
 };
 

@@ -88,19 +88,19 @@ public:
       settings.Count += 1;
     }
     if(settings.State == OFF)
-    {    
-      unsigned long lastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;
-      
-      if(lastTime > IGNORE_LESS_THEN_SEC)
-      { 
-        statistic.Max = lastTime > statistic.Max ? lastTime : statistic.Max;
-        statistic.Min = lastTime < statistic.Min || statistic.Min == 0 ? lastTime : statistic.Min;
-        statistic.Calc(lastTime);        
-        settings.LastTime = lastTime;
-      }
-
+    {  
       if(!fromStart)
-      {
+      {  
+        unsigned long lastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;
+        
+        if(lastTime > IGNORE_LESS_THEN_SEC)
+        { 
+          statistic.Max = lastTime > statistic.Max ? lastTime : statistic.Max;
+          statistic.Min = lastTime < statistic.Min || statistic.Min == 0 ? lastTime : statistic.Min;
+          statistic.Calc(lastTime);        
+          settings.LastTime = lastTime;
+        }
+      
         settings.TotalTime += lastTime;
       }
       _startTicks = 0;     
