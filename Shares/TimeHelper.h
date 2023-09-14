@@ -137,7 +137,7 @@ namespace Helpers
     }
     static const char * const ToString(const unsigned short &source, const bool &showZeros, char *buff)
     {
-      sprintf(buff, "%s%d", source < 10 && showZeros ? "0" : "", source);
+      sprintf(buff, showZeros ? "%02d" : "%d", source);
       return buff;
     }
   };

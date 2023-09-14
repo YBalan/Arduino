@@ -21,6 +21,8 @@
 #define SHOW_STATUS_DELAY 1000u
 #define BACKLIGHT_DELAY 30000u
 
+#define DOOR_OPEN_MORE_THEN 60000u
+
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 10
 
@@ -45,8 +47,8 @@ short currentPage = End;
 Light wcLight;
 Light btLight;
 
-ezButton WCBtn(WC_IN_PIN);
-ezButton BathBtn(BATH_IN_PIN);
+Button WCBtn(WC_IN_PIN);
+Button BathBtn(BATH_IN_PIN);
 Button BacklightBtn(BACKLIGHT_PIN);
 Button ResetBtn(RESET_BTN_PIN);
 
@@ -123,14 +125,16 @@ void loop()
   WCBtn.loop();
   BathBtn.loop();
   ResetBtn.loop();
-  BacklightBtn.loop();  
+  BacklightBtn.loop();
 
-  if(!(millis() % SHOW_STATUS_DELAY))
+  const auto currentTicks = millis();
+
+  if(!(currentTicks % SHOW_STATUS_DELAY))
   {      
     PrintStatus(/*fromTimer:*/true);    
   }
 
-  if(backlightStart > 0 && millis() - backlightStart >= BACKLIGHT_DELAY)
+  if(backlightStart > 0 && currentTicks - backlightStart >= BACKLIGHT_DELAY)
   {      
     lcd.noBacklight();
     backlightStart = 0;
@@ -251,6 +255,12 @@ void loop()
   {    
     Serial.println("The ""BathBtn"" is released: ");
 
+    if(BathBtn.getTicks() >= DOOR_OPEN_MORE_THEN )
+    {
+      btLight.setToOff();
+      BathBtn.resetTicks();
+    }
+
     if(btLight.Released())
     {
       SaveSettings();
@@ -303,6 +313,7 @@ void HandleDebugSerialCommands()
 
 
     Serial.println(Helpers::Time::HumanizeTime(5, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(5, buff, true));
     Serial.println(Helpers::Time::HumanizeTime(59, buff, false));
   }
 
@@ -348,8 +359,8 @@ void ResetStatistic()
 void PrintStatus(){PrintStatus(false);}
 void PrintStatus(const bool &fromTimer)
 { 
-  auto &wcStart = wcLight.GetStartTicks();
-  auto &btStart = btLight.GetStartTicks();
+  const auto &wcStart = wcLight.GetStartTicks();
+  const auto &btStart = btLight.GetStartTicks();
 
   if((wcStart > 0 || btStart > 0) || !fromTimer)
   {
@@ -552,28 +563,28 @@ void LoadSettings()
 
 const bool IsDebugPressed(const short &value, bool &pressedState)
 {
-  #ifdef DEBUG
+  //#ifdef DEBUG
   if(debugButtonFromSerial == value && !pressedState)
   {
     pressedState = true;
     debugButtonFromSerial = 0;
     return true;
   }
-  #endif
+  //#endif
   
   return false;  
 }
 
 const bool IsDebugReleased(const short &value, bool &pressedState)
 {
-  #ifdef DEBUG
+  //#ifdef DEBUG
   if(debugButtonFromSerial == value && pressedState)
   {
     pressedState = false;
     debugButtonFromSerial = 0;
     return true;
   }
-  #endif
+  //#endif
   
   return false;  
 }

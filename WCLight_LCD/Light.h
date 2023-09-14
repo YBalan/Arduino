@@ -35,6 +35,11 @@ public:
         TotalTime = 0;      
       }
 
+      void setToOff()
+      {
+        Counter = 3;
+      }
+
   } settings;
 
   Statistic statistic;
@@ -69,6 +74,7 @@ public:
   void resetState() { settings.resetState(); _startTicks = 0; }
   void resetTime() { settings.resetTime(); }
   void resetStatistic() { statistic.reset(); }
+  void setToOff() { settings.setToOff(); }
 
   void CalculateTimeAndStatistics(){CalculateTimeAndStatistics(false);}
   void CalculateTimeAndStatistics(const bool &fromStart)
