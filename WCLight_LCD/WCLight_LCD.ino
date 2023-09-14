@@ -284,6 +284,28 @@ void HandleDebugSerialCommands()
     PrintStatisticDataAll();
     SaveSettings();
   }
+
+  //Unit Test Helpers::Time::HumanizeTime
+  if(debugButtonFromSerial == 10)
+  {
+    char buff[10];
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + MonthSecs * 2, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + MonthSecs * 2, buff, true));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + WeekSecs * 3, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + DaySecs * 4, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + HourSecs * 5, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + MinuteSecs * 6, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(YearSecs * 2 + 31, buff, false));
+
+    Serial.println(Helpers::Time::HumanizeTime(WeekSecs * 2 + DaySecs * 4, buff, false));
+    
+    Serial.println(Helpers::Time::HumanizeTime(HourSecs * 2 + 30, buff, false));
+
+
+    Serial.println(Helpers::Time::HumanizeTime(5, buff, false));
+    Serial.println(Helpers::Time::HumanizeTime(59, buff, false));
+  }
+
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == -1)
   {
@@ -326,8 +348,8 @@ void ResetStatistic()
 void PrintStatus(){PrintStatus(false);}
 void PrintStatus(const bool &fromTimer)
 { 
-  auto wcStart = wcLight.GetStartTicks();
-  auto btStart = btLight.GetStartTicks();
+  auto &wcStart = wcLight.GetStartTicks();
+  auto &btStart = btLight.GetStartTicks();
 
   if((wcStart > 0 || btStart > 0) || !fromTimer)
   {

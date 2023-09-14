@@ -1,17 +1,8 @@
 #ifndef Light_h
 #define Light_h
 
+#include "../../Shares/TimeHelper.h"
 #include "Statistic.h"
-
-// #define WeekMillis 604800000lu
-// #define DayMillis 86400000lu
-// #define HoursMillis 3600000lu
-// #define MinuteMillis 60000lu
-
-#define WeekSecs 604800lu
-#define DaySecs 86400lu
-#define HoursSecs 3600lu
-#define MinuteSecs 60lu
 
 #define OFF HIGH
 #define ON LOW
@@ -55,12 +46,12 @@ private:
 
 public:
 
-  const char *GetLastTime(unsigned long &current)
+  const char * const GetLastTime(unsigned long &current)
   {
       return _startTicks > 0 && current > 0 ? HumanizeShortTime((current - _startTicks) / 1000, _lastTimeStatus) : _lastTimeStatus;
   }
 
-  const char *GetTotalTime() const
+  const char * const GetTotalTime() const
   {
       return _totalTimeStatus;
   }
@@ -70,7 +61,7 @@ public:
     return _startTicks;
   }
 
-  const char *GetStatus() const
+  const char * const GetStatus() const
   {
     return settings.State == ON ? "ON" : "OFF";
   }  
@@ -105,7 +96,7 @@ public:
       }
       _startTicks = 0;     
     }
-    HumanizeTotalTime(settings.LastTime, _lastTimeStatus);
+    HumanizeShortTime(settings.LastTime, _lastTimeStatus);
     HumanizeTotalTime(settings.TotalTime, _totalTimeStatus);
   }
 
@@ -149,68 +140,8 @@ public:
   }
 
 public:
-  static const char * HumanizeShortTime(const unsigned long &timeSec, char *buff){return HumanizeTime(timeSec, buff, true);}
-  static const char * HumanizeTotalTime(const unsigned long &timeSec, char *buff){return HumanizeTime(timeSec, buff, false);}
-  static const char * HumanizeTime(const unsigned long &timeSec, char *buff, const bool &shortTime)
-  {  
-    char dbuff1[3];
-    char dbuff2[3]; 
-    if(!shortTime)
-    {      
-      {
-        short weeks = (short)(timeSec / WeekSecs);
-        if(weeks > 0)
-        {          
-          //Serial.print("weeks: "); Serial.println(weeks);
-          unsigned long tmp = (unsigned long)weeks * WeekSecs;
-          short days = (short)((timeSec - tmp) / DaySecs);
-          sprintf(buff, "%sw:%sd", ToString(weeks, dbuff1), ToString(days, dbuff2));
-          return buff;
-        }
-      } 
-      {
-        short days = (short)(timeSec / DaySecs);
-        if(days > 0)
-        {
-          //Serial.print("days: "); Serial.println(days);
-          unsigned long tmp = (unsigned long)days * DaySecs;
-          short hours = (short)((timeSec - tmp) / HoursSecs);          
-          sprintf(buff, "%sd:%sh", ToString(days, dbuff1), ToString(hours, dbuff2));
-          return buff;
-        }
-      }
-    }
-    {
-      short hours = (short)(timeSec / HoursSecs);
-      if(hours > 0)
-      {
-        //Serial.print("hours: "); Serial.println(hours);
-        unsigned long tmp = (unsigned long)hours * HoursSecs;
-        short mins = (short)((timeSec - tmp) / MinuteSecs);        
-        sprintf(buff, "%sh:%sm", ToString(hours, dbuff1), ToString(mins, dbuff2));
-        return buff;
-      }
-    }
-    {
-      short mins = (timeSec / MinuteSecs);
-      if(mins > 0)
-      {
-        //Serial.print("mins: "); Serial.print(mins); Serial.print(" time:"); Serial.println(time);
-        unsigned long tmp = (unsigned long)mins * MinuteSecs;
-        short secs = (short)(timeSec - tmp);
-        sprintf(buff, "%dm:%ds", mins, secs);
-        return buff;
-      }
-    }
-
-    sprintf(buff, "%lus", timeSec);  
-    return buff;  
-  }
-private:  
-  static const char *ToString(const short &source, char *buff)
-  {
-    sprintf(buff, "%s%d", source < 10 ? "0" : "", source);
-    return buff;
-  }
+  static const char * const HumanizeShortTime(const unsigned long &timeSec, char *buff){return Helpers::Time::HumanizeTime(timeSec, buff, true);}
+  static const char * const HumanizeTotalTime(const unsigned long &timeSec, char *buff){return Helpers::Time::HumanizeTime(timeSec, buff, false);} 
+  
 };
 #endif
