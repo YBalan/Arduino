@@ -274,7 +274,10 @@ public:
         }
         else
         {            
-          showCount ? sprintf(statusBuff, "%d", ToPct(Settings.WateringRequired, shortStatus)) : sprintf(statusBuff, shortStatus ? SENSOR_NOT_USED_CODE : SENSOR_NOT_USED_LCODE);          
+          showCount 
+            ? sprintf(statusBuff, "%d", ToPct(Settings.WateringRequired, shortStatus)) 
+            //: sprintf(statusBuff, shortStatus ? SENSOR_NOT_USED_CODE : SENSOR_NOT_USED_LCODE);
+            : sprintf(statusBuff, shortStatus ? (isOn() ? "On" : "Of") : SENSOR_NOT_USED_LCODE);          
         }
       }
     }
