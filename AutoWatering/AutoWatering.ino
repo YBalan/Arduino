@@ -29,6 +29,9 @@ short currentPumpToShowFullStatus = -1;
 #define WATER_SENSOR_PIN 2
 Button waterSensor(WATER_SENSOR_PIN);
 
+#define SHEDULE_WATERING_PIN 8
+ezButton scheduleWatering(SHEDULE_WATERING_PIN);
+
 #define BACKLIGHT_DELAY 50000
 unsigned long backlightStartTicks = 0;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -78,7 +81,7 @@ void setup()
 
   LoadSettings();
   //ResetSettings();  
-  //SerialPrintPumpsStatus(millis());
+  DebugSerialPrintPumpsStatus(millis());  
 
   startShowSensorStatusTicks = millis();
 
@@ -141,6 +144,7 @@ void loop()
     {
       Serial.println("!!!! NO Water !!!!");
       SetAllPumps(PumpState::OFF);
+      currentPumpToShowFullStatus = -1;
     }
 
     digitalWrite(WATER_ALARM_PIN, HIGH);
@@ -152,9 +156,9 @@ void loop()
     if(!HasWater)
     {
       Serial.println("Has Water");
-      ResetPumpStates();
+      //ResetPumpStates();
       
-      //SerialPrintPumpsStatus(current);
+      DebugSerialPrintPumpsStatus(current);
     }
     
     digitalWrite(WATER_ALARM_PIN, LOW);
@@ -180,8 +184,14 @@ void loop()
       Serial.println("Hard reset settings...");
       ResetSettings();
       
-      //SerialPrintPumpsStatus(current);      
+      DebugSerialPrintPumpsStatus(current);      
     }
+  }
+
+  if(scheduleWatering.isReleased() || debugButtonFromSerial == 9)
+  {
+    Serial.println("Schedule Watering pressed...");
+    ResetPumpStates();
   }
   
   for (short pumpIdx = 0; pumpIdx < PUMPS_COUNT; pumpIdx++) 
@@ -192,9 +202,11 @@ void loop()
       pumps[pumpIdx].End(TIMEOUT_OFF);
 
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
+
+      SaveSettings();
     }
 
-    if(HasWater && pumps[pumpIdx].IsWateringRequired())
+    if(pumps[pumpIdx].IsWateringRequired() && HasWater)
     {
       BacklightOn();
 
@@ -206,12 +218,14 @@ void loop()
       SaveSettings();
     }
 
-    if(HasWater && pumps[pumpIdx].IsWateringEnough())
+    if(pumps[pumpIdx].IsWateringEnough() && HasWater)
     {
       Serial.print(pumpIdx + 1); Serial.print("   ENOUGH: ");      
       pumps[pumpIdx].End();
       
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
+
+      SaveSettings();
     }
 
     if((buttons[pumpIdx].isPressed()) 
@@ -286,11 +300,11 @@ void HandleDebugSerialCommands()
     SerialPrintPumpsStatus(millis());
   }
 
-  if(debugButtonFromSerial == 9)
-  {
-    ResetCounts();    
-    SerialPrintPumpsStatus(millis());
-  }
+  // if(debugButtonFromSerial == 9)
+  // {
+  //   ResetCounts();    
+  //   SerialPrintPumpsStatus(millis());
+  // }
 
   if(debugButtonFromSerial == 10)
   {
@@ -322,7 +336,7 @@ void DebugSerialPrintPumpStatus(const unsigned short &pumpIdx, const unsigned lo
   char serialBuff[200];
   Serial.println(pumps[pumpIdx].PrintStatus(/*showDebugInfo:*/showDebugInfo, currentTicks, serialBuff));
   #else
-  Serial.println(GetState(pumps[pumpIdx].getState()));
+  Serial.print(GetState(pumps[pumpIdx].getState())); Serial.print(" (wd:"); Serial.print(pumps[pumpIdx].Settings.WatchDog / 1000); Serial.println("s.)");
   #endif
 }
 
@@ -389,7 +403,15 @@ void SerialPrintPumpsStatus(const unsigned long &currentTicks)
   {
     char buff[200];
     Serial.println(pumps[i].PrintStatus(/*showDebugInfo:*/true, currentTicks, buff));
-  }
+  }  
+}
+
+void DebugSerialPrintPumpsStatus(const unsigned long &currentTicks)
+{   
+  for (short i = 0; i < PUMPS_COUNT; i++)
+  {
+    Serial.print(i + 1); Serial.print(" "); DebugSerialPrintPumpStatus(i, currentTicks, /*showDebugInfo:*/false);
+  }  
 }
 
 void SerialPrintSensorsStatus()
@@ -411,6 +433,12 @@ const char * const LcdPrintSensorStatus(const bool &hasWater, const short &curre
   char pumpBuff13[10];    
 
   lcd.clear();
+
+  if(!hasWater)
+  {
+    lcd.setCursor(0, 0);
+    lcd.print("No Water");
+  }  
 
   const bool shortStatus = currentPump <= -1 || currentPump >= PUMPS_COUNT;
   
@@ -453,6 +481,14 @@ const char * const LcdPrintSensorStatus(const bool &hasWater, const short &curre
 
       lcd.setCursor(0, 1);
       lcd.print(pumpBuff1);      
+    }
+    else
+    {
+      if(!hasWater)
+      {
+        lcd.setCursor(0, 0);
+        lcd.print("No Water");
+      }  
     }
   }
 

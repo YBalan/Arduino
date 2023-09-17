@@ -4,13 +4,13 @@
 #include "PumpState.h"
 
 #define NO_WATER_CODE               "NW"
-#define TIMEOUT_CODE                "TO"
+#define TIMEOUT_CODE                "T"
 #define CALIBRATING_REQUIRED_CODE   "CL"
 
-#define SENSOR_LOST_CODE            "LS"
+#define SENSOR_LOST_CODE            "L"
 #define SENSOR_NOT_USED_CODE        "NS"
-#define SENSOR_MAX_VALUE_CODE       "Dr"
-#define SENSOR_MIN_VALUE_CODE       "Wt"
+#define SENSOR_MAX_VALUE_CODE       "D"
+#define SENSOR_MIN_VALUE_CODE       "W"
 
 #define NO_WATER_LCODE               "NoW"
 #define TIMEOUT_LCODE                "ToT"
@@ -140,7 +140,7 @@ public:
       Settings.SensorNotChangedCount = 0;
     }
 
-    Settings.PumpState = HandleSensorState(state);
+    Settings.PumpState = HandleSensorState(state);    
 
     _startTiks = 0;
     digitalWrite(_pumpPin, OFF);
@@ -165,7 +165,7 @@ public:
 
     if(IsCalibratingRequired()) { return false; }
     if(Settings.PumpState == TIMEOUT_OFF && !DO_NOT_USE_ENOUGH_LOW_LEVEL){ return false; }
-    if(Settings.PumpState == MANUAL_ON) { return false; }
+    if(Settings.PumpState == MANUAL_ON) { return false; }    
 
     if(isSensorUsed() && isOff())
     {
@@ -173,6 +173,12 @@ public:
         ? _sensorValue > Settings.WateringRequired && _sensorValue < SENSOR_VALUE_MAX
         : _sensorValue > Settings.WateringRequired && _sensorValue < SENSOR_VALUE_MAX;
     }
+
+    if(!isSensorUsed() && isOff() && Settings.PumpState != TIMEOUT_OFF && Settings.PumpState != MANUAL_OFF)
+    {
+      return true;
+    }
+
     return false;
   }
 
@@ -273,7 +279,8 @@ public:
       }
     }
     
-    sprintf(buff, showCount ? "%s/%s:%d" : "%s/%s", sensorValueBuff, statusBuff, Settings.Count);      
+    showCount = showCount || !shortStatus;
+    sprintf(buff, showCount ? "%s/%s:%02d" : "%s/%s", sensorValueBuff, statusBuff, Settings.Count);      
     
     return buff;
   }
@@ -281,6 +288,11 @@ public:
 private:
   const PumpState HandleSensorState(const PumpState &state)
   {
+    if(!isSensorUsed() && (state == CALIBRATING || state == MANUAL_OFF))
+    {
+      return TIMEOUT_OFF;
+    }
+
     if(state == TIMEOUT_OFF || state == OFF)
     {
       if(abs(_sensorValueStart - _sensorValueEnd) <= SENSOR_CHANGES_LEVEL)
@@ -305,7 +317,7 @@ public:
   static const short ToPct(const short &value, const bool &shortStatus)
   {
     //map(value, fromLow, fromHigh, toLow, toHigh)
-    return map(value, 0, 1022, 0, shortStatus ? 9 : 99);
+    return map(value, 0, 1023, 0, shortStatus ? 10 : 100);
   }
 };
 
