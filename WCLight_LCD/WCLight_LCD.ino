@@ -19,9 +19,10 @@
 #define BACKLIGHT_PIN 10
 
 #define SHOW_STATUS_DELAY 1000u
-#define BACKLIGHT_DELAY 30000u
+#define BACKLIGHT_DELAY 40000u
 
-#define DOOR_OPEN_MORE_THEN 60000u
+#define WC_DOOR_OPEN_MORE_THEN 20000u
+#define BT_DOOR_OPEN_MORE_THEN 30000u
 
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 10
@@ -33,12 +34,12 @@ const unsigned long ULONG_MAX = 0UL - 1UL;
 
 enum StatPage
 {
-  Counts = 0,
-  Max = 1,
-  Min = 2,
-  Avg = 3,
-  Med = 4,
-  Filled = 5,
+  Visits = 0,
+  Max,
+  Min,
+  Avg,
+  Med,
+  Filled,
   End,
 };
 
@@ -149,7 +150,7 @@ void loop()
     }
     
     Serial.print("Current page before: "); Serial.println(currentPage);
-    if(currentPage >= Counts && currentPage < End)
+    if(currentPage >= Visits && currentPage < End)
     {
       currentPage += 1;
       PrintStatistics(currentPage);
@@ -166,7 +167,7 @@ void loop()
     if(BacklightBtn.isLongPress())
     {
       BacklightBtn.resetTicks();
-      currentPage = Counts;
+      currentPage = Visits;
       PrintStatistics(currentPage);
     }     
   }
@@ -227,6 +228,12 @@ void loop()
   {    
     Serial.println("The ""WCBtn"" is released: ");
 
+    if(WCBtn.getTicks() >= WC_DOOR_OPEN_MORE_THEN)
+    {
+      wcLight.setToOff();
+      WCBtn.resetTicks();
+    }
+
     if(wcLight.Released())
     {
       SaveSettings();
@@ -255,7 +262,7 @@ void loop()
   {    
     Serial.println("The ""BathBtn"" is released: ");
 
-    if(BathBtn.getTicks() >= DOOR_OPEN_MORE_THEN )
+    if(BathBtn.getTicks() >= BT_DOOR_OPEN_MORE_THEN)
     {
       btLight.setToOff();
       BathBtn.resetTicks();
@@ -411,7 +418,7 @@ void PrintStatistics(const StatPage &page)
 
   switch(page)
   {
-    case Counts:
+    case Visits:
       sprintf(wcBuff, "W:Visits:%d", wcLight.settings.Count);
       sprintf(btBuff, "B:Visits:%d", btLight.settings.Count);
     break;
@@ -472,7 +479,7 @@ void PrintStatistics(const StatPage &page)
 
 void PrintStatisticDataAll()
 {
-  PrintStatistics(Counts);
+  PrintStatistics(Visits);
   PrintStatistics(Max);
   PrintStatistics(Min);
   PrintStatistics(Avg);
