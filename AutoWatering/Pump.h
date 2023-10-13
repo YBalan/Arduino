@@ -64,6 +64,12 @@ public:
       SensorNotChangedCount = 0;
     }
 
+    void resetState(const ::PumpState &state)
+    {
+      PumpState = state;
+      SensorNotChangedCount = 0;
+    }
+
     void reset()
     {
       resetSettings();
@@ -214,7 +220,12 @@ public:
 
   void ResetState()
   {
-    Settings.resetState();
+    Settings.resetState();    
+  }
+
+  void ResetState(const PumpState &state)
+  {
+    Settings.resetState(state);
   }
   
 public:  

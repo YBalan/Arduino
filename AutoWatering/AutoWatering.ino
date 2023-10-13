@@ -141,9 +141,7 @@ void loop()
 
   const auto &current = millis();
 
-  CheckBacklightDelay(current);
-
-  CheckPrintSensorStatusDelay(current);
+  CheckBacklightDelay(current); 
 
   if(USE_WATER_SENSOR && (waterSensor.isPressed() || waterSensor.getState() == ON))
   { 
@@ -163,7 +161,7 @@ void loop()
     if(!HasWater)
     {
       Serial.println("Has Water");
-      //ResetPumpStates();
+      ResetPumpStates(PumpState::TIMEOUT_OFF);
       
       DebugSerialPrintPumpsStatus(current);
     }
@@ -292,6 +290,7 @@ void loop()
     }
   }  
 
+  CheckPrintSensorStatusDelay(current);
   HandleDebugSerialCommands();  
 }
 
@@ -554,6 +553,7 @@ void ResetSettings()
   for (short i = 0; i < PUMPS_COUNT; i++)
   {    
     pumps[i].Reset();
+    pumps[i].ResetState(TIMEOUT_OFF);
     auto settings = pumps[i].Settings;
     EEPROM.put(addr, settings);
     addr += sizeof(settings);
@@ -575,6 +575,14 @@ void ResetPumpStates()
   for (short i = 0; i < PUMPS_COUNT; i++) 
   {
     pumps[i].ResetState();
+  }
+}
+
+void ResetPumpStates(const PumpState &state)
+{
+  for (short i = 0; i < PUMPS_COUNT; i++) 
+  {
+    pumps[i].ResetState(state);
   }
 }
 
