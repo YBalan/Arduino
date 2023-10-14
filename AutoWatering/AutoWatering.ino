@@ -242,7 +242,7 @@ void loop()
     if(pumps[pumpIdx].IsWateringEnough() && HasWater)
     {
       Serial.print(pumpIdx + 1); Serial.print("   ENOUGH: ");      
-      pumps[pumpIdx].End();
+      pumps[pumpIdx].End(DO_NOT_USE_ENOUGH_LOW_LEVEL ? SENSOR_OFF : OFF);
       
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
 

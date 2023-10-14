@@ -34,6 +34,7 @@
 
 #define ULONG_MAX (0UL - 1UL)
 #define SENSOR_VALUE_MAX 1023
+#define SENSOR_VALUE_MIN 10
 
 #define SENSOR_DOES_NOT_CHANGED_ATTEMPTS 3
 #define SENSOR_CHANGES_LEVEL 10
@@ -170,8 +171,9 @@ public:
     _sensorValue = GetSensorValue();
 
     if(IsCalibratingRequired()) { return false; }
-    if(Settings.PumpState == TIMEOUT_OFF && !DO_NOT_USE_ENOUGH_LOW_LEVEL){ return false; }
-    if(Settings.PumpState == MANUAL_ON) { return false; }    
+    if(Settings.PumpState == TIMEOUT_OFF) { return false; }
+    if(Settings.PumpState == MANUAL_ON) { return false; } 
+    if(Settings.PumpState == SENSOR_OFF) { return false; } 
 
     if(isSensorUsed() && isOff())
     {
@@ -194,6 +196,8 @@ public:
 
     if(IsCalibratingRequired()) { return false; }
     if(Settings.PumpState == MANUAL_ON) { return false; }
+
+    if(DO_NOT_USE_ENOUGH_LOW_LEVEL && isOn() && _sensorValue <= SENSOR_VALUE_MIN) { return true; }
 
     if(isSensorUsed() && isOn())
     {
