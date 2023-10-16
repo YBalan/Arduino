@@ -68,7 +68,7 @@ void loop()
 
   if(MainBtn.isPressed())
   {
-	  settings.BrDirectionDown = !settings.BrDirectionDown;
+	  
   }
 	
   if(MainBtn.isReleased())
@@ -78,6 +78,8 @@ void loop()
       Serial.println("Btn pressed NO long press");
       SwitchReverse();      
     }
+    
+    settings.BrDirectionDown = !settings.BrDirectionDown;
     
     MainBtn.resetTicks();
 
@@ -131,7 +133,7 @@ void CheckAndChangeBrightness()
 
       settings.IsOn = settings.LedBrightnes != 0;
       analogWrite(LED_PIN, settings.LedBrightnes);
-    }
+    }    
 
     Serial.println(settings.LedBrightnes);
 
@@ -210,7 +212,7 @@ void LoadSettings()
   Serial.println("Load Settings...");
   
   EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
-  if(settings.LedBrightnes > MAX_BR_VALUE)
+  if(settings.LedBrightnes < 0 || settings.LedBrightnes > MAX_BR_VALUE)
   {
     settings.LedBrightnes = MAX_BR_VALUE;
     settings.BrDirectionDown = true;
