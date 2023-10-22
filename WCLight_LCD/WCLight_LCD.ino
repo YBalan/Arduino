@@ -19,9 +19,10 @@
 #define BACKLIGHT_PIN 10
 
 #define SHOW_STATUS_DELAY 1000u
-#define BACKLIGHT_DELAY 30000u
+#define BACKLIGHT_DELAY 40000u
 
-#define DOOR_OPEN_MORE_THEN 60000u
+#define WC_DOOR_OPEN_MORE_THEN 10000u
+#define BT_DOOR_OPEN_MORE_THEN 20000u
 
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 10
@@ -33,13 +34,13 @@ const unsigned long ULONG_MAX = 0UL - 1UL;
 
 enum StatPage
 {
-  Counts = 0,
-  Max = 1,
-  Min = 2,
-  Avg = 3,
-  Med = 4,
-  Filled = 5,
-  End,
+  Visits = 0,
+  Max,  
+  Avg,
+  Med,
+  Filled,
+  End = STATISTIC_DATA_LENGHT + 5,
+  Min,
 };
 
 short currentPage = End;
@@ -147,18 +148,6 @@ void loop()
     {
       Backlight();
     }
-    
-    Serial.print("Current page before: "); Serial.println(currentPage);
-    if(currentPage >= Counts && currentPage < End)
-    {
-      currentPage += 1;
-      PrintStatistics(currentPage);
-    }
-    else
-    {
-      PrintStatus();
-    }
-    Serial.print("Current page after: "); Serial.println(currentPage);
   }
 
   if(BacklightBtn.isReleased() || IsDebugPressed(BACKLIGHT_PIN, BKLPressed))
@@ -166,8 +155,28 @@ void loop()
     if(BacklightBtn.isLongPress())
     {
       BacklightBtn.resetTicks();
-      currentPage = Counts;
-      PrintStatistics(currentPage);
+      if(currentPage != End)
+      {
+        currentPage = End;
+        PrintStatus();
+      }
+      else
+      {
+        currentPage = Visits;
+        PrintStatistics(currentPage);
+      }
+    }
+    else
+    {     
+      if(currentPage >= Visits && currentPage < End)
+      {        
+        currentPage += 1;
+        PrintStatistics(currentPage);        
+      }
+      else
+      {
+        PrintStatus();
+      }      
     }     
   }
 
@@ -199,7 +208,6 @@ void loop()
       Serial.println("Reset Time...");
       ResetTime();
 
-      Serial.println("Reset Statistic...");
       ResetStatistic();
 
       Backlight();
@@ -226,6 +234,12 @@ void loop()
   if(WCBtn.isReleased() || IsDebugReleased(WC_IN_PIN, WCPressed))
   {    
     Serial.println("The ""WCBtn"" is released: ");
+
+    if(WCBtn.getTicks() >= WC_DOOR_OPEN_MORE_THEN)
+    {
+      wcLight.setToOff();
+      WCBtn.resetTicks();
+    }
 
     if(wcLight.Released())
     {
@@ -255,7 +269,7 @@ void loop()
   {    
     Serial.println("The ""BathBtn"" is released: ");
 
-    if(BathBtn.getTicks() >= DOOR_OPEN_MORE_THEN )
+    if(BathBtn.getTicks() >= BT_DOOR_OPEN_MORE_THEN)
     {
       btLight.setToOff();
       BathBtn.resetTicks();
@@ -286,6 +300,7 @@ void HandleDebugSerialCommands()
   {    
     ResetTime();
     SaveSettings();
+    PrintStatus();
   }
 
   if(debugButtonFromSerial == 3)
@@ -293,6 +308,7 @@ void HandleDebugSerialCommands()
     ResetStatistic();
     PrintStatisticDataAll();
     SaveSettings();
+    PrintStatus();
   }
 
   //Unit Test Helpers::Time::HumanizeTime
@@ -352,6 +368,8 @@ void ResetTime()
 
 void ResetStatistic()
 {
+  Serial.println("Reset Statistic...");
+
   wcLight.resetStatistic();
   btLight.resetStatistic();
 }
@@ -391,7 +409,7 @@ void PrintStatus(const bool &fromTimer)
 
       if(btStart > 0)
       {
-        sprintf(btBuff, "%s:%s|%s", btLight.settings.State == ON ? "B" : "b",btLight.GetTotalTime(), btLight.GetLastTime(current));
+        sprintf(btBuff, "%s:%s|%s", btLight.settings.State == ON ? "B" : "b", btLight.GetTotalTime(), btLight.GetLastTime(current));
         ClearRow(1);
         lcd.print(btBuff);
       }
@@ -404,14 +422,14 @@ void PrintStatus(const bool &fromTimer)
   }
 }
 
-void PrintStatistics(const StatPage &page)
+void PrintStatistics(const short &page)
 {
   char wcBuff[20];
   char btBuff[20];
 
   switch(page)
   {
-    case Counts:
+    case Visits:
       sprintf(wcBuff, "W:Visits:%d", wcLight.settings.Count);
       sprintf(btBuff, "B:Visits:%d", btLight.settings.Count);
     break;
@@ -452,13 +470,26 @@ void PrintStatistics(const StatPage &page)
       sprintf(wcBuff, "W:Filled:%d/%d", wcLight.statistic.GetFilledCount(), STATISTIC_DATA_LENGHT);
       sprintf(btBuff, "B:Filled:%d/%d", btLight.statistic.GetFilledCount(), STATISTIC_DATA_LENGHT);
       break;
-    }
+    }    
     case End:
+    {
       PrintStatus();
       return;    
+    }
     default:
+    {
+      if(page > Filled && page < End)
+      {
+        char buff1[10];
+        char buff2[10];
+        short idx = End - page - 1;
+        sprintf(wcBuff, "W:#%d=%s", STATISTIC_DATA_LENGHT - idx, Light::HumanizeShortTime(wcLight.statistic.GetByIndex(idx), buff1));
+        sprintf(btBuff, "B:#%d=%s", STATISTIC_DATA_LENGHT - idx, Light::HumanizeShortTime(btLight.statistic.GetByIndex(idx), buff2));
+        break;
+      }
       PrintStatus();
       return;
+    }
   }
 
   ClearRow(0);
@@ -466,13 +497,15 @@ void PrintStatistics(const StatPage &page)
   ClearRow(1);
   lcd.print(btBuff);
 
+  #ifdef DEBUG
   Serial.println(wcBuff);
   Serial.println(btBuff);  
+  #endif
 }
 
 void PrintStatisticDataAll()
 {
-  PrintStatistics(Counts);
+  PrintStatistics(Visits);
   PrintStatistics(Max);
   PrintStatistics(Min);
   PrintStatistics(Avg);

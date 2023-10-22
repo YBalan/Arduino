@@ -64,6 +64,15 @@ public:
     }
   }
 
+  const unsigned short GetByIndex(const short &idx)
+  {
+    if(idx >= 0 && idx < STATISTIC_DATA_LENGHT)
+    {
+      return Data[idx];
+    }
+    return USHORT_MAX;
+  }
+
   const short GetStartIndex() const
   {
     short startIdx = -1;
