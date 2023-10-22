@@ -83,7 +83,7 @@ void loop()
     //Serial.println("Button loop ended");
     
     //Serial.println("Button is pressed check");
-    if(generatorOffBtn.isPressed() || debugButtonFromSerial == 4) 
+    if(generatorOffBtn.isReleased() || debugButtonFromSerial == 4) 
     {
       Serial.println("The ""generatorOffBtn"" is pressed");
       GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);
@@ -91,7 +91,7 @@ void loop()
       debugButtonFromSerial = 0;
     }
 
-    if(generatorOffRemoteBtn.isPressed() || debugButtonFromSerial == 5) 
+    if(generatorOffRemoteBtn.isReleased() || debugButtonFromSerial == 5) 
     {
       Serial.println("The ""generatorOffRemoteBtn"" is pressed");
       GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */true);
@@ -129,7 +129,7 @@ void loop()
     }
 }
 
-bool CorrectAngles()
+const bool CorrectAngles()
 {
   bool res = false;
   if(settings.angle < START_ANGLE || settings.angle > END_ANGLE)
@@ -146,21 +146,23 @@ bool CorrectAngles()
   return res;
 }
 
-void GeneratorOff(int rotateDelay, bool returnToPrevState)
+void GeneratorOff(const short &rotateDelay, const bool &returnToPrevState)
 {
     AttachServos();
 
     Settings prevState = settings;
 
     //Serial.print("Servo started "); Serial.println(angle);
-    if(delay > 0)
-    {
-      char buffer[256];
-      int rotateAngle = settings.angle <= GENERATOR_OFF_ANGLE ? ROTATE_WITH_DELAY_ANGLE : -ROTATE_WITH_DELAY_ANGLE;
-      int rotateCount = abs((settings.angle - GENERATOR_OFF_ANGLE) / ROTATE_WITH_DELAY_ANGLE);
+    if(rotateDelay > 0)
+    {      
+      short rotateAngle = settings.angle <= GENERATOR_OFF_ANGLE ? ROTATE_WITH_DELAY_ANGLE : -ROTATE_WITH_DELAY_ANGLE;
+      short rotateCount = abs((settings.angle - GENERATOR_OFF_ANGLE) / ROTATE_WITH_DELAY_ANGLE);
 
+      #ifdef DEBUG
+      char buffer[256];
       sprintf(buffer, "Servos started at: %d & %d; Destination: %d & %d; Moved by: %d; %d Times. (with delay: %d)", settings.angle, settings.angle2, GENERATOR_OFF_ANGLE, GENERATOR_OFF_2_ANGLE, rotateAngle, rotateCount, rotateDelay);
       Serial.println(buffer);
+      #endif
 
       for(int i = 0; i < rotateCount; i++)
       {        
@@ -270,7 +272,7 @@ void DetachServos()
 
 void PrintServosStatus()
 {  
-  char buffer[256];
+  char buffer[100];
   sprintf(buffer, "Status: angle1:[%d] angle2:[%d]", settings.angle, settings.angle2);
   Serial.println(buffer);
 }
