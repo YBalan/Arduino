@@ -13,7 +13,7 @@ enum PumpState
   UNKNOWN,
 };
 
-static const char * const GetStatus(const PumpState & state)
+static const char * const GetState(const PumpState & state)
 {
     switch(state)
     {
