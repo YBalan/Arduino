@@ -48,7 +48,7 @@ void setup()
 
   PrintStatus();
 
-  MODE_POWERON_MAX = digitalRead(MODE_PIN) == HIGH;
+  MODE_POWERON_MAX = digitalRead(MODE_PIN) == LOW;
   Serial.print("MODE: POWER ON - MAX Brightness: "); Serial.println(MODE_POWERON_MAX ? "ON" : "OFF");
   
   settings.LedBrightnes = MODE_POWERON_MAX ? MAX_BR_VALUE : settings.LedBrightnes;
