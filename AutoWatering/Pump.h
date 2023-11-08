@@ -112,7 +112,7 @@ public:
   const bool isOff() const { return Settings.PumpState == OFF || Settings.PumpState == MANUAL_OFF || Settings.PumpState == TIMEOUT_OFF || Settings.PumpState == CALIBRATING || Settings.PumpState == SENSOR_OFF; }
   const bool isOn() const { return Settings.PumpState == ON || Settings.PumpState == MANUAL_ON; }
   const bool IsCalibratingRequired(){ return Settings.WatchDog == DEFAULT_PUMP_TIMEOUT; }  
-  const unsigned long &getTicks() const {return _startTiks;}
+  const unsigned long getTicks() const {return _startTiks;}
 
   const bool Start(){ return Start(PumpState::ON); }
 

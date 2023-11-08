@@ -448,7 +448,7 @@ void SerialPrintSensorsStatus()
   Serial.println();  
 }
 
-const char * const LcdPrintSensorStatus(const bool &hasWater, const short &currentPump)
+const char * const LcdPrintSensorStatus(const bool hasWater, const short currentPump)
 {
   char pumpBuff1[20];  
   char pumpBuff12[10];
@@ -462,11 +462,9 @@ const char * const LcdPrintSensorStatus(const bool &hasWater, const short &curre
   {
     lcd.setCursor(0, 0);
     lcd.print("No Water");
-  }  
-
-  const bool shortStatus = currentPump <= -1 || currentPump >= PUMPS_COUNT;
+  }   
   
-  if(shortStatus)
+  if(currentPump < 0 || currentPump >= PUMPS_COUNT) //ShortStatus
   { 
     sprintf(pumpBuff1, "%s|%s", pumps[0].GetShortStatus(hasWater, pumpBuff12), pumps[1].GetShortStatus(hasWater, pumpBuff13));    
     #ifdef DEBUG
@@ -494,10 +492,10 @@ const char * const LcdPrintSensorStatus(const bool &hasWater, const short &curre
     lcd.setCursor(0, 0);
     lcd.print(pumpBuff1);
     
-      const unsigned short wdSecs = pumps[currentPump].Settings.WatchDog / 1000;
+    unsigned short wdSecs = pumps[currentPump].Settings.WatchDog / 1000;
     if(pumps[currentPump].isOn())
     {
-      const unsigned short secs = (millis() - pumps[currentPump].getTicks()) / 1000;       
+      unsigned short secs = (millis() - pumps[currentPump].getTicks()) / 1000;       
       sprintf(pumpBuff1, "%d:ON:%02d|WD:%02ds", currentPump + 1, secs, wdSecs);
     }
     else
