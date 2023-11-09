@@ -1,8 +1,13 @@
 #include <EEPROM.h>
 #include <avr/wdt.h>
 #include <DS323x.h>
+#include <Servo.h>
 #include <LiquidCrystal_I2C.h>
+
 #include "../../Shares/Button.h"
+#include "FeedStatusInfo.h"
+#include "FeedSettings.h"
+#include "FeedScheduler.h"
 
 #define DEBUG
 //DebounceTime
@@ -19,10 +24,24 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 DS323x rtc;
 
-struct Settings
-{
-} settings;
+#define SERVO_PIN 3
+Servo servo;
 
+Feed::Settings settings;
+
+#define OK_PIN 10
+#define UP_PIN 9
+#define DW_PIN 8
+#define MANUAL_FEED_PIN 11
+#define REMOTE_FEED_PIN 12
+#define PAW_FEED_PIN 13
+
+Button btnOK(OK_PIN);
+ezButton btnUp(UP_PIN);
+ezButton btnDw(DW_PIN);
+Button btnManualFeed(MANUAL_FEED_PIN);
+ezButton btnRemoteFeed(REMOTE_FEED_PIN);
+ezButton btnPawFeed(PAW_FEED_PIN);
 
 void setup() 
 {
@@ -37,11 +56,22 @@ void setup()
 
   Wire.begin();
   delay(2000);
-  rtc.attach(Wire);
+  rtc.attach(Wire);  
 
   Serial.println();
   Serial.println();
-  Serial.println("Start Auto Feeder");
+  Serial.println("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
+
+  Serial.println(rtc.now().timestamp());
+
+  btnOK.setDebounceTime(DEBOUNCE_TIME);
+  btnUp.setDebounceTime(DEBOUNCE_TIME);
+  btnDw.setDebounceTime(DEBOUNCE_TIME);
+  btnManualFeed.setDebounceTime(DEBOUNCE_TIME);
+  btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
+  btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
+
+  AttachServo();
 
   LoadSettings();
   PrintStatus();
@@ -52,6 +82,14 @@ void setup()
 void loop() 
 {
   const auto current = millis();
+
+  btnOK.loop();
+  btnUp.loop();
+  btnDw.loop();
+  btnManualFeed.loop();
+  btnRemoteFeed.loop();
+  btnPawFeed.loop();
+
 
   CheckBacklightDelay(current); 
   HandleDebugSerialCommands();
@@ -92,7 +130,6 @@ const bool CheckBacklightDelay(const unsigned long &currentTicks)
     backlightStartTicks = 0;
     return true;
   }
-
   return false;
 }
 
@@ -105,6 +142,21 @@ void EnableWatchDog()
 void PrintStatus()
 {  
   Serial.print("");
+}
+
+void AttachServo()
+{
+  if(!servo.attached())
+  {
+    Serial.println("Servo Attached");
+    servo.attach(SERVO_PIN);
+  }  
+}
+
+void DetachServo()
+{  
+    Serial.println("Servo Detached");
+    servo.detach();    
 }
 
 void SaveSettings()
