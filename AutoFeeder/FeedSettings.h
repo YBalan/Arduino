@@ -7,12 +7,13 @@
 namespace Feed
 {
   struct Settings
-  {
+  {    
     unsigned short Delay;
+    unsigned short RotateCount;
     private:
     Feed::StatusInfo FeedHistory[FEEDS_STATUS_HISTORY_COUNT];
     public:
-    const 
+    
   };
 }
 

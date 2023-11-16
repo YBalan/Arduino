@@ -10,6 +10,15 @@
 #include "FeedScheduler.h"
 
 #define DEBUG
+
+#ifdef DEBUG
+  #define SERIAL_PRINTLN(str) Serial.println((str))
+  #define SERIAL_PRINT(str) Serial.print((str))
+#else
+  #define SERIAL_PRINTLN(str) do{}while(0)
+  #define SERIAL_PRINT(str) do{}while(0)
+#endif
+
 //DebounceTime
 #define DEBOUNCE_TIME 50
 
@@ -54,13 +63,13 @@ void setup()
 
   Serial.begin(9600);  
 
+  Serial.println();
+  Serial.println();
+  SERIAL_PRINTLN("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
+
   Wire.begin();
   delay(2000);
   rtc.attach(Wire);  
-
-  Serial.println();
-  Serial.println();
-  Serial.println("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
 
   Serial.println(rtc.now().timestamp());
 
@@ -88,32 +97,78 @@ void loop()
   btnDw.loop();
   btnManualFeed.loop();
   btnRemoteFeed.loop();
-  btnPawFeed.loop();
-
+  btnPawFeed.loop();  
 
   CheckBacklightDelay(current); 
   HandleDebugSerialCommands();
 }
 
 void HandleDebugSerialCommands()
-{  
+{
+  if(debugButtonFromSerial == 1)
+  {
+    PrintToSerialDateTime();
+  }
+  
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == 11)
   {
-    Serial.println("Going to reset after 8secs...");
+    SERIAL_PRINTLN("Going to reset after 8secs...");
     delay(10 * 1000);
   }
 
   debugButtonFromSerial = 0;
   if(Serial.available() > 0)
   {
-    //Serial.println(Serial.readString().toInt());
-    debugButtonFromSerial = Serial.readString().toInt();
-    Serial.println(debugButtonFromSerial);
+    auto readFromSerial = Serial.readString();
+
+    if(SetCurrentDateTime(readFromSerial, rtc))
+    {      
+      PrintToSerialDateTime();
+    }
+    else
+    {    
+      debugButtonFromSerial = readFromSerial.toInt();
+      Serial.println(debugButtonFromSerial);
+    }
   }  
 
   //delay(50);
   wdt_reset();
+}
+
+//Format: yyyyMMddhhmmss (20231116163401)
+const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
+{
+  if(value.length() >= 12)
+  {
+    Serial.println(value);
+
+    short yyyy = value.substring(0, 4).toInt();
+    short MM = value.substring(4, 6).toInt();      
+    short dd = value.substring(6, 8).toInt();      
+
+    short HH = value.substring(8, 10).toInt();      
+    short mm = value.substring(10, 12).toInt();
+
+    if(yyyy < 2023 || yyyy > 2100)  {Serial.print("Wrong value - "); Serial.println(yyyy); return false; }
+    if(MM < 1 || MM > 12)           {Serial.print("Wrong value - "); Serial.println(MM); return false; }
+    if(dd < 1 || dd > 31)           {Serial.print("Wrong value - "); Serial.println(dd); return false; }
+    if(HH < 0 || HH > 23)           {Serial.print("Wrong value - "); Serial.println(HH); return false; }
+    if(mm < 0 || mm > 59)           {Serial.print("Wrong value - "); Serial.println(mm); return false; }        
+
+    auto dt = DateTime(yyyy, MM, dd, HH, mm, 0);      
+    realTimeClock.now(dt);
+
+    return true;
+  }
+  return false;
+}
+
+void PrintToSerialDateTime()
+{
+  SERIAL_PRINTLN("Current DateTime: ");
+  Serial.println(rtc.now().timestamp());
 }
 
 void BacklightOn()
@@ -136,7 +191,7 @@ const bool CheckBacklightDelay(const unsigned long &currentTicks)
 void EnableWatchDog()
 {
   wdt_enable(WDTO_8S); 
-  Serial.println("Watchdog enabled.");
+  SERIAL_PRINTLN("Watchdog enabled.");
 }
 
 void PrintStatus()
@@ -148,27 +203,27 @@ void AttachServo()
 {
   if(!servo.attached())
   {
-    Serial.println("Servo Attached");
+    SERIAL_PRINTLN("Servo Attached");
     servo.attach(SERVO_PIN);
   }  
 }
 
 void DetachServo()
 {  
-    Serial.println("Servo Detached");
+    SERIAL_PRINTLN("Servo Detached");
     servo.detach();    
 }
 
 void SaveSettings()
 {
-  Serial.println("Save Settings...");
+  SERIAL_PRINTLN("Save Settings...");
 
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
 }
 
 void LoadSettings()
 {
-  Serial.println("Load Settings...");
+  SERIAL_PRINTLN("Load Settings...");
   
   EEPROM.get(EEPROM_SETTINGS_ADDR, settings);  
 }
