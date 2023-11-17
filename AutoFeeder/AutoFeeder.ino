@@ -12,11 +12,13 @@
 #define DEBUG
 
 #ifdef DEBUG
-  #define SERIAL_PRINTLN(str) Serial.println((str))
-  #define SERIAL_PRINT(str) Serial.print((str))
-#else
-  #define SERIAL_PRINTLN(str) do{}while(0)
-  #define SERIAL_PRINT(str) do{}while(0)
+  #define S_PRINT(value) Serial.println((value))
+  #define S_PRINT2(value1, value2) Serial.print((value1)); Serial.println((value2))
+  #define S_PRINT3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))  
+#else  
+  #define S_PRINT(value) while(0)
+  #define S_PRINT2(value1, value2) while(0)
+  #define S_PRINT3(value1, value2, value3) while(0)
 #endif
 
 //DebounceTime
@@ -33,54 +35,61 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 DS323x rtc;
 
-#define SERVO_PIN 3
+#define SERVO_PIN 9
 Servo servo;
 
 Feed::Settings settings;
 
 #define OK_PIN 10
-#define UP_PIN 9
-#define DW_PIN 8
-#define MANUAL_FEED_PIN 11
-#define REMOTE_FEED_PIN 12
-#define PAW_FEED_PIN 13
+#define UP_PIN 11
+#define DW_PIN 12
+#define RT_PIN 13
+
+#define MANUAL_FEED_PIN 8
+#define REMOTE_FEED_PIN 7
+#define PAW_FEED_PIN 6
+#define PAW_LED_PIN A3
 
 Button btnOK(OK_PIN);
 ezButton btnUp(UP_PIN);
 ezButton btnDw(DW_PIN);
+ezButton btnRt(RT_PIN);
+
 Button btnManualFeed(MANUAL_FEED_PIN);
 ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
 void setup() 
 {
+  Serial.begin(9600);
+
+  Serial.println();
+  Serial.println();
+  S_PRINT("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
+
   lcd.init();
   lcd.init();
 
   BacklightOn();
   lcd.setCursor(0, 0);
-  lcd.print("Hello!");  
-
-  Serial.begin(9600);  
-
-  Serial.println();
-  Serial.println();
-  SERIAL_PRINTLN("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
+  lcd.print("Hello!");    
 
   Wire.begin();
   delay(2000);
-  rtc.attach(Wire);  
-
-  Serial.println(rtc.now().timestamp());
+  rtc.attach(Wire);
+  
+  ShowLcdTime(1000, rtc.now());
 
   btnOK.setDebounceTime(DEBOUNCE_TIME);
   btnUp.setDebounceTime(DEBOUNCE_TIME);
   btnDw.setDebounceTime(DEBOUNCE_TIME);
+  btnRt.setDebounceTime(DEBOUNCE_TIME);
+
   btnManualFeed.setDebounceTime(DEBOUNCE_TIME);
   btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
   btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
 
-  AttachServo();
+  //AttachServo();
 
   LoadSettings();
   PrintStatus();
@@ -90,17 +99,88 @@ void setup()
 
 void loop() 
 {
+  const auto dtNow = rtc.now();
   const auto current = millis();
-
+  
+  ShowLcdTime(current, dtNow);
+  
   btnOK.loop();
   btnUp.loop();
   btnDw.loop();
+  btnRt.loop();
+
   btnManualFeed.loop();
   btnRemoteFeed.loop();
   btnPawFeed.loop();  
 
-  CheckBacklightDelay(current); 
+  if(btnOK.isPressed())
+  {
+    S_PRINT("Ok btn is pressed...");
+    BacklightOn();
+  }  
+
+  if(btnManualFeed.isReleased() || btnRt.isReleased())
+  {
+    S_PRINT2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+
+    DoFeed();
+    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+
+    ShowLastAction();
+  }
+  else
+  if(btnRemoteFeed.isReleased())
+  {
+    S_PRINT2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+
+    DoFeed();
+    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+  }
+  else
+  if(btnPawFeed.isReleased())
+  {
+    S_PRINT2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+
+    DoFeed();
+    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+  }
+  else
+  if(settings.FeedScheduler.IsTimeToAlarm(rtc.now()))
+  {
+    S_PRINT2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+
+    DoFeed();
+    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
+    settings.FeedScheduler.SetNextAlarm(dtNow);
+  }  
+ 
+  CheckBacklightDelay(millis()); 
   HandleDebugSerialCommands();
+}
+
+void DoFeed()
+{
+  AttachServo();
+  S_PRINT3("Do Feed (", settings.CurrentPosition, ")");
+  if(settings.CurrentPosition == 0)
+  {
+    servo.write(360);
+    settings.CurrentPosition = 270;
+  }
+  else
+  {
+    servo.write(0);
+    settings.CurrentPosition = 0;
+  }
+  delay(3000);
+  DetachServo();
+}
+
+void ShowLastAction()
+{
+  S_PRINT2("LAST: ", settings.GetLastStatus().ToString());
+  ClearRow(0);
+  lcd.print("LAST: "); lcd.print(settings.GetLastStatus().ToString());
 }
 
 void HandleDebugSerialCommands()
@@ -113,7 +193,7 @@ void HandleDebugSerialCommands()
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == 11)
   {
-    SERIAL_PRINTLN("Going to reset after 8secs...");
+    S_PRINT("Going to reset after 8secs...");
     delay(10 * 1000);
   }
 
@@ -167,14 +247,25 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
 void PrintToSerialDateTime()
 {
-  SERIAL_PRINTLN("Current DateTime: ");
-  Serial.println(rtc.now().timestamp());
+  S_PRINT2("Current DateTime: ", rtc.now().timestamp());  
 }
 
 void BacklightOn()
 {
   lcd.backlight();
   backlightStartTicks = millis();
+}
+
+unsigned long prevTicks = 0;
+void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
+{ 
+  if(currentTicks - prevTicks >= 1000)
+  {
+    //S_PRINT(currentTicks);
+    ClearRow(1);    
+    lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    prevTicks = currentTicks;
+  }
 }
 
 const bool CheckBacklightDelay(const unsigned long &currentTicks)
@@ -191,39 +282,46 @@ const bool CheckBacklightDelay(const unsigned long &currentTicks)
 void EnableWatchDog()
 {
   wdt_enable(WDTO_8S); 
-  SERIAL_PRINTLN("Watchdog enabled.");
+  S_PRINT("Watchdog enabled.");
+}
+
+void ClearRow(const short &row)
+{
+  lcd.setCursor(0, row);
+  lcd.print("                  ");
+  lcd.setCursor(0, row);
 }
 
 void PrintStatus()
 {  
-  Serial.print("");
+  S_PRINT("Status: ");
 }
 
 void AttachServo()
 {
   if(!servo.attached())
   {
-    SERIAL_PRINTLN("Servo Attached");
+    S_PRINT("Servo Attached");
     servo.attach(SERVO_PIN);
   }  
 }
 
 void DetachServo()
 {  
-    SERIAL_PRINTLN("Servo Detached");
+    S_PRINT("Servo Detached");
     servo.detach();    
 }
 
 void SaveSettings()
 {
-  SERIAL_PRINTLN("Save Settings...");
+  S_PRINT("Save Settings...");
 
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
 }
 
 void LoadSettings()
 {
-  SERIAL_PRINTLN("Load Settings...");
+  S_PRINT("Load Settings...");
   
   EEPROM.get(EEPROM_SETTINGS_ADDR, settings);  
 }

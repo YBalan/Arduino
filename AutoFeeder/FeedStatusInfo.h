@@ -2,12 +2,16 @@
 #ifndef FEED_STATUS_INFO_H
 #define FEED_STATUS_INFO_H
 
+#include "DateTime.h"
+#include "FeedDateTime.h"
+
 namespace Feed
 {
-  enum Status
+  enum class Status : short
   {  
+    Unknown,
     MANUAL,
-    REMOTE,
+    REMOUTE,
     PAW,
     SCHEDULE,
   };  
@@ -16,21 +20,37 @@ namespace Feed
   {    
     switch(status)
     {
-      case MANUAL:    return shortStatus ? "M" : "MAN";
-      case REMOTE:    return shortStatus ? "R" : "REM";
-      case PAW:       return shortStatus ? "P" : "PAW";
-      case SCHEDULE:  return shortStatus ? "S" : "SCH";
-      default:        return shortStatus ? "NA": "NaN";
+      case Status::MANUAL:    return shortStatus ? "M" : "MAN";
+      case Status::REMOUTE:   return shortStatus ? "R" : "REM";
+      case Status::PAW:       return shortStatus ? "P" : "PAW";
+      case Status::SCHEDULE:  return shortStatus ? "S" : "SCH";
+      default:                return shortStatus ? "NA": "NaN";
     }
   }
 
   struct StatusInfo
   {
     Feed::Status Status;
-    DateTime DateTime;
-    const String ToString(const bool &shortStatus) const
+    FeedDateTime DT;
+
+    StatusInfo() : Status(Status::Unknown), DT()
+    { }
+
+    StatusInfo(const Feed::Status &status, const DateTime &dt) : Status(status), DT(dt) 
+    { }
+
+    StatusInfo& operator=(const StatusInfo &info)
     {
-      return String(GetStatusString(shortStatus)) + " " + DateTime.timestamp();
+      if (this != &info) {  // Check for self-assignment
+          Status = info.Status;
+          DT = info.DT;
+      }
+      return *this;  // Return a reference to this object
+    }
+
+    const String ToString(const bool shortStatus = false) const
+    {
+      return String(GetStatusString(shortStatus)) + " " + DT.timestamp(DateTime::TIMESTAMP_TIME);
     }    
 
     const char *const GetStatusString(const bool &shortStatus) const
