@@ -12,10 +12,12 @@
 #define DEBUG
 
 #ifdef DEBUG
+  #define S_PRNT(value) Serial.print((value))
   #define S_PRINT(value) Serial.println((value))
   #define S_PRINT2(value1, value2) Serial.print((value1)); Serial.println((value2))
   #define S_PRINT3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))  
 #else  
+  #define S_PRNT(value) while(0)
   #define S_PRINT(value) while(0)
   #define S_PRINT2(value1, value2) while(0)
   #define S_PRINT3(value1, value2, value3) while(0)
@@ -61,11 +63,13 @@ ezButton btnPawFeed(PAW_FEED_PIN);
 
 void setup() 
 {
-  Serial.begin(9600);
+  Serial.begin(9600);  
+  while (!Serial);
 
   Serial.println();
   Serial.println();
-  S_PRINT("!!!!!!!!!!!!!!!!!!!!! Start Auto Feeder !!!!!!!!!!!!!!!!!!!!!!!!");
+  S_PRINT("!!!! Start Auto Feeder !!!!");
+  S_PRINT3(__DATE__, " ", __TIME__);  
 
   lcd.init();
   lcd.init();
@@ -122,6 +126,7 @@ void loop()
   if(btnManualFeed.isReleased() || btnRt.isReleased())
   {
     S_PRINT2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    BacklightOn();
 
     DoFeed();
     settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
@@ -130,49 +135,102 @@ void loop()
   }
   else
   if(btnRemoteFeed.isReleased())
-  {
+  {    
     S_PRINT2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    BacklightOn();
 
     DoFeed();
     settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+
+    ShowLastAction();
   }
   else
   if(btnPawFeed.isReleased())
   {
     S_PRINT2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    BacklightOn();
 
     DoFeed();
     settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+    
+    ShowLastAction();
   }
   else
   if(settings.FeedScheduler.IsTimeToAlarm(rtc.now()))
   {
     S_PRINT2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    BacklightOn();
 
     DoFeed();
     settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
     settings.FeedScheduler.SetNextAlarm(dtNow);
+
+    ShowLastAction();
   }  
  
   CheckBacklightDelay(millis()); 
   HandleDebugSerialCommands();
 }
 
+#define MOTOR_RIGHT_POS 0
+#define MOTOR_LEFT_POS  180
+#define MOTOR_ROTATE_DELAY 100
+#define MOTOR_ROTATE_VALUE 5
+#define MOTOR_STEP_BACK_MODE true
+#define MOTOR_STEP_BACK_VALUE 10
+
+#define MOTOR_SHOW_PROGRESS true
+
 void DoFeed()
 {
   AttachServo();
   S_PRINT3("Do Feed (", settings.CurrentPosition, ")");
-  if(settings.CurrentPosition == 0)
+    
+  short pos = settings.CurrentPosition;
+  const short endPos = pos == MOTOR_LEFT_POS ? MOTOR_RIGHT_POS : MOTOR_LEFT_POS;
+  const short rotate = pos == MOTOR_LEFT_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
+  const short rotateBack = pos == MOTOR_LEFT_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
+
+  S_PRINT2("CurrentPos: ", pos);
+  S_PRINT2("    EndPos: ", endPos);
+  S_PRINT2("    Rotate: ", rotate);
+
+  if(pos >= MOTOR_RIGHT_POS && pos <= MOTOR_LEFT_POS)
   {
-    servo.write(360);
-    settings.CurrentPosition = 270;
+    while (rotate > 0 ? pos <= endPos : pos >= endPos)
+    {
+      btnRt.loop();
+      if(btnRt.isReleased()) break;
+      
+      if(MOTOR_SHOW_PROGRESS)
+      {
+        //map(value, fromLow, fromHigh, toLow, toHigh)
+        //short lcdPos = map(long, long, long, long, long);
+      }
+
+      servo.write(pos);
+      if(MOTOR_STEP_BACK_MODE)
+      {
+        short stepBackPos = pos - rotateBack;
+        if(stepBackPos >= MOTOR_RIGHT_POS + MOTOR_STEP_BACK_VALUE && stepBackPos <= MOTOR_LEFT_POS - MOTOR_STEP_BACK_VALUE)
+        {
+          delay(MOTOR_ROTATE_DELAY);
+          servo.write(stepBackPos);
+        }
+      }
+
+      S_PRINT2("CurrentPos: ", pos);
+
+      pos += rotate;
+      delay(MOTOR_ROTATE_DELAY);
+
+      wdt_reset();
+    }
   }
-  else
-  {
-    servo.write(0);
-    settings.CurrentPosition = 0;
-  }
-  delay(3000);
+
+  settings.CurrentPosition = endPos;
+
+  S_PRINT3("Do Feed (", settings.CurrentPosition, ")");  
   DetachServo();
 }
 
@@ -187,7 +245,7 @@ void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 1)
   {
-    PrintToSerialDateTime();
+    PrintToSerialDateTime();   
   }
   
   //Reset after 8 secs see watch dog timer
@@ -211,9 +269,8 @@ void HandleDebugSerialCommands()
       debugButtonFromSerial = readFromSerial.toInt();
       Serial.println(debugButtonFromSerial);
     }
-  }  
-
-  //delay(50);
+  }
+  
   wdt_reset();
 }
 
@@ -222,7 +279,7 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 {
   if(value.length() >= 12)
   {
-    Serial.println(value);
+    S_PRINT2("Entered debug value: ", value);
 
     short yyyy = value.substring(0, 4).toInt();
     short MM = value.substring(4, 6).toInt();      
@@ -231,13 +288,21 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
     short HH = value.substring(8, 10).toInt();      
     short mm = value.substring(10, 12).toInt();
 
-    if(yyyy < 2023 || yyyy > 2100)  {Serial.print("Wrong value - "); Serial.println(yyyy); return false; }
-    if(MM < 1 || MM > 12)           {Serial.print("Wrong value - "); Serial.println(MM); return false; }
-    if(dd < 1 || dd > 31)           {Serial.print("Wrong value - "); Serial.println(dd); return false; }
-    if(HH < 0 || HH > 23)           {Serial.print("Wrong value - "); Serial.println(HH); return false; }
-    if(mm < 0 || mm > 59)           {Serial.print("Wrong value - "); Serial.println(mm); return false; }        
+    short ss = 0;
 
-    auto dt = DateTime(yyyy, MM, dd, HH, mm, 0);      
+    if(yyyy < 2023 || yyyy > 2100)  {S_PRINT2("Wrong value: ", yyyy); return false; }
+    if(MM < 1 || MM > 12)           {S_PRINT2("Wrong value: ", MM); return false; }
+    if(dd < 1 || dd > 31)           {S_PRINT2("Wrong value: ", dd); return false; }
+    if(HH < 0 || HH > 23)           {S_PRINT2("Wrong value: ", HH); return false; }
+    if(mm < 0 || mm > 59)           {S_PRINT2("Wrong value: ", mm); return false; }
+
+    if(value.length() >= 14)
+    {
+      ss = value.substring(12, 14).toInt();
+      if(ss < 0 || ss > 59)         {S_PRINT2("Wrong value: ", ss); ss = 0;}
+    }
+
+    auto dt = DateTime(yyyy, MM, dd, HH, mm, ss);      
     realTimeClock.now(dt);
 
     return true;
@@ -247,7 +312,8 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
 void PrintToSerialDateTime()
 {
-  S_PRINT2("Current DateTime: ", rtc.now().timestamp());  
+  S_PRINT2("Current DateTime: ", rtc.now().timestamp());
+  S_PRNT  ("System  DateTime: "); S_PRINT3(__DATE__, " ", __TIME__);
 }
 
 void BacklightOn()
@@ -262,7 +328,7 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
   if(currentTicks - prevTicks >= 1000)
   {
     //S_PRINT(currentTicks);
-    ClearRow(1);    
+    ClearRow(1, 8);    
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     prevTicks = currentTicks;
   }
@@ -285,11 +351,12 @@ void EnableWatchDog()
   S_PRINT("Watchdog enabled.");
 }
 
-void ClearRow(const short &row)
+void ClearRow(const short &row) { ClearRow(row, 0); }
+void ClearRow(const short &row, const short &gotoY)
 {
   lcd.setCursor(0, row);
   lcd.print("                  ");
-  lcd.setCursor(0, row);
+  lcd.setCursor(gotoY, row);
 }
 
 void PrintStatus()

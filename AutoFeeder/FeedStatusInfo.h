@@ -50,7 +50,10 @@ namespace Feed
 
     const String ToString(const bool shortStatus = false) const
     {
-      return String(GetStatusString(shortStatus)) + " " + DT.timestamp(DateTime::TIMESTAMP_TIME);
+      char buff[17];
+      
+      sprintf(buff, "%02d:%02d -%s", DT.hour(), DT.minute(), GetStatusString(shortStatus));
+      return  String(buff);
     }    
 
     const char *const GetStatusString(const bool &shortStatus) const
