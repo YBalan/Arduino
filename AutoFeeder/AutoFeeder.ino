@@ -4,24 +4,15 @@
 #include <Servo.h>
 #include <LiquidCrystal_I2C.h>
 
+#define DEBUG
+#include "DEBUGHelper.h"
+
 #include "../../Shares/Button.h"
 #include "FeedStatusInfo.h"
 #include "FeedSettings.h"
 #include "FeedScheduler.h"
-
-#define DEBUG
-
-#ifdef DEBUG
-  #define S_PRNT(value) Serial.print((value))
-  #define S_PRINT(value) Serial.println((value))
-  #define S_PRINT2(value1, value2) Serial.print((value1)); Serial.println((value2))
-  #define S_PRINT3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))  
-#else  
-  #define S_PRNT(value) while(0)
-  #define S_PRINT(value) while(0)
-  #define S_PRINT2(value1, value2) while(0)
-  #define S_PRINT3(value1, value2, value3) while(0)
-#endif
+#include "FeedMotor.h"
+#include "LcdProgressBar.h"
 
 //DebounceTime
 #define DEBOUNCE_TIME 50
@@ -37,8 +28,11 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 DS323x rtc;
 
+Helpers::LcdProgressBar progress(lcd, 1, 0, 16, Helpers::LcdProgressSettings::NUMBERS_CENTER);
+
 #define SERVO_PIN 9
-Servo servo;
+#define MOTOR_SHOW_PROGRESS true
+Feed::FeedMotor servo(SERVO_PIN, progress);
 
 Feed::Settings settings;
 
@@ -93,7 +87,7 @@ void setup()
   btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
   btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
 
-  //AttachServo();
+  servo.Init();
 
   LoadSettings();
   PrintStatus();
@@ -121,15 +115,25 @@ void loop()
   {
     S_PRINT("Ok btn is pressed...");
     BacklightOn();
-  }  
+  }
 
-  if(btnManualFeed.isReleased() || btnRt.isReleased())
+  if(btnOK.isReleased())
+  {
+    if(btnOK.isLongPress())
+    {
+      btnOK.resetTicks();
+    }
+  }
+
+  if(btnManualFeed.isReleased() || btnUp.isReleased())
   {
     S_PRINT2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
     BacklightOn();
 
-    DoFeed();
-    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+    }
 
     ShowLastAction();
   }
@@ -139,8 +143,10 @@ void loop()
     S_PRINT2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    DoFeed();
-    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+    }
 
     ShowLastAction();
   }
@@ -150,8 +156,10 @@ void loop()
     S_PRINT2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    DoFeed();
-    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+    }
     
     ShowLastAction();
   }
@@ -161,8 +169,10 @@ void loop()
     S_PRINT2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    DoFeed();
-    settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
+    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
+    }
     settings.FeedScheduler.SetNextAlarm(dtNow);
 
     ShowLastAction();
@@ -172,73 +182,20 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-#define MOTOR_RIGHT_POS 0
-#define MOTOR_LEFT_POS  180
-#define MOTOR_ROTATE_DELAY 100
-#define MOTOR_ROTATE_VALUE 5
-#define MOTOR_STEP_BACK_MODE true
-#define MOTOR_STEP_BACK_VALUE 10
-
-#define MOTOR_SHOW_PROGRESS true
-
-void DoFeed()
+const bool DoFeed(const bool &showProgress)
 {
-  AttachServo();
-  S_PRINT3("Do Feed (", settings.CurrentPosition, ")");
-    
-  short pos = settings.CurrentPosition;
-  const short endPos = pos == MOTOR_LEFT_POS ? MOTOR_RIGHT_POS : MOTOR_LEFT_POS;
-  const short rotate = pos == MOTOR_LEFT_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
-  const short rotateBack = pos == MOTOR_LEFT_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
-
-  S_PRINT2("CurrentPos: ", pos);
-  S_PRINT2("    EndPos: ", endPos);
-  S_PRINT2("    Rotate: ", rotate);
-
-  if(pos >= MOTOR_RIGHT_POS && pos <= MOTOR_LEFT_POS)
-  {
-    while (rotate > 0 ? pos <= endPos : pos >= endPos)
-    {
-      btnRt.loop();
-      if(btnRt.isReleased()) break;
-      
-      if(MOTOR_SHOW_PROGRESS)
-      {
-        //map(value, fromLow, fromHigh, toLow, toHigh)
-        //short lcdPos = map(long, long, long, long, long);
-      }
-
-      servo.write(pos);
-      if(MOTOR_STEP_BACK_MODE)
-      {
-        short stepBackPos = pos - rotateBack;
-        if(stepBackPos >= MOTOR_RIGHT_POS + MOTOR_STEP_BACK_VALUE && stepBackPos <= MOTOR_LEFT_POS - MOTOR_STEP_BACK_VALUE)
-        {
-          delay(MOTOR_ROTATE_DELAY);
-          servo.write(stepBackPos);
-        }
-      }
-
-      S_PRINT2("CurrentPos: ", pos);
-
-      pos += rotate;
-      delay(MOTOR_ROTATE_DELAY);
-
-      wdt_reset();
-    }
-  }
-
-  settings.CurrentPosition = endPos;
-
-  S_PRINT3("Do Feed (", settings.CurrentPosition, ")");  
-  DetachServo();
+  return servo.DoFeed(settings.CurrentPosition, showProgress, btnRt);
 }
 
 void ShowLastAction()
 {
   S_PRINT2("LAST: ", settings.GetLastStatus().ToString());
+  
   ClearRow(0);
-  lcd.print("LAST: "); lcd.print(settings.GetLastStatus().ToString());
+
+  const Feed::StatusInfo &lastStatus = settings.GetLastStatus();  
+  if(lastStatus.Status != Feed::Status::Unknown)  
+    lcd.print("LAST: "); lcd.print(lastStatus.ToString());
 }
 
 void HandleDebugSerialCommands()
@@ -364,21 +321,6 @@ void PrintStatus()
   S_PRINT("Status: ");
 }
 
-void AttachServo()
-{
-  if(!servo.attached())
-  {
-    S_PRINT("Servo Attached");
-    servo.attach(SERVO_PIN);
-  }  
-}
-
-void DetachServo()
-{  
-    S_PRINT("Servo Detached");
-    servo.detach();    
-}
-
 void SaveSettings()
 {
   S_PRINT("Save Settings...");
@@ -391,4 +333,9 @@ void LoadSettings()
   S_PRINT("Load Settings...");
   
   EEPROM.get(EEPROM_SETTINGS_ADDR, settings);  
+
+  if(settings.CurrentPosition == 65535)
+  {
+    settings.CurrentPosition = 0;
+  }
 }

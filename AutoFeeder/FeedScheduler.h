@@ -36,7 +36,7 @@ namespace Feed
 
       if(NextAlarm.year() == current.year() && NextAlarm.month() == current.month() && NextAlarm.day() == current.day())
       {
-        if(NextAlarm.hour() == current.hour())
+        if(NextAlarm.hour() == current.hour() && NextAlarm.minute() == current.minute())
         {
           _hasAlarmed = true;          
         }
@@ -50,6 +50,11 @@ namespace Feed
     void SetNextAlarm(const DateTime &current)
     {
       NextAlarm = GetNextTime(current);
+    }
+
+    const DateTime &GetNextAlarm() const
+    {
+      return NextAlarm;
     }
 
     private:
