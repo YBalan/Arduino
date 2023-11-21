@@ -5,6 +5,7 @@
 #include <LiquidCrystal_I2C.h>
 
 #define DEBUG
+#define TRACE
 #include "DEBUGHelper.h"
 
 #include "../../Shares/Button.h"
@@ -55,6 +56,20 @@ Button btnManualFeed(MANUAL_FEED_PIN);
 ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
+//Menu
+#define RETURN_TO_MAIN_MENU_AFTER 60000
+bool IsBusy = false;
+short mainMenuPos = 0;
+short historyMenuPos = 0;
+short scheduleMenuPos = 0;
+
+enum Menu : short
+{
+  Main,
+  History,
+  Schedule,
+} currentMenu;
+
 void setup() 
 {
   Serial.begin(9600);  
@@ -62,8 +77,8 @@ void setup()
 
   Serial.println();
   Serial.println();
-  S_PRINT("!!!! Start Auto Feeder !!!!");
-  S_PRINT3(__DATE__, " ", __TIME__);  
+  Serial.println("!!!! Start Auto Feeder !!!!");
+  Serial.print(__DATE__); Serial.print(" "); Serial.println(__TIME__);  
 
   lcd.init();
   lcd.init();
@@ -73,7 +88,7 @@ void setup()
   lcd.print("Hello!");    
 
   Wire.begin();
-  delay(2000);
+  //delay(2000);
   rtc.attach(Wire);
   
   ShowLcdTime(1000, rtc.now());
@@ -117,20 +132,89 @@ void loop()
     BacklightOn();
   }
 
+  if(btnRt.isPressed())
+  {
+    S_PRINT("BACK btn is pressed...");
+    BacklightOn();
+    currentMenu = Menu::Main;
+    ShowLastAction();
+  }
+
   if(btnOK.isReleased())
   {
+    S_PRINT("Ok btn is released...");
     if(btnOK.isLongPress())
     {
+      S_PRINT("Ok btn is longpressed...");
+      if(currentMenu == Menu::Main)
+      {
+        currentMenu = Menu::History;
+        ShowHistory(historyMenuPos);
+      }else      
+      if(currentMenu == Menu::History)
+      {
+        currentMenu == Menu::Schedule;
+      }
+      else
+        currentMenu == Menu::Main;
       btnOK.resetTicks();
     }
   }
 
-  if(btnManualFeed.isReleased() || btnUp.isReleased())
+  if(btnUp.isReleased())
+  {
+    S_PRINT2("Button UP is released at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    BacklightOn();
+
+    if(currentMenu == Menu::History)
+    {      
+      // if(historyMenuPos >= FEEDS_STATUS_HISTORY_COUNT)
+      // {
+      //   historyMenuPos = 0;
+      // }
+      // ShowHistory(historyMenuPos++);
+      ShowHistory(historyMenuPos = historyMenuPos >= FEEDS_STATUS_HISTORY_COUNT ? historyMenuPos = 0 : historyMenuPos)++;
+      return;
+    }
+
+    if(DoFeed(2, MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+    }
+
+    ShowLastAction();
+  }
+
+   if(btnDw.isReleased())
+  {
+    S_PRINT2("Button DOWN is released at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    BacklightOn();
+
+    if(currentMenu == Menu::History)
+    {           
+      // if(historyMenuPos < 0)
+      // {
+      //   historyMenuPos = FEEDS_STATUS_HISTORY_COUNT - 1;
+      // }
+      // ShowHistory(historyMenuPos--);
+      ShowHistory(historyMenuPos = historyMenuPos < 0 ? historyMenuPos = FEEDS_STATUS_HISTORY_COUNT - 1 : historyMenuPos)--;
+      return;
+    }
+
+    if(DoFeed(1, MOTOR_SHOW_PROGRESS))
+    {
+      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+    }
+
+    ShowLastAction();
+  }
+
+  if(btnManualFeed.isReleased())
   {
     S_PRINT2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
     BacklightOn();
 
-    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
     }
@@ -143,7 +227,7 @@ void loop()
     S_PRINT2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
     }
@@ -156,7 +240,7 @@ void loop()
     S_PRINT2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
     }
@@ -169,7 +253,7 @@ void loop()
     S_PRINT2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
     }
@@ -182,20 +266,44 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-const bool DoFeed(const bool &showProgress)
+const bool DoFeed(const short &feedCount, const bool &showProgress)
 {
-  return servo.DoFeed(settings.CurrentPosition, showProgress, btnRt);
+  return servo.DoFeed(settings.CurrentPosition, feedCount, showProgress, btnRt);
 }
 
+//Menu
 void ShowLastAction()
-{
-  S_PRINT2("LAST: ", settings.GetLastStatus().ToString());
-  
-  ClearRow(0);
-
+{  
   const Feed::StatusInfo &lastStatus = settings.GetLastStatus();  
-  if(lastStatus.Status != Feed::Status::Unknown)  
-    lcd.print("LAST: "); lcd.print(lastStatus.ToString());
+  S_PRINT2("LAST: ", lastStatus.ToString());
+
+  ClearRow(0);  
+  if(lastStatus.Status != Feed::Status::Unknown)
+  {
+    lcd.print("LAST: "); lcd.print(lastStatus.ToString());    
+  }
+  
+  //if(settings.FeedScheduler.Set != Feed::ScheduleSet::NotSet)
+  {
+    ClearRow(1);
+    const DateTime &nextDt = settings.FeedScheduler.GetNextAlarm();
+    lcd.print("N:"); nextDt.hour() != 255 ? lcd.print(nextDt.timestamp(DateTime::TIMESTAMP_TIME)) : lcd.print("00:00");    
+  }
+}
+
+short &ShowHistory(short &pos)
+{
+  const short idx = FEEDS_STATUS_HISTORY_COUNT - pos - 1;
+  const Feed::StatusInfo &status = settings.GetStatusByIndex(idx);
+  S_PRINT3(idx + 1, ": ", status.ToString());
+
+  //if(status.Status != Feed::Status::Unknown)
+  {
+    ClearRow(0);
+    lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
+  }  
+
+  return pos;
 }
 
 void HandleDebugSerialCommands()
@@ -285,7 +393,8 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
   if(currentTicks - prevTicks >= 1000)
   {
     //S_PRINT(currentTicks);
-    ClearRow(1, 8);    
+    //ClearRow(1, 8);    
+    lcd.setCursor(8, 1);
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     prevTicks = currentTicks;
   }
@@ -336,6 +445,6 @@ void LoadSettings()
 
   if(settings.CurrentPosition == 65535)
   {
-    settings.CurrentPosition = 0;
+    settings.Reset();    
   }
 }

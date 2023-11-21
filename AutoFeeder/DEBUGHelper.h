@@ -15,4 +15,17 @@
 #endif
 
 
+#ifdef TRACE
+  #define S_TRCE(value) Serial.print((value))
+  #define S_TRACE(value) Serial.println((value))
+  #define S_TRACE2(value1, value2) Serial.print((value1)); Serial.println((value2))
+  #define S_TRACE3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))  
+#else  
+  #define S_TRCE(value) while(0)
+  #define S_TRACE(value) while(0)
+  #define S_TRACE2(value1, value2) while(0)
+  #define S_TRACE3(value1, value2, value3) while(0)
+#endif
+
+
 #endif //DEBUG_HELPER_H

@@ -2,7 +2,11 @@
 #ifndef FEED_SETTINGS_H
 #define FEED_SETTINGS_H
 
+#ifdef DEBUG
+#define FEEDS_STATUS_HISTORY_COUNT 5
+#else
 #define FEEDS_STATUS_HISTORY_COUNT 10
+#endif
 
 #include "FeedScheduler.h"
 
@@ -11,8 +15,8 @@ namespace Feed
   struct Settings
   {    
     unsigned short Delay;
-    unsigned short RotateCount;
-    unsigned short CurrentPosition;
+    unsigned short RotateCount = 1;
+    unsigned short CurrentPosition = 0;
     Scheduler FeedScheduler;
     private:
     Feed::StatusInfo FeedHistory[FEEDS_STATUS_HISTORY_COUNT];
@@ -22,18 +26,29 @@ namespace Feed
       Push(status);
     }
 
-    const Feed::StatusInfo &GetLastStatus()
+    const Feed::StatusInfo &GetLastStatus() const
     {
       return FeedHistory[FEEDS_STATUS_HISTORY_COUNT - 1];
     }
 
-    const Feed::StatusInfo &GetStatusByIndex(const short &idx)
+    const Feed::StatusInfo &GetStatusByIndex(const short &idx) const
     {
       if(idx >= 0 && idx < FEEDS_STATUS_HISTORY_COUNT)
       {
         return FeedHistory[idx];
       }
       return Feed::StatusInfo();
+    }
+
+    void Reset()
+    {
+      CurrentPosition = 0;
+      RotateCount = 2;
+      FeedScheduler.Set = Feed::ScheduleSet::NotSet;
+      for(short idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
+      {
+        FeedHistory[idx] = Feed::StatusInfo();
+      }
     }
 
     private:
