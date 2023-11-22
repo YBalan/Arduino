@@ -2,16 +2,38 @@
 #ifndef FEED_SCHEDULER_H
 #define FEED_SCHEDULER_H
 
+#define FEEDS_SCHEDULER_SETTINGS_COUNT 7
+
 namespace Feed
 {
-  enum class ScheduleSet : short
+  enum ScheduleSet : short
   {
     NotSet = 0,
 
-    DAILY_2 = 2,
-    DAILY_4 = 4,
-    DAILY_6 = 6,
+    DAILY_2,
+    DAILY_4,
+    DAILY_6,
+
+    DAYNIGHT_8,
+    DAYNIGHT_10,
+    DAYNIGHT_12,
   };
+
+  static const char *const GetSchedulerSetString(const ScheduleSet &set, const bool &shortView)
+  {    
+    switch(set)
+    {
+      case ScheduleSet::DAILY_2:      return shortView ? "D2"   : "Day 2";
+      case ScheduleSet::DAILY_4:      return shortView ? "D4"   : "Day 4";
+      case ScheduleSet::DAILY_6:      return shortView ? "D6"   : "Day 6";
+
+      case ScheduleSet::DAYNIGHT_8:   return shortView ? "DN8"  : "DayNght 8";
+      case ScheduleSet::DAYNIGHT_10:  return shortView ? "DN10" : "DayNght 10";
+      case ScheduleSet::DAYNIGHT_12:  return shortView ? "DN12" : "DayNght 12";
+      case ScheduleSet::NotSet:
+      default:                        return shortView ? "NA"   : "NotSet";
+    }
+  }
 
   struct Scheduler
   {
@@ -22,6 +44,8 @@ namespace Feed
     bool _hasAlarmed;
 
     public:   
+
+    const char *const SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
 
     const bool IsTimeToAlarm(const DateTime &current)
     {
@@ -71,7 +95,7 @@ namespace Feed
         default:
           return current;
       }
-    }
+    }      
 
     private:
     const TimeSpan GetTimeSpan(const DateTime &current, const short &startHour, const short &endHour, const short &count) const

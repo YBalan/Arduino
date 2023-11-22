@@ -5,7 +5,12 @@
 #include <LiquidCrystal_I2C.h>
 
 #define DEBUG
-#define TRACE
+
+#ifdef DEBUG
+  #define INFO
+  #define TRACE
+#endif
+
 #include "DEBUGHelper.h"
 
 #include "../../Shares/Button.h"
@@ -14,14 +19,13 @@
 #include "FeedScheduler.h"
 #include "FeedMotor.h"
 #include "LcdProgressBar.h"
+#include "AutoFeederMenuHelper.h"
 
 //DebounceTime
 #define DEBOUNCE_TIME 50
 
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 0
-
-short debugButtonFromSerial = 0;
 
 #define BACKLIGHT_DELAY 50000
 unsigned long backlightStartTicks = 0;
@@ -56,19 +60,10 @@ Button btnManualFeed(MANUAL_FEED_PIN);
 ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
-//Menu
-#define RETURN_TO_MAIN_MENU_AFTER 60000
-bool IsBusy = false;
-short mainMenuPos = 0;
-short historyMenuPos = 0;
-short scheduleMenuPos = 0;
-
-enum Menu : short
-{
-  Main,
-  History,
-  Schedule,
-} currentMenu;
+//Menus Functions
+short &ShowHistory(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_STATUS_HISTORY_COUNT);
+short &ShowSchedule(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_SCHEDULER_SETTINGS_COUNT);
+short &ShowFeedCount(short &pos, const short &minPositions = 0, const short &maxPositions = MAX_FEED_COUNT);
 
 void setup() 
 {
@@ -77,8 +72,8 @@ void setup()
 
   Serial.println();
   Serial.println();
-  Serial.println("!!!! Start Auto Feeder !!!!");
-  Serial.print(__DATE__); Serial.print(" "); Serial.println(__TIME__);  
+  S_INFO("!!!! Start Auto Feeder !!!!");
+  S_INFO3(__DATE__, " ", __TIME__);  
 
   lcd.init();
   lcd.init();
@@ -88,7 +83,7 @@ void setup()
   lcd.print("Hello!");    
 
   Wire.begin();
-  //delay(2000);
+  //delay(2000);  
   rtc.attach(Wire);
   
   ShowLcdTime(1000, rtc.now());
@@ -105,9 +100,9 @@ void setup()
   servo.Init();
 
   LoadSettings();
-  PrintStatus();
-
   EnableWatchDog();
+
+  ShowLastAction();
 }
 
 void loop() 
@@ -128,24 +123,29 @@ void loop()
 
   if(btnOK.isPressed())
   {
-    S_PRINT("Ok btn is pressed...");
+    S_INFO2("Ok ", BUTTON_IS_PRESSED_MSG);
     BacklightOn();
   }
 
   if(btnRt.isPressed())
   {
-    S_PRINT("BACK btn is pressed...");
+    S_INFO4("BACK ", BUTTON_IS_PRESSED_MSG, " menu: ", currentMenu);
     BacklightOn();
+
+    if(currentMenu != Menu::Main)
+    {
+      SaveSettings();
+    }
     currentMenu = Menu::Main;
     ShowLastAction();
   }
 
   if(btnOK.isReleased())
   {
-    S_PRINT("Ok btn is released...");
+    S_INFO4("Ok ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);
     if(btnOK.isLongPress())
     {
-      S_PRINT("Ok btn is longpressed...");
+      S_INFO2("Ok ", BUTTON_IS_LONGPRESSED_MSG);
       if(currentMenu == Menu::Main)
       {
         currentMenu = Menu::History;
@@ -153,65 +153,80 @@ void loop()
       }else      
       if(currentMenu == Menu::History)
       {
-        currentMenu == Menu::Schedule;
+        currentMenu = Menu::Schedule;
+        ShowSchedule(scheduleMenuPos = settings.FeedScheduler.Set);
+      }else
+      if(currentMenu == Menu::Schedule)
+      {
+        currentMenu = Menu::FeedCount;
+        ShowFeedCount(feedCountMenuPos = settings.RotateCount - 1);
       }
-      else
-        currentMenu == Menu::Main;
+      else currentMenu == Menu::Main;
       btnOK.resetTicks();
     }
   }
 
   if(btnUp.isReleased())
   {
-    S_PRINT2("Button UP is released at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    S_INFO4("UP ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);    
     BacklightOn();
 
     if(currentMenu == Menu::History)
-    {      
-      // if(historyMenuPos >= FEEDS_STATUS_HISTORY_COUNT)
-      // {
-      //   historyMenuPos = 0;
-      // }
-      // ShowHistory(historyMenuPos++);
-      ShowHistory(historyMenuPos = historyMenuPos >= FEEDS_STATUS_HISTORY_COUNT ? historyMenuPos = 0 : historyMenuPos)++;
-      return;
-    }
-
-    if(DoFeed(2, MOTOR_SHOW_PROGRESS))
+    { 
+      ShowHistory(++historyMenuPos);      
+    }else
+    if(currentMenu == Menu::Schedule)
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+      ShowSchedule(++scheduleMenuPos);
+    }else
+    if(currentMenu == Menu::FeedCount)
+    {
+      ShowFeedCount(++feedCountMenuPos);
     }
-
-    ShowLastAction();
+    else
+    {
+      #ifdef DEBUG
+      if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+      {
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
+      }
+      ShowLastAction();
+      #endif
+    }
   }
 
    if(btnDw.isReleased())
   {
-    S_PRINT2("Button DOWN is released at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    S_INFO4("DOWN ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);    
     BacklightOn();
 
     if(currentMenu == Menu::History)
     {           
-      // if(historyMenuPos < 0)
-      // {
-      //   historyMenuPos = FEEDS_STATUS_HISTORY_COUNT - 1;
-      // }
-      // ShowHistory(historyMenuPos--);
-      ShowHistory(historyMenuPos = historyMenuPos < 0 ? historyMenuPos = FEEDS_STATUS_HISTORY_COUNT - 1 : historyMenuPos)--;
-      return;
-    }
-
-    if(DoFeed(1, MOTOR_SHOW_PROGRESS))
+      ShowHistory(--historyMenuPos);      
+    }else
+    if(currentMenu == Menu::Schedule)
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+      ShowSchedule(--scheduleMenuPos);
+    }else
+    if(currentMenu == Menu::FeedCount)
+    {
+      ShowFeedCount(--feedCountMenuPos);
     }
-
-    ShowLastAction();
+    else
+    {
+      #ifdef DEBUG
+      if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+      {
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
+      }
+      ShowLastAction();
+      #endif
+    }
   }
 
   if(btnManualFeed.isReleased())
   {
-    S_PRINT2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+    //S_INFO2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
     BacklightOn();
 
     if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
@@ -219,12 +234,13 @@ void loop()
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
     }
 
-    ShowLastAction();
+    SaveSettings();
+    ShowLastAction();    
   }
   else
   if(btnRemoteFeed.isReleased())
   {    
-    S_PRINT2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    //S_INFO2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
     if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
@@ -232,12 +248,13 @@ void loop()
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
     }
 
-    ShowLastAction();
+    SaveSettings();
+    ShowLastAction();    
   }
   else
   if(btnPawFeed.isReleased())
   {
-    S_PRINT2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
     if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
@@ -245,12 +262,13 @@ void loop()
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
     }
     
-    ShowLastAction();
+    SaveSettings();
+    ShowLastAction();   
   }
   else
   if(settings.FeedScheduler.IsTimeToAlarm(rtc.now()))
   {
-    S_PRINT2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+    //S_INFO2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
     if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
@@ -259,15 +277,17 @@ void loop()
     }
     settings.FeedScheduler.SetNextAlarm(dtNow);
 
-    ShowLastAction();
+    SaveSettings();
+    ShowLastAction();    
   }  
  
-  CheckBacklightDelay(millis()); 
+  CheckBacklightDelayAndReturnToMainMenu(millis()); 
   HandleDebugSerialCommands();
 }
 
 const bool DoFeed(const short &feedCount, const bool &showProgress)
 {
+  S_INFO2("DoFead count: ", feedCount);
   return servo.DoFeed(settings.CurrentPosition, feedCount, showProgress, btnRt);
 }
 
@@ -275,48 +295,95 @@ const bool DoFeed(const short &feedCount, const bool &showProgress)
 void ShowLastAction()
 {  
   const Feed::StatusInfo &lastStatus = settings.GetLastStatus();  
-  S_PRINT2("LAST: ", lastStatus.ToString());
+  S_TRACE2("LAST: ", lastStatus.Status != Feed::Status::Unknown ? lastStatus.ToString() : NOT_FED_YET_MSG);
 
   ClearRow(0);  
   if(lastStatus.Status != Feed::Status::Unknown)
   {
     lcd.print("LAST: "); lcd.print(lastStatus.ToString());    
   }
-  
-  //if(settings.FeedScheduler.Set != Feed::ScheduleSet::NotSet)
+  else
   {
-    ClearRow(1);
-    const DateTime &nextDt = settings.FeedScheduler.GetNextAlarm();
-    lcd.print("N:"); nextDt.hour() != 255 ? lcd.print(nextDt.timestamp(DateTime::TIMESTAMP_TIME)) : lcd.print("00:00");    
+    lcd.print(NOT_FED_YET_MSG);
   }
+
+  ClearRow(1); 
+  if(settings.FeedScheduler.Set != Feed::ScheduleSet::NotSet)
+  {    
+    const DateTime &nextDt = settings.FeedScheduler.GetNextAlarm();
+    lcd.print("N:"); nextDt.hour() != 255 ? lcd.print(nextDt.timestamp(DateTime::TIMESTAMP_TIME)) : lcd.print(0);    
+  }
+  else
+  {
+    lcd.print(settings.FeedScheduler.SetToString(/*shortView:*/false));
+  }  
 }
 
-short &ShowHistory(short &pos)
+short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions)
 {
-  const short idx = FEEDS_STATUS_HISTORY_COUNT - pos - 1;
-  const Feed::StatusInfo &status = settings.GetStatusByIndex(idx);
-  S_PRINT3(idx + 1, ": ", status.ToString());
+  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
-  //if(status.Status != Feed::Status::Unknown)
-  {
-    ClearRow(0);
+  const short idx = maxPositions - pos - 1;
+  const Feed::StatusInfo &status = settings.GetStatusByIndex(idx);
+  S_TRACE4("Hist: ", idx + 1, ": ", status.ToString());
+
+  ClearRow(0);
+  if(status.Status != Feed::Status::Unknown)
+  {    
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
-  }  
+  } 
+  else
+  {
+    lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(NO_VALUES_MSG);
+  } 
 
   return pos;
 }
 
+short &ShowSchedule(short &pos, const short &minPositions, const short &maxPositions)
+{
+  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
+  S_TRACE4("Sched: ", pos, ": ", settings.FeedScheduler.SetToString());
+
+  ClearRow(0);
+  lcd.print("Set: "); lcd.print(Feed::GetSchedulerSetString(pos, /*shortView:*/false));
+
+  settings.FeedScheduler.Set = pos;
+
+  return pos;
+}
+
+short &ShowFeedCount(short &pos, const short &minPositions, const short &maxPositions)
+{
+  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
+  S_TRACE2("FeedCount: ", pos + 1);
+
+  ClearRow(0);
+  lcd.print("FeedCount: "); lcd.print(pos + 1);
+
+  settings.RotateCount = pos + 1;
+
+  return pos;
+}
+
+short debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
-  if(debugButtonFromSerial == 1)
+  if(debugButtonFromSerial == 1) // SHOW DateTime
   {
     PrintToSerialDateTime();   
+  }
+
+  if(debugButtonFromSerial == 2) //RESET Settings
+  {
+    settings.Reset();
+    ShowLastAction();
   }
   
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == 11)
   {
-    S_PRINT("Going to reset after 8secs...");
+    S_INFO("Reset in 8s...");
     delay(10 * 1000);
   }
 
@@ -325,14 +392,15 @@ void HandleDebugSerialCommands()
   {
     auto readFromSerial = Serial.readString();
 
+    S_INFO2("Input: ", readFromSerial);
+
     if(SetCurrentDateTime(readFromSerial, rtc))
     {      
       PrintToSerialDateTime();
     }
     else
     {    
-      debugButtonFromSerial = readFromSerial.toInt();
-      Serial.println(debugButtonFromSerial);
+      debugButtonFromSerial = readFromSerial.toInt();      
     }
   }
   
@@ -344,8 +412,6 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 {
   if(value.length() >= 12)
   {
-    S_PRINT2("Entered debug value: ", value);
-
     short yyyy = value.substring(0, 4).toInt();
     short MM = value.substring(4, 6).toInt();      
     short dd = value.substring(6, 8).toInt();      
@@ -355,16 +421,16 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
     short ss = 0;
 
-    if(yyyy < 2023 || yyyy > 2100)  {S_PRINT2("Wrong value: ", yyyy); return false; }
-    if(MM < 1 || MM > 12)           {S_PRINT2("Wrong value: ", MM); return false; }
-    if(dd < 1 || dd > 31)           {S_PRINT2("Wrong value: ", dd); return false; }
-    if(HH < 0 || HH > 23)           {S_PRINT2("Wrong value: ", HH); return false; }
-    if(mm < 0 || mm > 59)           {S_PRINT2("Wrong value: ", mm); return false; }
+    if(yyyy < 2023 || yyyy > 2100)  {S_INFO2("Wrong: ", yyyy);  return false; }
+    if(MM < 1 || MM > 12)           {S_INFO2("Wrong: ", MM);    return false; }
+    if(dd < 1 || dd > 31)           {S_INFO2("Wrong: ", dd);    return false; }
+    if(HH < 0 || HH > 23)           {S_INFO2("Wrong: ", HH);    return false; }
+    if(mm < 0 || mm > 59)           {S_INFO2("Wrong: ", mm);    return false; }
 
     if(value.length() >= 14)
     {
       ss = value.substring(12, 14).toInt();
-      if(ss < 0 || ss > 59)         {S_PRINT2("Wrong value: ", ss); ss = 0;}
+      if(ss < 0 || ss > 59)         {S_INFO2("Wrong: ", ss); ss = 0;}
     }
 
     auto dt = DateTime(yyyy, MM, dd, HH, mm, ss);      
@@ -377,14 +443,26 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
 void PrintToSerialDateTime()
 {
-  S_PRINT2("Current DateTime: ", rtc.now().timestamp());
-  S_PRNT  ("System  DateTime: "); S_PRINT3(__DATE__, " ", __TIME__);
+  S_INF  ("SYS DT: "); S_INFO3(__DATE__, " ", __TIME__);
+  S_INFO2("RTC DT: ", rtc.now().timestamp());  
 }
 
 void BacklightOn()
 {
   lcd.backlight();
   backlightStartTicks = millis();
+}
+
+const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentTicks)
+{
+  if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
+  {      
+    lcd.noBacklight();
+    ShowLastAction(); 
+    backlightStartTicks = 0;
+    return true;
+  }
+  return false;
 }
 
 unsigned long prevTicks = 0;
@@ -400,21 +478,10 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
   }
 }
 
-const bool CheckBacklightDelay(const unsigned long &currentTicks)
-{
-  if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
-  {      
-    lcd.noBacklight();
-    backlightStartTicks = 0;
-    return true;
-  }
-  return false;
-}
-
 void EnableWatchDog()
 {
   wdt_enable(WDTO_8S); 
-  S_PRINT("Watchdog enabled.");
+  S_INFO("Watchdog enabled.");
 }
 
 void ClearRow(const short &row) { ClearRow(row, 0); }
@@ -425,21 +492,24 @@ void ClearRow(const short &row, const short &gotoY)
   lcd.setCursor(gotoY, row);
 }
 
-void PrintStatus()
-{  
-  S_PRINT("Status: ");
-}
-
 void SaveSettings()
 {
-  S_PRINT("Save Settings...");
+  S_INFO("Save...");
+
+  ClearRow(1);
+  lcd.print("Save...");
+
+  delay(500);
 
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
 }
 
 void LoadSettings()
 {
-  S_PRINT("Load Settings...");
+  S_INFO("Load...");
+
+  ClearRow(1);
+  lcd.print("Load...");
   
   EEPROM.get(EEPROM_SETTINGS_ADDR, settings);  
 

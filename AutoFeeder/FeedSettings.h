@@ -2,11 +2,14 @@
 #ifndef FEED_SETTINGS_H
 #define FEED_SETTINGS_H
 
-#ifdef DEBUG
-#define FEEDS_STATUS_HISTORY_COUNT 5
-#else
+#ifdef RELEASE
 #define FEEDS_STATUS_HISTORY_COUNT 10
+#else
+#define FEEDS_STATUS_HISTORY_COUNT 5
 #endif
+
+#define MIN_FEED_COUNT 1
+#define MAX_FEED_COUNT 5
 
 #include "FeedScheduler.h"
 
@@ -43,7 +46,7 @@ namespace Feed
     void Reset()
     {
       CurrentPosition = 0;
-      RotateCount = 2;
+      RotateCount = 1;
       FeedScheduler.Set = Feed::ScheduleSet::NotSet;
       for(short idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
       {

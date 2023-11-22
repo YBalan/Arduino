@@ -47,9 +47,9 @@ namespace Feed
         { S_TRACE("Cancel!"); break; }
 
         short pos = currentPosition;
-        short endPos = pos == MOTOR_LEFT_POS ? MOTOR_RIGHT_POS : MOTOR_LEFT_POS;
-        const short rotate = pos == MOTOR_LEFT_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
-        const short rotateBack = pos == MOTOR_LEFT_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
+        short endPos = pos >= MOTOR_LEFT_POS ? MOTOR_RIGHT_POS : MOTOR_LEFT_POS;
+        const short rotate = pos >= MOTOR_LEFT_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
+        const short rotateBack = pos >= MOTOR_LEFT_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
 
         S_TRACE2("   Feed No: ", feed);
         S_TRACE2("CurrentPos: ", pos);
@@ -115,13 +115,13 @@ namespace Feed
       {
         if(_servo.attach(_pin) != INVALID_SERVO)
         {
-          S_TRACE2("Servo Attached to pin: ", _pin);
+          S_TRACE2("Attached: ", _pin);
           return true;
         }
-        S_TRACE2("INVALID SERVO on pin: ", _pin);
+        S_TRACE2("INVALID SERVO: ", _pin);
         return false;
       }
-      S_TRACE2("Servo already Attached to pin: ", _pin);
+      S_TRACE3("Attached: ", _pin, " already");
       return true;
     }
 
@@ -130,7 +130,7 @@ namespace Feed
       if(_servo.attached())
       {
         _servo.detach();
-        S_TRACE2("Servo Detached from pin: ", _pin);
+        S_TRACE2("Detached: ", _pin);
         return true;
       }
       return false;

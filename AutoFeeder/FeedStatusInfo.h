@@ -14,17 +14,19 @@ namespace Feed
     REMOUTE,
     PAW,
     SCHEDULE,
+    TEST,
   };  
 
-  static const char *const GetStatusString(const Status &status, const bool &shortStatus)
+  static const char *const GetFeedStatusString(const Status &status, const bool &shortView)
   {    
     switch(status)
     {
-      case Status::MANUAL:    return shortStatus ? "M" : "MAN";
-      case Status::REMOUTE:   return shortStatus ? "R" : "REM";
-      case Status::PAW:       return shortStatus ? "P" : "PAW";
-      case Status::SCHEDULE:  return shortStatus ? "S" : "SCH";
-      default:                return shortStatus ? "NA": "NaN";
+      case Status::MANUAL:    return shortView ? "M" : "MAN";
+      case Status::REMOUTE:   return shortView ? "R" : "REM";
+      case Status::PAW:       return shortView ? "P" : "PAW";
+      case Status::SCHEDULE:  return shortView ? "S" : "SCH";
+      case Status::TEST:      return shortView ? "T" : "TST";
+      default:                return shortView ? "U" : "NaN";
     }
   }
 
@@ -48,18 +50,13 @@ namespace Feed
       return *this;  // Return a reference to this object
     }
 
-    const String ToString(const bool shortStatus = false) const
+    const String ToString(const bool shortView = false) const
     {
       char buff[17];
       
-      sprintf(buff, "%02d:%02d -%s", DT.hour(), DT.minute(), GetStatusString(shortStatus));
-      return  String(buff);
-    }    
-
-    const char *const GetStatusString(const bool &shortStatus) const
-    {    
-      return Feed::GetStatusString(Status, shortStatus);
-    }
+      sprintf(buff, "%02d:%02d -%s", DT.hour(), DT.minute(), GetFeedStatusString(Status, shortView));
+      return buff;
+    }   
   };
 }
 

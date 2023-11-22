@@ -3,20 +3,20 @@
 
 #include <ezButton.h>
 
-struct Button
+
+
+class Button
 {
-  const int LongPressValue = 2000;
-
-  Button(const short & pin) : _btn(pin)
-  {
-
-  }
-
 private:
   ezButton _btn;
   unsigned long _startTicks = 0;
+  short  _longPressValue;
 
 public:
+  Button(const short & pin, const short &longPressValue = 2000) : _btn(pin), _longPressValue(longPressValue)
+  {
+
+  }
   void loop(){ _btn.loop();  }
 
   const bool isPressed() 
@@ -49,10 +49,15 @@ public:
       }
     }
   }
+  
+  const short &GetLongPressValue() const { return _longPressValue; }
+  const short &SetLongPressValue(const short &longPressValue) { _longPressValue = longPressValue; return _longPressValue; }  
 
   const unsigned long getTicks() { return millis() - _startTicks; }
 
-  const bool isLongPress(){ auto res = _startTicks != 0 && getTicks() >= LongPressValue; return res; }
+  const bool isLongPress() const { auto res = _startTicks != 0 && getTicks() >= _longPressValue; return res; }
+  
+  const bool isLongPress(const short &longPressValue) const{ auto res = _startTicks != 0 && (millis() - longPressValue) >= _longPressValue; return res; }
 
   void resetTicks(){ _startTicks = 0; }
 
