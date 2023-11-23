@@ -98,7 +98,7 @@ namespace Helpers
   private:
     static void ShowProgress(LiquidCrystal_I2C * const lcd, const short &value, const short &row, const short &startPos, const short &maxSymbolsCount, const LcdProgressSettings &settings)
     {
-      S_INFO3(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
+      S_TRACE3(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
 
       if(lcd != 0)
       {

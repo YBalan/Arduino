@@ -6,8 +6,14 @@
 #include "ezButton.h"
 #include "DEBUGHelper.h"
 
+
+#define MOTOR_DS3218MG_270
+
+#define MOTOR_MIN_US 500
+#define MOTOR_MAX_US 2500
 #define MOTOR_RIGHT_POS 0
 #define MOTOR_LEFT_POS  180
+
 #define MOTOR_ROTATE_DELAY 100
 #define MOTOR_ROTATE_VALUE 5
 #define MOTOR_STEP_BACK_MODE true
@@ -23,7 +29,7 @@ namespace Feed
   public:
     FeedMotor(const short &pin) : _pin(pin)
     { }
-    FeedMotor(const short &pin, const Print &print) : _pin(pin), _printProgress(&print)
+    FeedMotor(const short &pin, const Print &print) : _pin(pin), _servo(), _printProgress(&print)
     { }
 
     const short &Init() const { return _printProgress != 0 ? _printProgress->write("", /*Helpers::LcdProgressCommands::Init*/4) : 0; }
@@ -31,6 +37,9 @@ namespace Feed
     const bool DoFeed(unsigned short &currentPosition, const short &feedCount, const bool &showProgress, const ezButton &cancelButton)
     {
       if(!Attach()) return false;
+
+      float usFactor = (MOTOR_MAX_US - MOTOR_MIN_US) / MOTOR_LEFT_POS;
+      S_INFO4("Servo read: ", _servo.readMicroseconds(), " factor: ", usFactor);      
 
       bool res = false;
 
@@ -78,6 +87,7 @@ namespace Feed
             }
            
             _servo.write(pos);
+
             if(MOTOR_STEP_BACK_MODE)
             {
               short stepBackPos = pos - rotateBack;
@@ -90,7 +100,7 @@ namespace Feed
                 delay(MOTOR_ROTATE_DELAY);
                 _servo.write(stepBackPos);
               }
-            }    
+            }             
 
             cancelButton.loop();
             if(cancelButton.isPressed())
@@ -105,6 +115,13 @@ namespace Feed
         res = true;
       }
 
+      if(_servo.readMicroseconds() == MOTOR_MAX_US - MOTOR_STEP_BACK_VALUE * usFactor)
+        _servo.writeMicroseconds(MOTOR_MAX_US);
+
+      if(_servo.readMicroseconds() == MOTOR_MIN_US + MOTOR_STEP_BACK_VALUE * usFactor)
+        _servo.writeMicroseconds(MOTOR_MIN_US);
+
+      S_INFO2("Servo read: ", _servo.readMicroseconds());
       Detach();
       return res;
     }
@@ -113,7 +130,7 @@ namespace Feed
     {
       if(!_servo.attached())
       {
-        if(_servo.attach(_pin) != INVALID_SERVO)
+        if(_servo.attach(_pin, MOTOR_MIN_US, MOTOR_MAX_US) != INVALID_SERVO)
         {
           S_TRACE2("Attached: ", _pin);
           return true;

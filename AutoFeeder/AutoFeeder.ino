@@ -27,13 +27,15 @@
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 0
 
+#define LCD_COLS 16
+#define LCD_ROWS 2
 #define BACKLIGHT_DELAY 50000
 unsigned long backlightStartTicks = 0;
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, LCD_COLS, LCD_ROWS);
 
 DS323x rtc;
 
-Helpers::LcdProgressBar progress(lcd, 1, 0, 16, Helpers::LcdProgressSettings::NUMBERS_CENTER);
+Helpers::LcdProgressBar progress(lcd, 1, 0, LCD_COLS, Helpers::LcdProgressSettings::NUMBERS_CENTER);
 
 #define SERVO_PIN 9
 #define MOTOR_SHOW_PROGRESS true
@@ -100,6 +102,7 @@ void setup()
   servo.Init();
 
   LoadSettings();
+  PrintToSerialStatus();
   EnableWatchDog();
 
   ShowLastAction();
@@ -137,6 +140,7 @@ void loop()
       SaveSettings();
     }
     currentMenu = Menu::Main;
+    settings.FeedScheduler.SetNextAlarm(dtNow);
     ShowLastAction();
   }
 
@@ -186,7 +190,7 @@ void loop()
     else
     {
       #ifdef DEBUG
-      if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+      if(DoFeed(settings.RotateCount, Feed::Status::TEST, MOTOR_SHOW_PROGRESS))
       {
         settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
       }
@@ -195,7 +199,7 @@ void loop()
     }
   }
 
-   if(btnDw.isReleased())
+  if(btnDw.isReleased())
   {
     S_INFO4("DOWN ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);    
     BacklightOn();
@@ -215,7 +219,7 @@ void loop()
     else
     {
       #ifdef DEBUG
-      if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+      if(DoFeed(settings.RotateCount, Feed::Status::TEST, MOTOR_SHOW_PROGRESS))
       {
         settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
       }
@@ -224,12 +228,14 @@ void loop()
     }
   }
 
+  if(currentMenu == Menu::Main)
+  {
   if(btnManualFeed.isReleased())
   {
     //S_INFO2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
     BacklightOn();
 
-    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, Feed::Status::MANUAL, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
     }
@@ -243,7 +249,7 @@ void loop()
     //S_INFO2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, Feed::Status::REMOUTE, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
     }
@@ -257,7 +263,7 @@ void loop()
     //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
     }
@@ -266,12 +272,12 @@ void loop()
     ShowLastAction();   
   }
   else
-  if(settings.FeedScheduler.IsTimeToAlarm(rtc.now()))
+  if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
   {
     //S_INFO2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     BacklightOn();
 
-    if(DoFeed(settings.RotateCount, MOTOR_SHOW_PROGRESS))
+    if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
     }
@@ -280,14 +286,17 @@ void loop()
     SaveSettings();
     ShowLastAction();    
   }  
+  }
  
   CheckBacklightDelayAndReturnToMainMenu(millis()); 
   HandleDebugSerialCommands();
 }
 
-const bool DoFeed(const short &feedCount, const bool &showProgress)
+const bool DoFeed(const short &feedCount, const Feed::Status &source, const bool &showProgress)
 {
   S_INFO2("DoFead count: ", feedCount);
+  ClearRow(0);
+  lcd.print(" Feeding... -"); lcd.print(Feed::GetFeedStatusString(source, /*shortView:*/false));
   return servo.DoFeed(settings.CurrentPosition, feedCount, showProgress, btnRt);
 }
 
@@ -307,16 +316,21 @@ void ShowLastAction()
     lcd.print(NOT_FED_YET_MSG);
   }
 
-  ClearRow(1); 
+  ShowNextFeedTime();
+}
+
+void ShowNextFeedTime()
+{
+  ClearRow(1, 0, 8, 0); 
   if(settings.FeedScheduler.Set != Feed::ScheduleSet::NotSet)
   {    
-    const DateTime &nextDt = settings.FeedScheduler.GetNextAlarm();
-    lcd.print("N:"); nextDt.hour() != 255 ? lcd.print(nextDt.timestamp(DateTime::TIMESTAMP_TIME)) : lcd.print(0);    
+    const auto &nextDt = settings.FeedScheduler.GetNextAlarm();
+    lcd.print("N:"); nextDt.hour() != 255 ? lcd.print(nextDt.GetTimeWithoutSeconds()) : lcd.print(0);    
   }
   else
   {
     lcd.print(settings.FeedScheduler.SetToString(/*shortView:*/false));
-  }  
+  } 
 }
 
 short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions)
@@ -350,6 +364,8 @@ short &ShowSchedule(short &pos, const short &minPositions, const short &maxPosit
 
   settings.FeedScheduler.Set = pos;
 
+  settings.FeedScheduler.SetNextAlarm(rtc.now());
+
   return pos;
 }
 
@@ -377,7 +393,13 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 2) //RESET Settings
   {
     settings.Reset();
+    SaveSettings();
     ShowLastAction();
+  }
+
+  if(debugButtonFromSerial == 3)
+  {
+    PrintToSerialStatus();
   }
   
   //Reset after 8 secs see watch dog timer
@@ -447,6 +469,15 @@ void PrintToSerialDateTime()
   S_INFO2("RTC DT: ", rtc.now().timestamp());  
 }
 
+void PrintToSerialStatus()
+{
+  S_INFO2("CurrentPos: ", settings.CurrentPosition);
+  S_INFO2("Sched: ", settings.FeedScheduler.SetToString());
+  S_INFO2("Next Alarm: ", settings.FeedScheduler.GetNextAlarm().timestamp());
+  S_INFO2("HasAlarmed: ", settings.FeedScheduler.HasAlarmed() ? "True" : "False");
+  S_INFO2("FeedCount: ", settings.RotateCount);  
+}
+
 void BacklightOn()
 {
   lcd.backlight();
@@ -470,8 +501,8 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
 { 
   if(currentTicks - prevTicks >= 1000)
   {
-    //S_PRINT(currentTicks);
-    //ClearRow(1, 8);    
+    ShowNextFeedTime();
+     
     lcd.setCursor(8, 1);
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     prevTicks = currentTicks;
@@ -484,12 +515,12 @@ void EnableWatchDog()
   S_INFO("Watchdog enabled.");
 }
 
-void ClearRow(const short &row) { ClearRow(row, 0); }
-void ClearRow(const short &row, const short &gotoY)
+void ClearRow(const short &row) { ClearRow(row, 0, LCD_COLS, -1); }
+void ClearRow(const short &row, const short &columnStart, const short &columnEnd, const short &gotoX)
 {
-  lcd.setCursor(0, row);
-  lcd.print("                  ");
-  lcd.setCursor(gotoY, row);
+  lcd.setCursor(columnStart, row);
+  for(short ch = columnStart; ch < columnEnd; ch++) lcd.print(' ');
+  lcd.setCursor(gotoX == -1 ? columnStart : gotoX, row);
 }
 
 void SaveSettings()

@@ -45,9 +45,10 @@ namespace Feed
 
     void Reset()
     {
+      Delay = 0;
       CurrentPosition = 0;
-      RotateCount = 1;
-      FeedScheduler.Set = Feed::ScheduleSet::NotSet;
+      RotateCount = MIN_FEED_COUNT;
+      FeedScheduler.Reset();
       for(short idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
       {
         FeedHistory[idx] = Feed::StatusInfo();

@@ -43,29 +43,33 @@ namespace Feed
     private:
     bool _hasAlarmed;
 
-    public:   
+    public: 
+
+    Scheduler() : Set(NotSet), NextAlarm(), _hasAlarmed(false) { }
 
     const char *const SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
 
     const bool IsTimeToAlarm(const DateTime &current)
     {
-      if(Set == ScheduleSet::NotSet) return false;
-      if(_hasAlarmed) return false;
+      if(Set == ScheduleSet::NotSet) return false;      
 
-      if(NextAlarm < current) 
+      //S_TRACE4("Next Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
+           
+      if(NextAlarm < current)
       {
-        _hasAlarmed = true;
+        //_hasAlarmed = true;
+        SetNextAlarm(current);
         return false;
       }
 
-      if(NextAlarm.year() == current.year() && NextAlarm.month() == current.month() && NextAlarm.day() == current.day())
-      {
-        if(NextAlarm.hour() == current.hour() && NextAlarm.minute() == current.minute())
-        {
-          _hasAlarmed = true;          
-        }
+      if(NextAlarm == current)
+      {       
+        S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
+        //_hasAlarmed = true;
+        SetNextAlarm(current);
+        return true;        
       }
-      return !_hasAlarmed;
+      return false;
     }
 
     const bool HasAlarmed() const { return _hasAlarmed; }
@@ -74,11 +78,18 @@ namespace Feed
     void SetNextAlarm(const DateTime &current)
     {
       NextAlarm = GetNextTime(current);
+      S_TRACE2("Set Next Alarm: ", NextAlarm.timestamp());
     }
 
-    const DateTime &GetNextAlarm() const
+    const FeedDateTime &GetNextAlarm() const
     {
       return NextAlarm;
+    }
+
+    void Reset()
+    {
+      Set = Feed::ScheduleSet::NotSet;
+      NextAlarm = FeedDateTime();
     }
 
     private:
@@ -88,24 +99,48 @@ namespace Feed
       {
         case ScheduleSet::NotSet:
           return current;
-        case ScheduleSet::DAILY_2:
-        {
-          return current + GetTimeSpan(current, 7, 23, 2);
-        }        
+        case ScheduleSet::DAILY_2:        
+          return GetNextDateTime(current, 7, 23, 2);
+        case ScheduleSet::DAILY_4:
+          return GetNextDateTime(current, 7, 23, 4);
+        case ScheduleSet::DAILY_6:
+          return GetNextDateTime(current, 7, 23, 6);
+
+        case ScheduleSet::DAYNIGHT_8:
+          return GetNextDateTime(current, 0, 24, 8);
+        case ScheduleSet::DAYNIGHT_10:
+          return GetNextDateTime(current, 0, 24, 10);
+        case ScheduleSet::DAYNIGHT_12:
+          return GetNextDateTime(current, 0, 24, 12);
         default:
           return current;
       }
     }      
 
     private:
-    const TimeSpan GetTimeSpan(const DateTime &current, const short &startHour, const short &endHour, const short &count) const
+    const DateTime GetNextDateTime(const DateTime &current, const short &startHour, const short &endHour, const short &count) const
     {
-      short step = endHour - startHour / count;
-      for(short nextHour = startHour; startHour <= endHour; nextHour += step )
-      {
+      const auto currentDay = current.day();
+      FeedDateTime nextTime = DateTime(current.year(), current.month(), current.day());      
+      const auto step = TimeSpan( (int)( ((endHour - startHour) / count) * 3600 ));
 
+      S_TRACE4("Step: ", step.hours(), ":", step.minutes());
+      
+      for(nextTime += TimeSpan(startHour * 3600); nextTime.hour() <= endHour; nextTime += step)
+      {
+        if(nextTime.hour() > current.hour())
+        {
+          break;
+        }
       }
-      return TimeSpan(0, 0, step, 0);
+
+      if(nextTime.day() > currentDay || nextTime.hour() > endHour)
+      {
+        const auto nextDayStart = DateTime(current.year(), current.month(), currentDay + 1);
+        return GetNextDateTime(nextDayStart, startHour, endHour, count);
+      }
+
+      return nextTime;
     }
   };
 }
