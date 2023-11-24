@@ -130,7 +130,8 @@ namespace Feed
     {
       if(!_servo.attached())
       {
-        if(_servo.attach(_pin, MOTOR_MIN_US, MOTOR_MAX_US) != INVALID_SERVO)
+        //if(_servo.attach(_pin, MOTOR_MIN_US, MOTOR_MAX_US) != INVALID_SERVO)
+        if(_servo.attach(_pin) != INVALID_SERVO)
         {
           S_TRACE2("Attached: ", _pin);
           return true;

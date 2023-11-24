@@ -4,7 +4,7 @@
 #include <Servo.h>
 #include <LiquidCrystal_I2C.h>
 
-#define DEBUG
+#define TRACE
 
 #ifdef DEBUG
   #define INFO
@@ -51,7 +51,9 @@ Feed::Settings settings;
 #define MANUAL_FEED_PIN 8
 #define REMOTE_FEED_PIN 7
 #define PAW_FEED_PIN 6
-#define PAW_LED_PIN A3
+#define PAW_LED_PIN 2
+#define PAW_BTN_AVALIABLE_AFTER_LAST_FEEDENG 900000//(15 * 60 * 1000)
+unsigned long pawBtnAvaliabilityTicks = 0;
 
 Button btnOK(OK_PIN);
 ezButton btnUp(UP_PIN);
@@ -74,7 +76,7 @@ void setup()
 
   Serial.println();
   Serial.println();
-  S_INFO("!!!! Start Auto Feeder !!!!");
+  Serial.println("!!!! Start Auto Feeder !!!!");
   S_INFO3(__DATE__, " ", __TIME__);  
 
   lcd.init();
@@ -98,6 +100,9 @@ void setup()
   btnManualFeed.setDebounceTime(DEBOUNCE_TIME);
   btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
   btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
+
+  pinMode(PAW_LED_PIN, OUTPUT);
+  digitalWrite(PAW_LED_PIN, HIGH);
 
   servo.Init();
 
@@ -261,15 +266,21 @@ void loop()
   if(btnPawFeed.isReleased())
   {
     //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
-    BacklightOn();
-
-    if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
+    if(pawBtnAvaliabilityTicks == 0)
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+      pawBtnAvaliabilityTicks = current;
+      BacklightOn();
+
+      if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
+      {
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+      }
+
+      digitalWrite(PAW_LED_PIN, LOW);
+      
+      SaveSettings();
+      ShowLastAction();      
     }
-    
-    SaveSettings();
-    ShowLastAction();   
   }
   else
   if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
@@ -280,14 +291,14 @@ void loop()
     if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
     {
       settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
-    }
-    settings.FeedScheduler.SetNextAlarm(dtNow);
+    }    
 
     SaveSettings();
     ShowLastAction();    
   }  
   }
  
+  CheckPawButtonAvaliable(current);
   CheckBacklightDelayAndReturnToMainMenu(millis()); 
   HandleDebugSerialCommands();
 }
@@ -488,9 +499,22 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
 {
   if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
   {      
-    lcd.noBacklight();
-    ShowLastAction(); 
     backlightStartTicks = 0;
+    currentMenu = Menu::Main;
+    lcd.noBacklight();
+    ShowLastAction();     
+    return true;
+  }
+  return false;
+}
+
+const bool CheckPawButtonAvaliable(const unsigned long &currentTicks)
+{
+  if(pawBtnAvaliabilityTicks > 0 && currentTicks - pawBtnAvaliabilityTicks >= PAW_BTN_AVALIABLE_AFTER_LAST_FEEDENG)
+  {      
+    BacklightOn();
+    digitalWrite(PAW_LED_PIN, HIGH);
+    pawBtnAvaliabilityTicks = 0;
     return true;
   }
   return false;

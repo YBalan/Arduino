@@ -44,7 +44,7 @@ namespace Feed
 
     bool operator<(const DateTime& right) const
     {
-        return GetValue() < GetValue(right);
+        return GetTotalValueWithoutSeconds() < GetTotalValueWithoutSeconds(right);
     }
     bool operator>(const DateTime& right) const
     {
@@ -60,7 +60,7 @@ namespace Feed
     }
     bool operator==(const DateTime& right) const
     {
-        return GetValue() == GetValue(right);
+        return GetTotalValueWithoutSeconds() == GetTotalValueWithoutSeconds(right);
     }
     bool operator!=(const DateTime& right) const
     {
@@ -68,15 +68,15 @@ namespace Feed
     }
 
     public:
-    const int GetValue(const bool &includeSeconds = false) const
+    const long GetTotalValueWithoutSeconds() const
     {
-      return (year() + m + d + hh + mm + includeSeconds ? ss : 0);
+      return time2long(day(), hour(), minute(), 0);
     }
 
-    static const int GetValue(const DateTime &dt, const bool &includeSeconds = true)
+    static const long GetTotalValueWithoutSeconds(const DateTime &dt)
     {
-      return (dt.year() + dt.month() + dt.day() + dt.hour() + dt.minute() + includeSeconds ? dt.second() : 0);
-    }
+      return time2long(dt.day(), dt.hour(), dt.minute(), 0);
+    }    
   };
 }
 

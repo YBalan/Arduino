@@ -51,21 +51,24 @@ namespace Feed
 
     const bool IsTimeToAlarm(const DateTime &current)
     {
-      if(Set == ScheduleSet::NotSet) return false;      
+      if(Set == ScheduleSet::NotSet) return false;   
 
-      //S_TRACE4("Next Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
+      volatile auto nextAlarmDtValue = FeedDateTime::GetTotalValueWithoutSeconds(NextAlarm);
+      volatile auto currentDtValue   = FeedDateTime::GetTotalValueWithoutSeconds(current);
+
+      //S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);      
+      //S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
            
-      if(NextAlarm < current)
+      if(nextAlarmDtValue < currentDtValue)
       {
-        //_hasAlarmed = true;
+        S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);        
         SetNextAlarm(current);
         return false;
       }
 
-      if(NextAlarm == current)
+      if(nextAlarmDtValue == currentDtValue)
       {       
-        S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
-        //_hasAlarmed = true;
+        S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());        
         SetNextAlarm(current);
         return true;        
       }
@@ -77,8 +80,7 @@ namespace Feed
 
     void SetNextAlarm(const DateTime &current)
     {
-      NextAlarm = GetNextTime(current);
-      S_TRACE2("Set Next Alarm: ", NextAlarm.timestamp());
+      NextAlarm = GetNextTime(current);      
     }
 
     const FeedDateTime &GetNextAlarm() const
@@ -95,6 +97,7 @@ namespace Feed
     private:
     const DateTime GetNextTime(const DateTime &current) const
     {
+      //return current + TimeSpan(0, 0, 4, 0);
       switch(Set)
       {
         case ScheduleSet::NotSet:
@@ -140,6 +143,7 @@ namespace Feed
         return GetNextDateTime(nextDayStart, startHour, endHour, count);
       }
 
+      S_TRACE2("Get Next Alarm: ", nextTime.timestamp());
       return nextTime;
     }
   };
