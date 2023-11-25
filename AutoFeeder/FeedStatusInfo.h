@@ -21,12 +21,12 @@ namespace Feed
   {    
     switch(status)
     {
-      case Status::MANUAL:    return shortView ? "M" : "MAN";
-      case Status::REMOUTE:   return shortView ? "R" : "REM";
-      case Status::PAW:       return shortView ? "P" : "PAW";
-      case Status::SCHEDULE:  return shortView ? "S" : "SCH";
-      case Status::TEST:      return shortView ? "T" : "TST";
-      default:                return shortView ? "U" : "NaN";
+      case Status::MANUAL:    return "MAN";
+      case Status::REMOUTE:   return "REM";
+      case Status::PAW:       return "PAW";
+      case Status::SCHEDULE:  return "SCH";
+      case Status::TEST:      return "TST";
+      default:                return "NaN";
     }
   }
 
@@ -56,7 +56,14 @@ namespace Feed
       
       sprintf(buff, "%02d:%02d -%s", DT.hour(), DT.minute(), GetFeedStatusString(Status, shortView));
       return buff;
-    }   
+    } 
+
+    const String GetDateString()
+    {
+      char buff[6];
+      sprintf(buff, "%02d:%02d", DT.month(), DT.day());
+      return buff;
+    }  
   };
 }
 

@@ -52,7 +52,12 @@ Feed::Settings settings;
 #define REMOTE_FEED_PIN 7
 #define PAW_FEED_PIN 6
 #define PAW_LED_PIN 2
-#define PAW_BTN_AVALIABLE_AFTER_LAST_FEEDENG 900000//(15 * 60 * 1000)
+#ifdef RELEASE
+#define PAW_BTN_AVALIABLE_AFTER 900000//(15 * 60 * 1000)
+#else
+#define PAW_BTN_AVALIABLE_AFTER 30000//(15 * 60 * 1000)
+#endif
+#define PAW_BTN_AVAILABLE_AFTER_LAST_FEEDING false
 unsigned long pawBtnAvaliabilityTicks = 0;
 
 Button btnOK(OK_PIN);
@@ -158,7 +163,7 @@ void loop()
       if(currentMenu == Menu::Main)
       {
         currentMenu = Menu::History;
-        ShowHistory(historyMenuPos);
+        ShowHistory(historyMenuPos = 0);
       }else      
       if(currentMenu == Menu::History)
       {
@@ -281,6 +286,12 @@ void loop()
       SaveSettings();
       ShowLastAction();      
     }
+    else
+    {
+      ClearNextTime(); 
+      lcd.print("Wait...");
+      delay(500);
+    }
   }
   else
   if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
@@ -332,7 +343,7 @@ void ShowLastAction()
 
 void ShowNextFeedTime()
 {
-  ClearRow(1, 0, 8, 0); 
+  ClearNextTime();
   if(settings.FeedScheduler.Set != Feed::ScheduleSet::NotSet)
   {    
     const auto &nextDt = settings.FeedScheduler.GetNextAlarm();
@@ -342,6 +353,11 @@ void ShowNextFeedTime()
   {
     lcd.print(settings.FeedScheduler.SetToString(/*shortView:*/false));
   } 
+}
+
+void ClearNextTime()
+{
+  ClearRow(/*row:*/1, /*startColumn:*/0, /*endColumn:*/8, /*gotoX:*/0); 
 }
 
 short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions)
@@ -356,6 +372,8 @@ short &ShowHistory(short &pos, const short &minPositions, const short &maxPositi
   if(status.Status != Feed::Status::Unknown)
   {    
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
+    ClearNextTime();
+    lcd.print(status.GetDateString());
   } 
   else
   {
@@ -383,10 +401,10 @@ short &ShowSchedule(short &pos, const short &minPositions, const short &maxPosit
 short &ShowFeedCount(short &pos, const short &minPositions, const short &maxPositions)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
-  S_TRACE2("FeedCount: ", pos + 1);
+  S_TRACE2("Feed Count: ", pos + 1);
 
   ClearRow(0);
-  lcd.print("FeedCount: "); lcd.print(pos + 1);
+  lcd.print("Feed Count: "); lcd.print(pos + 1);
 
   settings.RotateCount = pos + 1;
 
@@ -484,9 +502,8 @@ void PrintToSerialStatus()
 {
   S_INFO2("CurrentPos: ", settings.CurrentPosition);
   S_INFO2("Sched: ", settings.FeedScheduler.SetToString());
-  S_INFO2("Next Alarm: ", settings.FeedScheduler.GetNextAlarm().timestamp());
-  S_INFO2("HasAlarmed: ", settings.FeedScheduler.HasAlarmed() ? "True" : "False");
-  S_INFO2("FeedCount: ", settings.RotateCount);  
+  S_INFO2("Next Alarm: ", settings.FeedScheduler.GetNextAlarm().timestamp());  
+  S_INFO2("Feed Count: ", settings.RotateCount);  
 }
 
 void BacklightOn()
@@ -510,7 +527,7 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
 
 const bool CheckPawButtonAvaliable(const unsigned long &currentTicks)
 {
-  if(pawBtnAvaliabilityTicks > 0 && currentTicks - pawBtnAvaliabilityTicks >= PAW_BTN_AVALIABLE_AFTER_LAST_FEEDENG)
+  if(pawBtnAvaliabilityTicks > 0 && currentTicks - pawBtnAvaliabilityTicks >= PAW_BTN_AVALIABLE_AFTER)
   {      
     BacklightOn();
     digitalWrite(PAW_LED_PIN, HIGH);
@@ -525,7 +542,10 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
 { 
   if(currentTicks - prevTicks >= 1000)
   {
-    ShowNextFeedTime();
+    if(currentMenu != Menu::History)
+    {
+      ShowNextFeedTime();
+    }
      
     lcd.setCursor(8, 1);
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));

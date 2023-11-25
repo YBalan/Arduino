@@ -10,28 +10,28 @@ namespace Feed
   {
     NotSet = 0,
 
-    DAILY_2,
     DAILY_4,
     DAILY_6,
+    DAILY_8,
 
-    DAYNIGHT_8,
     DAYNIGHT_10,
     DAYNIGHT_12,
+    DAYNIGHT_14,
   };
 
   static const char *const GetSchedulerSetString(const ScheduleSet &set, const bool &shortView)
   {    
     switch(set)
     {
-      case ScheduleSet::DAILY_2:      return shortView ? "D2"   : "Day 2";
-      case ScheduleSet::DAILY_4:      return shortView ? "D4"   : "Day 4";
-      case ScheduleSet::DAILY_6:      return shortView ? "D6"   : "Day 6";
+      case ScheduleSet::DAILY_4:      return "Day 4";
+      case ScheduleSet::DAILY_6:      return "Day 6";
+      case ScheduleSet::DAILY_8:      return "Day 8";
 
-      case ScheduleSet::DAYNIGHT_8:   return shortView ? "DN8"  : "DayNght 8";
-      case ScheduleSet::DAYNIGHT_10:  return shortView ? "DN10" : "DayNght 10";
-      case ScheduleSet::DAYNIGHT_12:  return shortView ? "DN12" : "DayNght 12";
+      case ScheduleSet::DAYNIGHT_10:  return "DayNght 10";
+      case ScheduleSet::DAYNIGHT_12:  return "DayNght 12";
+      case ScheduleSet::DAYNIGHT_14:  return "DayNght 14";
       case ScheduleSet::NotSet:
-      default:                        return shortView ? "NA"   : "NotSet";
+      default:                        return "NotSet";
     }
   }
 
@@ -40,12 +40,9 @@ namespace Feed
     ScheduleSet Set;
     FeedDateTime NextAlarm;
 
-    private:
-    bool _hasAlarmed;
-
     public: 
 
-    Scheduler() : Set(NotSet), NextAlarm(), _hasAlarmed(false) { }
+    Scheduler() : Set(NotSet), NextAlarm() { }
 
     const char *const SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
 
@@ -61,7 +58,7 @@ namespace Feed
            
       if(nextAlarmDtValue < currentDtValue)
       {
-        S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);        
+        //S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);        
         SetNextAlarm(current);
         return false;
       }
@@ -74,9 +71,6 @@ namespace Feed
       }
       return false;
     }
-
-    const bool HasAlarmed() const { return _hasAlarmed; }
-    //void HasAlarmed(const bool &hasAlarmed) {_hasAlarmed = hasAlarmed;}
 
     void SetNextAlarm(const DateTime &current)
     {
@@ -102,19 +96,19 @@ namespace Feed
       {
         case ScheduleSet::NotSet:
           return current;
-        case ScheduleSet::DAILY_2:        
-          return GetNextDateTime(current, 7, 23, 2);
-        case ScheduleSet::DAILY_4:
+        case ScheduleSet::DAILY_4:        
           return GetNextDateTime(current, 7, 23, 4);
         case ScheduleSet::DAILY_6:
           return GetNextDateTime(current, 7, 23, 6);
+        case ScheduleSet::DAILY_8:
+          return GetNextDateTime(current, 7, 23, 8);
 
-        case ScheduleSet::DAYNIGHT_8:
-          return GetNextDateTime(current, 0, 24, 8);
         case ScheduleSet::DAYNIGHT_10:
           return GetNextDateTime(current, 0, 24, 10);
         case ScheduleSet::DAYNIGHT_12:
           return GetNextDateTime(current, 0, 24, 12);
+        case ScheduleSet::DAYNIGHT_14:
+          return GetNextDateTime(current, 0, 24, 14);
         default:
           return current;
       }

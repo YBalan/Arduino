@@ -2,6 +2,10 @@
 #ifndef DEBUG_HELPER_H
 #define DEBUG_HELPER_H
 
+#define BUTTON_IS_RELEASED_MSG "Btn rel..."
+#define BUTTON_IS_PRESSED_MSG "Btn press..."
+#define BUTTON_IS_LONGPRESSED_MSG "Btn LONG press..."
+
 #ifdef DEBUG
   #define S_DBG(value) Serial.print((value))
   #define S_DEBUG(value) Serial.println((value))
