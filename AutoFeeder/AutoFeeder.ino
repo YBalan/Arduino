@@ -288,9 +288,18 @@ void loop()
     }
     else
     {
-      ClearNextTime(); 
-      lcd.print("Wait...");
-      delay(500);
+      //ClearNextTime(); 
+      ClearRow(1);      
+
+      short t = (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000;
+      const short ss = t % 60;
+      t /= 60;
+      const short mm = t % 60; 
+      
+      lcd.print("Wait "); 
+      if(mm > 0) { lcd.print(mm); lcd.print("min"); lcd.print(' '); }
+      lcd.print(ss); lcd.print("sec...");
+      delay(700);
     }
   }
   else
