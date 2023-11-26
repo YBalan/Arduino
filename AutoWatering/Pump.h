@@ -233,19 +233,19 @@ public:
   }
   
 public:  
-  const char * const PrintStatus(const bool &showDebugInfo, const unsigned long &currentTicks, char *buff) const
-  { 
-    const auto &ticks = currentTicks == 0 ? millis() : currentTicks;
-    if(showDebugInfo)
-    { 
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} (start:%lu, ticks:%lu sub:%lu) timeout:{%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, _startTiks, ticks, (ticks - _startTiks), Settings.WatchDog);      
-    }
-    else
-    {      
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} {timeout:%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, Settings.WatchDog);      
-    }
-    return buff;
-  }
+  // const char * const PrintStatus(const bool &showDebugInfo, const unsigned long &currentTicks, char *buff) const
+  // { 
+  //   const auto &ticks = currentTicks == 0 ? millis() : currentTicks;
+  //   if(showDebugInfo)
+  //   { 
+  //     sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} (start:%lu, ticks:%lu sub:%lu) timeout:{%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, _startTiks, ticks, (ticks - _startTiks), Settings.WatchDog);      
+  //   }
+  //   else
+  //   {      
+  //     sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} {timeout:%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, Settings.WatchDog);      
+  //   }
+  //   return buff;
+  // }
 
   const char * const GetFullStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, false, buff); }
   const char * const GetShortStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, true, buff); }
