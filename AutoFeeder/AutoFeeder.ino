@@ -272,14 +272,15 @@ void loop()
   {
     //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
     if(pawBtnAvaliabilityTicks == 0)
-    {
-      pawBtnAvaliabilityTicks = current;
+    {      
       BacklightOn();
 
       if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
       {
         settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
       }
+
+      pawBtnAvaliabilityTicks = current;
 
       digitalWrite(PAW_LED_PIN, LOW);
       
@@ -290,15 +291,11 @@ void loop()
     {
       //ClearNextTime(); 
       ClearRow(1);      
-
-      short t = (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000;
-      const short ss = t % 60;
-      t /= 60;
-      const short mm = t % 60; 
       
-      lcd.print("Wait "); 
-      if(mm > 0) { lcd.print(mm); lcd.print("min"); lcd.print(' '); }
-      lcd.print(ss); lcd.print("sec...");
+      lcd.print("Wait ");       
+      PrintTime(lcd, (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000);
+      lcd.print("...");
+
       delay(700);
     }
   }
