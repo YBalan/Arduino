@@ -26,6 +26,8 @@
   #define S_TRACE3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))  
   #define S_TRACE4(value1, value2, value3, value4) Serial.print((value1)); Serial.print((value2)); Serial.print((value3)); Serial.println((value4))
   #define S_TRACE5(value1, value2, value3, value4, value5) Serial.print((value1)); Serial.print((value2)); Serial.print((value3)); Serial.print((value4)); Serial.println((value5))
+  #define S_TRACE6(value1, value2, value3, value4, value5, value6) Serial.print((value1)); Serial.print((value2)); Serial.print((value3)); Serial.print((value4)); Serial.print((value5)); Serial.println((value6))
+  #define S_TRACE7(value1, value2, value3, value4, value5, value6, value7) Serial.print((value1)); Serial.print((value2)); Serial.print((value3)); Serial.print((value4)); Serial.print((value5)); Serial.print((value6));; Serial.println((value7))
 #else  
   #define S_TRCE(value) while(0)
   #define S_TRACE(value) while(0)
@@ -33,11 +35,13 @@
   #define S_TRACE3(value1, value2, value3) while(0)
   #define S_TRACE4(value1, value2, value3, value4) while(0)
   #define S_TRACE5(value1, value2, value3, value4, value5) while(0)
+  #define S_TRACE6(value1, value2, value3, value4, value5, value6) while(0)
+  #define S_TRACE7(value1, value2, value3, value4, value5, value6, value7) while(0)
 #endif
 
 #ifdef INFO
-  #define S_INF(value) Serial.print((value))
-  #define S_INFO(value) Serial.println((value))
+  #define S_INF(value) Serial.print((value))  
+  #define S_INFO(value) Serial.println((value))  
   #define S_INFO2(value1, value2) Serial.print((value1)); Serial.println((value2))
   #define S_INFO3(value1, value2, value3) Serial.print((value1)); Serial.print((value2)); Serial.println((value3))
   #define S_INFO4(value1, value2, value3, value4) Serial.print((value1)); Serial.print((value2)); Serial.print((value3)); Serial.println((value4))
@@ -48,7 +52,7 @@
   #define S_INFO2(value1, value2) while(0)
   #define S_INFO3(value1, value2, value3) while(0)
   #define S_INFO4(value1, value2, value3, value4) while(0)
-  #define S_INFO5(value1, value2, value3, value4, value5) while(0)
+  #define S_INFO5(value1, value2, value3, value4, value5) while(0)  
 #endif
 
 

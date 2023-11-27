@@ -53,12 +53,12 @@ namespace Feed
       volatile auto nextAlarmDtValue = FeedDateTime::GetTotalValueWithoutSeconds(NextAlarm);
       volatile auto currentDtValue   = FeedDateTime::GetTotalValueWithoutSeconds(current);
 
-      //S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);      
-      //S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
+      //S_TRACE("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);      
+      //S_TRACE("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
            
       if(nextAlarmDtValue < currentDtValue)
       {
-        //S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);        
+        //S_TRACE("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);        
         SetNextAlarm(current);
         return false;
       }
@@ -121,7 +121,7 @@ namespace Feed
       FeedDateTime nextTime = DateTime(current.year(), current.month(), current.day());      
       const auto step = TimeSpan( (int)( ((endHour - startHour) / count) * 3600 ));
 
-      S_TRACE4("Step: ", step.hours(), ":", step.minutes());
+      //S_TRACE("Step: ", step.hours(), ":", step.minutes());
       
       for(nextTime += TimeSpan(startHour * 3600); nextTime.hour() <= endHour; nextTime += step)
       {

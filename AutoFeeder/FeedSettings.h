@@ -3,7 +3,7 @@
 #define FEED_SETTINGS_H
 
 #ifdef RELEASE
-#define FEEDS_STATUS_HISTORY_COUNT 10
+#define FEEDS_STATUS_HISTORY_COUNT 20
 #else
 #define FEEDS_STATUS_HISTORY_COUNT 5
 #endif
@@ -21,7 +21,7 @@ namespace Feed
     unsigned short RotateCount = 1;
     unsigned short CurrentPosition = 0;
     Scheduler FeedScheduler;
-    private:
+    //private:
     Feed::StatusInfo FeedHistory[FEEDS_STATUS_HISTORY_COUNT];
     public:
     void SetLastStatus(const Feed::StatusInfo& status)

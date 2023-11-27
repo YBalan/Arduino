@@ -4,7 +4,9 @@
 #include <Servo.h>
 #include <LiquidCrystal_I2C.h>
 
-#define TRACE
+#define RELEASE
+//#define TRACE
+//#define INFO
 
 #ifdef DEBUG
   #define INFO
@@ -105,6 +107,8 @@ void setup()
   btnManualFeed.setDebounceTime(DEBOUNCE_TIME);
   btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
   btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
+
+  pinMode(SERVO_PIN, INPUT_PULLUP);
 
   pinMode(PAW_LED_PIN, OUTPUT);
   digitalWrite(PAW_LED_PIN, HIGH);
@@ -580,9 +584,11 @@ void SaveSettings()
   ClearRow(1);
   lcd.print("Save...");
 
-  delay(500);
+  //S_TRACE7("Max:", EEPROM.length(), " Total: ", sizeof(settings), " ", "Hist: ", sizeof(settings.FeedHistory));
 
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
+
+  delay(500);  
 }
 
 void LoadSettings()
