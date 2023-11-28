@@ -104,11 +104,11 @@ namespace Feed
           return GetNextDateTime(current, 7, 23, 8);
 
         case ScheduleSet::DAYNIGHT_10:
-          return GetNextDateTime(current, 0, 24, 10);
+          return GetNextDateTime(current, 0, 23, 10);
         case ScheduleSet::DAYNIGHT_12:
-          return GetNextDateTime(current, 0, 24, 12);
+          return GetNextDateTime(current, 0, 23, 12);
         case ScheduleSet::DAYNIGHT_14:
-          return GetNextDateTime(current, 0, 24, 14);
+          return GetNextDateTime(current, 0, 23, 14);
         default:
           return current;
       }
@@ -119,9 +119,11 @@ namespace Feed
     {
       const auto currentDay = current.day();
       FeedDateTime nextTime = DateTime(current.year(), current.month(), current.day());      
-      const auto step = TimeSpan( (int)( ((endHour - startHour) / count) * 3600 ));
+      float stepFloat = (float)(endHour - startHour) / count;
+      const auto step = TimeSpan( (int32_t)( stepFloat * 3600 ));
 
-      //S_TRACE("Step: ", step.hours(), ":", step.minutes());
+      S_TRACE6("Step: ", stepFloat, " ", step.hours(), ":", step.minutes());
+      S_TRACE(step.totalseconds());
       
       for(nextTime += TimeSpan(startHour * 3600); nextTime.hour() <= endHour; nextTime += step)
       {

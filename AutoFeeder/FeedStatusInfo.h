@@ -61,7 +61,7 @@ namespace Feed
     const String GetDateString()
     {
       char buff[6];
-      sprintf(buff, "%02d:%02d", DT.month(), DT.day());
+      sprintf(buff, "%02d/%02d", DT.month(), DT.day());
       return buff;
     }  
   };

@@ -395,13 +395,14 @@ short &ShowHistory(short &pos, const short &minPositions, const short &maxPositi
 
 short &ShowSchedule(short &pos, const short &minPositions, const short &maxPositions)
 {
-  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
-  S_TRACE4("Sched: ", pos, ": ", settings.FeedScheduler.SetToString());
+  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
   ClearRow(0);
   lcd.print("Set: "); lcd.print(Feed::GetSchedulerSetString(pos, /*shortView:*/false));
 
   settings.FeedScheduler.Set = pos;
+
+  S_TRACE4("Sched: ", pos, ": ", settings.FeedScheduler.SetToString());
 
   settings.FeedScheduler.SetNextAlarm(rtc.now());
 
