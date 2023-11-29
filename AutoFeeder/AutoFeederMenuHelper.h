@@ -12,6 +12,7 @@
 enum Menu : short
 {
   Main,
+  Dht,
   History,
   Schedule,
   RotateCount,

@@ -2,6 +2,7 @@
 #include <avr/wdt.h>
 #include <DS323x.h>
 #include <Servo.h>
+#include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
 #define RELEASE
@@ -54,10 +55,16 @@ Feed::Settings settings;
 #define REMOTE_FEED_PIN 7
 #define PAW_FEED_PIN 6
 #define PAW_LED_PIN 2
+
+#ifdef DHT
+#define HUMADITY_SENSOR_PIN 3
+DHT dht(HUMADITY_SENSOR_PIN, DHT11);
+#endif
+
 #ifdef RELEASE
 #define PAW_BTN_AVALIABLE_AFTER 900000//(15 * 60 * 1000)
 #else
-#define PAW_BTN_AVALIABLE_AFTER 30000//(15 * 60 * 1000)
+#define PAW_BTN_AVALIABLE_AFTER 30000//(30 * 60 * 1000)
 #endif
 #define PAW_BTN_AVAILABLE_AFTER_LAST_FEEDING false
 unsigned long pawBtnAvaliabilityTicks = 0;
@@ -97,6 +104,11 @@ void setup()
   Wire.begin();
   //delay(2000);  
   rtc.attach(Wire);
+
+#ifdef DHT
+  dht.begin();
+#endif
+
   
   ShowLcdTime(1000, rtc.now());
 
@@ -109,7 +121,7 @@ void setup()
   btnRemoteFeed.setDebounceTime(DEBOUNCE_TIME);
   btnPawFeed.setDebounceTime(DEBOUNCE_TIME);
 
-  pinMode(SERVO_PIN, INPUT_PULLUP);
+  pinMode(SERVO_PIN, INPUT_PULLUP);  
 
   pinMode(PAW_LED_PIN, OUTPUT);
   digitalWrite(PAW_LED_PIN, HIGH);
@@ -166,6 +178,15 @@ void loop()
     {
       S_INFO2("Ok ", BUTTON_IS_LONGPRESSED_MSG);
       if(currentMenu == Menu::Main)
+      {
+        currentMenu = Menu::Dht;
+        if(!ShowDht())
+        {
+          currentMenu = Menu::History;
+          ShowHistory(historyMenuPos = 0);
+        }
+      }else
+      if(currentMenu == Menu::Dht)
       {
         currentMenu = Menu::History;
         ShowHistory(historyMenuPos = 0);
@@ -383,6 +404,17 @@ void ClearNextTime()
   ClearRow(/*row:*/1, /*startColumn:*/0, /*endColumn:*/8, /*gotoX:*/0); 
 }
 
+const bool ShowDht()
+{
+  #ifdef DHT
+  if(isnan(dht.readTemperature()) && isnan(dht.readHumidity())) return false;
+  ClearRow(0);
+  lcd.print(dht.readTemperature()); lcd.print('C'); lcd.print(" "); lcd.print(dht.readHumidity()); lcd.print('%');
+  return true;
+  #endif
+  return false;
+}
+
 short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions, const short &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
@@ -533,8 +565,8 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
 void PrintToSerialDateTime()
 {
-  S_INF  ("SYS DT: "); S_INFO3(__DATE__, " ", __TIME__);
-  S_INFO2("RTC DT: ", rtc.now().timestamp());  
+  /*S_INF  ("SYS DT: ");*/ S_INFO3(__DATE__, " ", __TIME__);
+  S_INFO(rtc.now().timestamp());  
 }
 
 void PrintToSerialStatus()
@@ -585,6 +617,11 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
     {
       ShowNextFeedTime();
     }
+
+    if(currentMenu == Menu::Dht)
+    {
+      ShowDht();
+    }   
      
     lcd.setCursor(8, 1);
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
