@@ -7,12 +7,12 @@
 #include "DEBUGHelper.h"
 
 
-#define MOTOR_DS3218MG_270
+//#define MOTOR_DS3218MG_270
 
-#define MOTOR_MIN_US 500
-#define MOTOR_MAX_US 2500
-#define MOTOR_RIGHT_POS 0
-#define MOTOR_LEFT_POS  180
+//#define MOTOR_MIN_US 500
+//#define MOTOR_MAX_US 2500
+//#define MOTOR_RIGHT_POS MOTOR_START_POS
+#define MOTOR_MAX_POS  180
 
 #define MOTOR_ROTATE_DELAY 100
 #define MOTOR_ROTATE_VALUE 5
@@ -34,20 +34,21 @@ namespace Feed
 
     const short &Init() const { return _printProgress != 0 ? _printProgress->write("", /*Helpers::LcdProgressCommands::Init*/4) : 0; }
 
-    const bool DoFeed(unsigned short &currentPosition, const short &feedCount, const bool &showProgress, const ezButton &cancelButton)
+    const bool DoFeed(unsigned short &currentPosition, const short &startPosition, const short &feedCount, const bool &showProgress, const ezButton &cancelButton)
     {
       if(!Attach()) return false;
-
-      float usFactor = (MOTOR_MAX_US - MOTOR_MIN_US) / MOTOR_LEFT_POS;
-      S_INFO4("Servo read: ", _servo.readMicroseconds(), " factor: ", usFactor);      
+      
+      S_INFO2("Servo read: ", _servo.readMicroseconds());      
 
       bool res = false;
 
       if(showProgress && _printProgress != 0) _printProgress->write("", /*Helpers::LcdProgressCommands::Clear*/5);
 
-      const short totalCount = (MOTOR_LEFT_POS - MOTOR_RIGHT_POS) * feedCount;
+      const short totalCount = (MOTOR_MAX_POS - startPosition) * feedCount;
       short pctValue = 0;
       bool cancel = false;
+
+      currentPosition = currentPosition == MOTOR_MAX_POS ? MOTOR_MAX_POS : startPosition;
 
       for(short feed = 1; feed <= feedCount; feed++)
       {   
@@ -56,9 +57,9 @@ namespace Feed
         { S_TRACE("Cancel!"); break; }
 
         short pos = currentPosition;
-        short endPos = pos >= MOTOR_LEFT_POS ? MOTOR_RIGHT_POS : MOTOR_LEFT_POS;
-        const short rotate = pos >= MOTOR_LEFT_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
-        const short rotateBack = pos >= MOTOR_LEFT_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
+        short endPos = pos >= MOTOR_MAX_POS ? startPosition : MOTOR_MAX_POS;
+        const short rotate = pos >= MOTOR_MAX_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
+        const short rotateBack = pos >= MOTOR_MAX_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
 
         S_TRACE2("   Feed No: ", feed);
         S_TRACE2("CurrentPos: ", pos);
@@ -67,7 +68,7 @@ namespace Feed
 
         if(feed > 1) pos += rotate;
 
-        if(pos >= MOTOR_RIGHT_POS && pos <= MOTOR_LEFT_POS)
+        if(pos >= startPosition && pos <= MOTOR_MAX_POS)
         {
           while (rotate > 0 ? pos <= endPos : pos >= endPos)
           {
@@ -81,7 +82,7 @@ namespace Feed
             if(showProgress && _printProgress != 0)
             {              
               S_TRACE2("  PctValue: ", pctValue);
-              short pct = map(pctValue, MOTOR_RIGHT_POS, totalCount, 0, 100);         
+              short pct = map(pctValue, 0, totalCount, 0, 100);         
               _printProgress->write(pct);
               pctValue += abs(rotate);
             }
@@ -91,7 +92,7 @@ namespace Feed
             if(MOTOR_STEP_BACK_MODE)
             {
               short stepBackPos = pos - rotateBack;
-              if(stepBackPos >= MOTOR_RIGHT_POS + MOTOR_STEP_BACK_VALUE && stepBackPos <= MOTOR_LEFT_POS - MOTOR_STEP_BACK_VALUE)
+              if(stepBackPos >= startPosition + MOTOR_STEP_BACK_VALUE && stepBackPos <= MOTOR_MAX_POS - MOTOR_STEP_BACK_VALUE)
               {
                 cancelButton.loop();
                 if(cancelButton.isPressed())
@@ -113,13 +114,7 @@ namespace Feed
           }               
         }
         res = true;
-      }
-
-      if(_servo.readMicroseconds() == MOTOR_MAX_US - MOTOR_STEP_BACK_VALUE * usFactor)
-        _servo.writeMicroseconds(MOTOR_MAX_US);
-
-      if(_servo.readMicroseconds() == MOTOR_MIN_US + MOTOR_STEP_BACK_VALUE * usFactor)
-        _servo.writeMicroseconds(MOTOR_MIN_US);
+      }      
 
       S_INFO2("Servo read: ", _servo.readMicroseconds());
       Detach();

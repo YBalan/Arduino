@@ -14,14 +14,16 @@ enum Menu : short
   Main,
   History,
   Schedule,
-  FeedCount,
+  RotateCount,
+  StartAngle,
 } currentMenu;
 
 //bool IsBusy = false;
 short mainMenuPos = 0;
 short historyMenuPos = 0;
 short scheduleMenuPos = 0;
-short feedCountMenuPos = 0;
+short rotateCountMenuPos = 0;
+short startAngleMenuPos = 0;
 
 static void PrintTime(const Print &print, const short &timeInSeconds, const char &sep = ' ', const bool &showUnitName = true, const bool &showMinsIfZero = false, const bool &showSecsIfZero = true)
 {  

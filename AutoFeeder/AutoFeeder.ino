@@ -72,9 +72,10 @@ ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
 //Menus Functions
-short &ShowHistory(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_STATUS_HISTORY_COUNT);
-short &ShowSchedule(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_SCHEDULER_SETTINGS_COUNT);
-short &ShowFeedCount(short &pos, const short &minPositions = 0, const short &maxPositions = MAX_FEED_COUNT);
+short &ShowHistory(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_STATUS_HISTORY_COUNT, const short &step = 1);
+short &ShowSchedule(short &pos, const short &minPositions = 0, const short &maxPositions = Feed::ScheduleSet::MAX, const short &step = 1);
+short &ShowStartAngle(short &pos, const short &minPositions = 0, const short &maxPositions = MOTOR_MAX_POS / 2, const short &step = MOTOR_START_POS_INCREMENT);
+short &ShowRotateCount(short &pos, const short &minPositions = 0, const short &maxPositions = MAX_FEED_COUNT, const short &step = 1);
 
 void setup() 
 {
@@ -176,8 +177,13 @@ void loop()
       }else
       if(currentMenu == Menu::Schedule)
       {
-        currentMenu = Menu::FeedCount;
-        ShowFeedCount(feedCountMenuPos = settings.RotateCount - 1);
+        currentMenu = Menu::StartAngle;
+        ShowStartAngle(startAngleMenuPos = settings.StartAngle);
+      }else
+      if(currentMenu == Menu::StartAngle)
+      {
+        currentMenu = Menu::RotateCount;
+        ShowRotateCount(rotateCountMenuPos = settings.RotateCount - 1);
       }
       else currentMenu == Menu::Main;
       btnOK.resetTicks();
@@ -197,20 +203,14 @@ void loop()
     {
       ShowSchedule(++scheduleMenuPos);
     }else
-    if(currentMenu == Menu::FeedCount)
+    if(currentMenu == Menu::StartAngle)
     {
-      ShowFeedCount(++feedCountMenuPos);
-    }
-    else
+      ShowStartAngle(startAngleMenuPos += MOTOR_START_POS_INCREMENT);
+    }else
+    if(currentMenu == Menu::RotateCount)
     {
-      #ifdef DEBUG
-      if(DoFeed(settings.RotateCount, Feed::Status::TEST, MOTOR_SHOW_PROGRESS))
-      {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
-      }
-      ShowLastAction();
-      #endif
-    }
+      ShowRotateCount(++rotateCountMenuPos);
+    }    
   }
 
   if(btnDw.isReleased())
@@ -226,97 +226,110 @@ void loop()
     {
       ShowSchedule(--scheduleMenuPos);
     }else
-    if(currentMenu == Menu::FeedCount)
+    if(currentMenu == Menu::StartAngle)
     {
-      ShowFeedCount(--feedCountMenuPos);
-    }
-    else
+      ShowStartAngle(startAngleMenuPos -= MOTOR_START_POS_INCREMENT);
+    }else
+    if(currentMenu == Menu::RotateCount)
     {
-      #ifdef DEBUG
-      if(DoFeed(settings.RotateCount, Feed::Status::TEST, MOTOR_SHOW_PROGRESS))
-      {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
-      }
-      ShowLastAction();
-      #endif
-    }
+      ShowRotateCount(--rotateCountMenuPos);
+    }    
   }
 
   if(currentMenu == Menu::Main)
-  {
-  if(btnManualFeed.isReleased())
-  {
-    //S_INFO2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
-    BacklightOn();
-
-    if(DoFeed(settings.RotateCount, Feed::Status::MANUAL, MOTOR_SHOW_PROGRESS))
+  {  
+    if(btnManualFeed.isPressed())
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+      S_INFO2("Manual ", BUTTON_IS_PRESSED_MSG);
     }
-
-    SaveSettings();
-    ShowLastAction();    
-  }
-  else
-  if(btnRemoteFeed.isReleased())
-  {    
-    //S_INFO2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
-    BacklightOn();
-
-    if(DoFeed(settings.RotateCount, Feed::Status::REMOUTE, MOTOR_SHOW_PROGRESS))
+    if(btnManualFeed.isReleased())
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
-    }
+      //S_INFO2("Manual at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));    
+      S_INFO2("Manual ", BUTTON_IS_RELEASED_MSG);
 
-    SaveSettings();
-    ShowLastAction();    
-  }
-  else
-  if(btnPawFeed.isReleased())
-  {
-    //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
-    if(pawBtnAvaliabilityTicks == 0)
-    {      
       BacklightOn();
-
-      if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
+      if(btnManualFeed.isLongPress())
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+        S_INFO2("Manual ", BUTTON_IS_LONGPRESSED_MSG);
+
+        btnManualFeed.resetTicks();
+        if(DoFeed(settings.RotateCount, Feed::Status::TEST, MOTOR_SHOW_PROGRESS))
+        {
+          //settings.SetLastStatus(Feed::StatusInfo(Feed::Status::TEST, dtNow));
+        }
+        ShowLastAction();      
       }
+      else
+      {    
+        if(DoFeed(settings.RotateCount, Feed::Status::MANUAL, MOTOR_SHOW_PROGRESS))
+        {
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+        }
 
-      pawBtnAvaliabilityTicks = current;
-
-      digitalWrite(PAW_LED_PIN, LOW);
-      
-      SaveSettings();
-      ShowLastAction();      
+        SaveSettings();
+        ShowLastAction();
+      }
     }
     else
-    {
-      //ClearNextTime(); 
-      ClearRow(1);      
-      
-      lcd.print("Wait ");       
-      PrintTime(lcd, (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000);
-      lcd.print("...");
+    if(btnRemoteFeed.isReleased())
+    {    
+      //S_INFO2("Remoute at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+      BacklightOn();
 
-      delay(700);
+      if(DoFeed(settings.RotateCount, Feed::Status::REMOUTE, MOTOR_SHOW_PROGRESS))
+      {
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+      }
+
+      SaveSettings();
+      ShowLastAction();    
     }
-  }
-  else
-  if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
-  {
-    //S_INFO2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
-    BacklightOn();
-
-    if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
+    else
+    if(btnPawFeed.isReleased())
     {
-      settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
-    }    
+      //S_INFO2("Paw at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+      if(pawBtnAvaliabilityTicks == 0)
+      {      
+        BacklightOn();
 
-    SaveSettings();
-    ShowLastAction();    
-  }  
+        if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
+        {
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+        }
+
+        pawBtnAvaliabilityTicks = current;
+
+        digitalWrite(PAW_LED_PIN, LOW);
+        
+        SaveSettings();
+        ShowLastAction();      
+      }
+      else
+      {
+        //ClearNextTime(); 
+        ClearRow(1);      
+        
+        lcd.print("Wait ");       
+        PrintTime(lcd, (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000);
+        lcd.print("...");
+
+        delay(700);
+      }
+    }
+    else
+    if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
+    {
+      //S_INFO2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
+      BacklightOn();
+
+      if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
+      {
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
+      }    
+
+      SaveSettings();
+      ShowLastAction();    
+    }  
   }
  
   CheckPawButtonAvaliable(current);
@@ -329,7 +342,7 @@ const bool DoFeed(const short &feedCount, const Feed::Status &source, const bool
   S_INFO2("DoFead count: ", feedCount);
   ClearRow(0);
   lcd.print(" Feeding... -"); lcd.print(Feed::GetFeedStatusString(source, /*shortView:*/false));
-  return servo.DoFeed(settings.CurrentPosition, feedCount, showProgress, btnRt);
+  return servo.DoFeed(settings.CurrentPosition, settings.StartAngle, feedCount, showProgress, btnRt);
 }
 
 //Menu
@@ -370,7 +383,7 @@ void ClearNextTime()
   ClearRow(/*row:*/1, /*startColumn:*/0, /*endColumn:*/8, /*gotoX:*/0); 
 }
 
-short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions)
+short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions, const short &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
@@ -393,12 +406,12 @@ short &ShowHistory(short &pos, const short &minPositions, const short &maxPositi
   return pos;
 }
 
-short &ShowSchedule(short &pos, const short &minPositions, const short &maxPositions)
+short &ShowSchedule(short &pos, const short &minPositions, const short &maxPositions, const short &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
   ClearRow(0);
-  lcd.print("Set: "); lcd.print(Feed::GetSchedulerSetString(pos, /*shortView:*/false));
+  lcd.print("Sched: "); lcd.print(Feed::GetSchedulerSetString(pos, /*shortView:*/false));
 
   settings.FeedScheduler.Set = pos;
 
@@ -409,15 +422,30 @@ short &ShowSchedule(short &pos, const short &minPositions, const short &maxPosit
   return pos;
 }
 
-short &ShowFeedCount(short &pos, const short &minPositions, const short &maxPositions)
+short &ShowStartAngle(short &pos, const short &minPositions = 0, const short &maxPositions, const short &step)
 {
-  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
-  S_TRACE2("Feed Count: ", pos + 1);
+  pos = pos < minPositions ? maxPositions : pos > maxPositions ? minPositions : pos;
 
   ClearRow(0);
-  lcd.print("Feed Count: "); lcd.print(pos + 1);
+  lcd.print("Start: "); lcd.print(pos); lcd.print('\''); //lcd.print("°");
+
+  settings.StartAngle = pos;  
+
+  S_TRACE4("Start: ", pos, ": ", settings.StartAngle);  
+
+  return pos;
+}
+
+short &ShowRotateCount(short &pos, const short &minPositions, const short &maxPositions, const short &step)
+{
+  pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
+
+  ClearRow(0);
+  lcd.print("Rotate Count: "); lcd.print(pos + 1);
 
   settings.RotateCount = pos + 1;
+
+  S_TRACE2("Rotate Count: ", pos + 1);
 
   return pos;
 }
@@ -514,7 +542,7 @@ void PrintToSerialStatus()
   S_INFO2("CurrentPos: ", settings.CurrentPosition);
   S_INFO2("Sched: ", settings.FeedScheduler.SetToString());
   S_INFO2("Next Alarm: ", settings.FeedScheduler.GetNextAlarm().timestamp());  
-  S_INFO2("Feed Count: ", settings.RotateCount);  
+  S_INFO2("Rotate Count: ", settings.RotateCount);  
 }
 
 void BacklightOn()
@@ -585,7 +613,7 @@ void SaveSettings()
   ClearRow(1);
   lcd.print("Save...");
 
-  //S_TRACE7("Max:", EEPROM.length(), " Total: ", sizeof(settings), " ", "Hist: ", sizeof(settings.FeedHistory));
+  S_TRACE7("Max:", EEPROM.length(), " Total: ", sizeof(settings), " ", "Hist: ", sizeof(settings.FeedHistory));
 
   EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
 

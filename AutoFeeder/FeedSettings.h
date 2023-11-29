@@ -10,6 +10,8 @@
 
 #define MIN_FEED_COUNT 1
 #define MAX_FEED_COUNT 5
+#define MOTOR_START_POS 30 //Impact on portion size
+#define MOTOR_START_POS_INCREMENT 10
 
 #include "FeedScheduler.h"
 
@@ -19,8 +21,13 @@ namespace Feed
   {    
     unsigned short Delay;
     unsigned short RotateCount = 1;
-    unsigned short CurrentPosition = 0;
+    unsigned short CurrentPosition = MOTOR_START_POS;
+    unsigned short StartAngle = MOTOR_START_POS;
     Scheduler FeedScheduler;
+    unsigned short Reserved1 = 0;
+    unsigned short Reserved2 = 0;
+    unsigned short Reserved3 = 3;
+    
     //private:
     Feed::StatusInfo FeedHistory[FEEDS_STATUS_HISTORY_COUNT];
     public:
@@ -46,8 +53,9 @@ namespace Feed
     void Reset()
     {
       Delay = 0;
-      CurrentPosition = 0;
+      CurrentPosition = MOTOR_START_POS;
       RotateCount = MIN_FEED_COUNT;
+      StartAngle = MOTOR_START_POS;
       FeedScheduler.Reset();
       for(short idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
       {

@@ -2,37 +2,50 @@
 #ifndef FEED_SCHEDULER_H
 #define FEED_SCHEDULER_H
 
-#define FEEDS_SCHEDULER_SETTINGS_COUNT 7
-
 namespace Feed
 {
   enum ScheduleSet : short
   {
     NotSet = 0,
 
+    DAILY_2,
+    DAILY_3,
     DAILY_4,
-    DAILY_6,
-    DAILY_8,
+    DAILY_6,    
 
+    DAYNIGHT_8,
     DAYNIGHT_10,
     DAYNIGHT_12,
     DAYNIGHT_14,
+
+    MAX,
   };
 
-  static const char *const GetSchedulerSetString(const ScheduleSet &set, const bool &shortView)
+  static const short GetSchedulerSetCount(const ScheduleSet &set, bool &isDayNight)
   {    
+    isDayNight = false;
     switch(set)
     {
-      case ScheduleSet::DAILY_4:      return "Day 4";
-      case ScheduleSet::DAILY_6:      return "Day 6";
-      case ScheduleSet::DAILY_8:      return "Day 8";
+      case DAILY_2:                          return 2;
+      case DAILY_3:                          return 3;
+      case DAILY_4:                          return 4;
+      case DAILY_6:                          return 6;
 
-      case ScheduleSet::DAYNIGHT_10:  return "DayNght 10";
-      case ScheduleSet::DAYNIGHT_12:  return "DayNght 12";
-      case ScheduleSet::DAYNIGHT_14:  return "DayNght 14";
+
+      case DAYNIGHT_8:    isDayNight = true; return 8;
+      case DAYNIGHT_10:   isDayNight = true; return 10;
+      case DAYNIGHT_12:   isDayNight = true; return 12;
+      case DAYNIGHT_14:   isDayNight = true; return 14;
       case ScheduleSet::NotSet:
-      default:                        return "NotSet";
+      default:                               return 0;
     }
+  }
+
+  static const String GetSchedulerSetString(const ScheduleSet &set, const bool &shortView)
+  {    
+    bool isDayNight = false;
+    const short count = GetSchedulerSetCount(set, isDayNight);    
+    return set == ScheduleSet::NotSet ? "NotSet" : String(count) + (isDayNight ? "DayNight" : "Day"); 
   }
 
   struct Scheduler
@@ -42,9 +55,9 @@ namespace Feed
 
     public: 
 
-    Scheduler() : Set(NotSet), NextAlarm() { }
+    Scheduler() : Set(ScheduleSet::NotSet), NextAlarm() { }
 
-    const char *const SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
+    const String SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
 
     const bool IsTimeToAlarm(const DateTime &current)
     {
@@ -92,40 +105,27 @@ namespace Feed
     const DateTime GetNextTime(const DateTime &current) const
     {
       //return current + TimeSpan(0, 0, 4, 0);
-      switch(Set)
-      {
-        case ScheduleSet::NotSet:
-          return current;
-        case ScheduleSet::DAILY_4:        
-          return GetNextDateTime(current, 7, 23, 4);
-        case ScheduleSet::DAILY_6:
-          return GetNextDateTime(current, 7, 23, 6);
-        case ScheduleSet::DAILY_8:
-          return GetNextDateTime(current, 7, 23, 8);
 
-        case ScheduleSet::DAYNIGHT_10:
-          return GetNextDateTime(current, 0, 23, 10);
-        case ScheduleSet::DAYNIGHT_12:
-          return GetNextDateTime(current, 0, 23, 12);
-        case ScheduleSet::DAYNIGHT_14:
-          return GetNextDateTime(current, 0, 23, 14);
-        default:
-          return current;
-      }
+      if(Set == ScheduleSet::NotSet) return current;
+      bool isDayNight = false;
+      const short count = GetSchedulerSetCount(Set, isDayNight);
+      return GetNextDateTime(current, isDayNight ? 0 : 7, 23, count);      
     }      
 
     private:
     const DateTime GetNextDateTime(const DateTime &current, const short &startHour, const short &endHour, const short &count) const
     {
+      if(count == 0) return current;
       const auto currentDay = current.day();
       FeedDateTime nextTime = DateTime(current.year(), current.month(), current.day());      
       float stepFloat = (float)(endHour - startHour) / count;
-      const auto step = TimeSpan( (int32_t)( stepFloat * 3600 ));
+      const auto timeSpan = TimeSpan( (int32_t)( stepFloat * 3600L ));
+      const auto step = TimeSpan(0, timeSpan.hours(), timeSpan.minutes() ,0);
 
       S_TRACE6("Step: ", stepFloat, " ", step.hours(), ":", step.minutes());
-      S_TRACE(step.totalseconds());
+      //S_TRACE(step.totalseconds());
       
-      for(nextTime += TimeSpan(startHour * 3600); nextTime.hour() <= endHour; nextTime += step)
+      for(nextTime = nextTime + TimeSpan(0, startHour, 0, 0); nextTime.hour() <= endHour && nextTime.day() == currentDay; nextTime = nextTime + step)
       {
         if(nextTime.hour() > current.hour())
         {
@@ -135,7 +135,8 @@ namespace Feed
 
       if(nextTime.day() > currentDay || nextTime.hour() > endHour)
       {
-        const auto nextDayStart = DateTime(current.year(), current.month(), currentDay + 1);
+        //current.Date + one day
+        const auto nextDayStart = DateTime(current.year(), current.month(), currentDay) + TimeSpan(86400L);
         return GetNextDateTime(nextDayStart, startHour, endHour, count);
       }
 
