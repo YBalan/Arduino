@@ -3,7 +3,7 @@
 #define FEED_SETTINGS_H
 
 #ifdef RELEASE
-#define FEEDS_STATUS_HISTORY_COUNT 20
+#define FEEDS_STATUS_HISTORY_COUNT 25
 #else
 #define FEEDS_STATUS_HISTORY_COUNT 5
 #endif
@@ -33,12 +33,12 @@ namespace Feed
     public:
     void SetLastStatus(const Feed::StatusInfo& status)
     {
-      Push(status);
+      PushFirst(status);
     }
 
     const Feed::StatusInfo &GetLastStatus() const
     {
-      return FeedHistory[FEEDS_STATUS_HISTORY_COUNT - 1];
+      return FeedHistory[0];
     }
 
     const Feed::StatusInfo &GetStatusByIndex(const short &idx) const
@@ -64,16 +64,28 @@ namespace Feed
     }
 
     private:
-    void Push(const Feed::StatusInfo& status)
+    void PushLast(const Feed::StatusInfo& status)
     {
       if(FEEDS_STATUS_HISTORY_COUNT > 1)
       {
-        for(short idx = 1; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
+        for(int8_t idx = 1; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
         {
           FeedHistory[idx - 1] = FeedHistory[idx];
         }
       }
       FeedHistory[FEEDS_STATUS_HISTORY_COUNT - 1] = status;      
+    }
+
+    void PushFirst(const Feed::StatusInfo& status)
+    {
+      if(FEEDS_STATUS_HISTORY_COUNT > 1)
+      {
+        for(int8_t idx = FEEDS_STATUS_HISTORY_COUNT - 2; idx >= 0 ; idx--)
+        {
+          FeedHistory[idx + 1] = FeedHistory[idx];
+        }
+      }
+      FeedHistory[0] = status;      
     }
   };
 }

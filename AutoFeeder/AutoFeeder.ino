@@ -8,6 +8,7 @@
 #define RELEASE
 //#define TRACE
 //#define INFO
+#define USE_DHT
 
 #ifdef DEBUG
   #define INFO
@@ -56,7 +57,7 @@ Feed::Settings settings;
 #define PAW_FEED_PIN 6
 #define PAW_LED_PIN 2
 
-#ifdef DHT
+#ifdef USE_DHT
 #define HUMADITY_SENSOR_PIN 3
 DHT dht(HUMADITY_SENSOR_PIN, DHT11);
 #endif
@@ -79,10 +80,10 @@ ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
 //Menus Functions
-short &ShowHistory(short &pos, const short &minPositions = 0, const short &maxPositions = FEEDS_STATUS_HISTORY_COUNT, const short &step = 1);
-short &ShowSchedule(short &pos, const short &minPositions = 0, const short &maxPositions = Feed::ScheduleSet::MAX, const short &step = 1);
-short &ShowStartAngle(short &pos, const short &minPositions = 0, const short &maxPositions = MOTOR_MAX_POS / 2, const short &step = MOTOR_START_POS_INCREMENT);
-short &ShowRotateCount(short &pos, const short &minPositions = 0, const short &maxPositions = MAX_FEED_COUNT, const short &step = 1);
+int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = FEEDS_STATUS_HISTORY_COUNT, const int8_t &step = 1);
+int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = Feed::ScheduleSet::MAX, const int8_t &step = 1);
+int8_t &ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MOTOR_MAX_POS / 2, const int8_t &step = MOTOR_START_POS_INCREMENT);
+int8_t &ShowRotateCount(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MAX_FEED_COUNT, const int8_t &step = 1);
 
 void setup() 
 {
@@ -92,7 +93,7 @@ void setup()
   Serial.println();
   Serial.println();
   Serial.println("!!!! Start Auto Feeder !!!!");
-  S_INFO3(__DATE__, " ", __TIME__);  
+  Serial.print(__DATE__); Serial.print(" "); Serial.println(__TIME__);  
 
   lcd.init();
   lcd.init();
@@ -105,7 +106,7 @@ void setup()
   //delay(2000);  
   rtc.attach(Wire);
 
-#ifdef DHT
+#ifdef USE_DHT
   dht.begin();
 #endif
 
@@ -162,7 +163,7 @@ void loop()
     S_INFO4("BACK ", BUTTON_IS_PRESSED_MSG, " menu: ", currentMenu);
     BacklightOn();
 
-    if(currentMenu != Menu::Main)
+    if(currentMenu != Menu::Main && currentMenu != Menu::Dht && currentMenu != Menu::History)
     {
       SaveSettings();
     }
@@ -284,7 +285,7 @@ void loop()
       {    
         if(DoFeed(settings.RotateCount, Feed::Status::MANUAL, MOTOR_SHOW_PROGRESS))
         {
-          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow));
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow, GetCombinedDht()));
         }
 
         SaveSettings();
@@ -299,7 +300,7 @@ void loop()
 
       if(DoFeed(settings.RotateCount, Feed::Status::REMOUTE, MOTOR_SHOW_PROGRESS))
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow));
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow, GetCombinedDht()));
       }
 
       SaveSettings();
@@ -315,7 +316,7 @@ void loop()
 
         if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
         {
-          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow));
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow, GetCombinedDht()));
         }
 
         pawBtnAvaliabilityTicks = current;
@@ -345,7 +346,7 @@ void loop()
 
       if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow));
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow, GetCombinedDht()));
       }    
 
       SaveSettings();
@@ -358,7 +359,7 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-const bool DoFeed(const short &feedCount, const Feed::Status &source, const bool &showProgress)
+const bool DoFeed(const uint8_t &feedCount, const Feed::Status &source, const bool &showProgress)
 {
   S_INFO2("DoFead count: ", feedCount);
   ClearRow(0);
@@ -406,21 +407,47 @@ void ClearNextTime()
 
 const bool ShowDht()
 {
-  #ifdef DHT
-  if(isnan(dht.readTemperature()) && isnan(dht.readHumidity())) return false;
+  #ifdef USE_DHT
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  if(isnan(t) && isnan(h)) return false;
   ClearRow(0);
-  lcd.print(dht.readTemperature()); lcd.print('C'); lcd.print(" "); lcd.print(dht.readHumidity()); lcd.print('%');
+  lcd.print(t); lcd.print('C'); lcd.print(" "); lcd.print(h); lcd.print('%');
   return true;
   #endif
   return false;
 }
 
-short &ShowHistory(short &pos, const short &minPositions, const short &maxPositions, const short &step)
+const bool ShowDhtForHistory(const uint16_t &dht)
+{
+  if(dht > 0)
+  {
+    uint8_t t = 0, h = 0;
+    Feed::StoreHelper::ExtractFromUint16(dht, t, h);
+    ClearRow(1, 8, LCD_COLS, 8);
+    lcd.print(t); lcd.print('C'); lcd.print(" "); lcd.print(h); lcd.print('%');
+    return true;
+  }
+  return false;
+}
+
+const uint16_t GetCombinedDht()
+{
+  #ifdef USE_DHT
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  if(isnan(t) && isnan(h)) return 0;
+  return Feed::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
+  #endif
+  return 0;
+}
+
+int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
-  const short idx = maxPositions - pos - 1;
-  const Feed::StatusInfo &status = settings.GetStatusByIndex(idx);
+  const uint8_t idx = maxPositions - pos - 1;
+  const Feed::StatusInfo &status = settings.GetStatusByIndex(pos);
   S_TRACE4("Hist: ", idx + 1, ": ", status.ToString());
 
   ClearRow(0);
@@ -429,16 +456,18 @@ short &ShowHistory(short &pos, const short &minPositions, const short &maxPositi
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
     ClearNextTime();
     lcd.print(status.GetDateString());
+    ShowDhtForHistory(status.DHT);
   } 
   else
   {
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(NO_VALUES_MSG);
+    ClearNextTime();
   } 
 
   return pos;
 }
 
-short &ShowSchedule(short &pos, const short &minPositions, const short &maxPositions, const short &step)
+int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
@@ -454,7 +483,7 @@ short &ShowSchedule(short &pos, const short &minPositions, const short &maxPosit
   return pos;
 }
 
-short &ShowStartAngle(short &pos, const short &minPositions = 0, const short &maxPositions, const short &step)
+int8_t &ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions : pos > maxPositions ? minPositions : pos;
 
@@ -468,7 +497,7 @@ short &ShowStartAngle(short &pos, const short &minPositions = 0, const short &ma
   return pos;
 }
 
-short &ShowRotateCount(short &pos, const short &minPositions, const short &maxPositions, const short &step)
+int8_t &ShowRotateCount(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
@@ -482,7 +511,7 @@ short &ShowRotateCount(short &pos, const short &minPositions, const short &maxPo
   return pos;
 }
 
-short debugButtonFromSerial = 0;
+uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 1) // SHOW DateTime
@@ -492,6 +521,7 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 2) //RESET Settings
   {
+    currentMenu = Menu::Main;
     settings.Reset();
     SaveSettings();
     ShowLastAction();
@@ -519,6 +549,7 @@ void HandleDebugSerialCommands()
     if(SetCurrentDateTime(readFromSerial, rtc))
     {      
       PrintToSerialDateTime();
+      settings.FeedScheduler.SetNextAlarm(rtc.now());
     }
     else
     {    
@@ -534,14 +565,14 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 {
   if(value.length() >= 12)
   {
-    short yyyy = value.substring(0, 4).toInt();
-    short MM = value.substring(4, 6).toInt();      
-    short dd = value.substring(6, 8).toInt();      
+    uint16_t yyyy = value.substring(0, 4).toInt();
+    uint8_t MM = value.substring(4, 6).toInt();      
+    uint8_t dd = value.substring(6, 8).toInt();      
 
-    short HH = value.substring(8, 10).toInt();      
-    short mm = value.substring(10, 12).toInt();
+    uint8_t HH = value.substring(8, 10).toInt();      
+    uint8_t mm = value.substring(10, 12).toInt();
 
-    short ss = 0;
+    uint8_t ss = 0;
 
     if(yyyy < 2023 || yyyy > 2100)  {S_INFO2("Wrong: ", yyyy);  return false; }
     if(MM < 1 || MM > 12)           {S_INFO2("Wrong: ", MM);    return false; }
@@ -557,6 +588,8 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
     auto dt = DateTime(yyyy, MM, dd, HH, mm, ss);      
     realTimeClock.now(dt);
+
+    //S_TRACE("OK ");
 
     return true;
   }
@@ -613,15 +646,20 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
 { 
   if(currentTicks - prevTicks >= 1000)
   {
-    if(currentMenu != Menu::History)
-    {
-      ShowNextFeedTime();
-    }
-
     if(currentMenu == Menu::Dht)
     {
       ShowDht();
+    }
+
+    if(currentMenu != Menu::History)
+    {
+      ShowNextFeedTime();      
     }   
+
+    if(currentMenu == Menu::History && settings.GetStatusByIndex(historyMenuPos).DHT > 0)
+    {
+      return;
+    }
      
     lcd.setCursor(8, 1);
     lcd.print(dtNow.timestamp(DateTime::TIMESTAMP_TIME));
@@ -635,11 +673,11 @@ void EnableWatchDog()
   S_INFO("Watchdog enabled.");
 }
 
-void ClearRow(const short &row) { ClearRow(row, 0, LCD_COLS, -1); }
-void ClearRow(const short &row, const short &columnStart, const short &columnEnd, const short &gotoX)
+void ClearRow(const uint8_t &row) { ClearRow(row, 0, LCD_COLS, -1); }
+void ClearRow(const uint8_t &row, const uint8_t &columnStart, const uint8_t &columnEnd, const uint8_t &gotoX)
 {
   lcd.setCursor(columnStart, row);
-  for(short ch = columnStart; ch < columnEnd; ch++) lcd.print(' ');
+  for(uint8_t ch = columnStart; ch < columnEnd; ch++) lcd.print(' ');
   lcd.setCursor(gotoX == -1 ? columnStart : gotoX, row);
 }
 

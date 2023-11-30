@@ -4,7 +4,7 @@
 
 namespace Feed
 {
-  enum ScheduleSet : short
+  enum ScheduleSet : uint8_t
   {
     NotSet = 0,
 
@@ -125,15 +125,15 @@ namespace Feed
       S_TRACE6("Step: ", stepFloat, " ", step.hours(), ":", step.minutes());
       //S_TRACE(step.totalseconds());
       
-      for(nextTime = nextTime + TimeSpan(0, startHour, 0, 0); nextTime.hour() <= endHour && nextTime.day() == currentDay; nextTime = nextTime + step)
+      for(nextTime = nextTime + TimeSpan(0, startHour, 0, 0); nextTime.hour() < endHour && nextTime.day() == currentDay; nextTime = nextTime + step)
       {
-        if(nextTime.hour() > current.hour())
+        if(nextTime > current)
         {
           break;
         }
       }
 
-      if(nextTime.day() > currentDay || nextTime.hour() > endHour)
+      if(nextTime.day() > currentDay || nextTime.hour() >= endHour)
       {
         //current.Date + one day
         const auto nextDayStart = DateTime(current.year(), current.month(), currentDay) + TimeSpan(86400L);

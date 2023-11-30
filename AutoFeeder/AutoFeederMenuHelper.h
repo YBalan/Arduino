@@ -9,7 +9,7 @@
 
 #define RETURN_TO_MAIN_MENU_AFTER 60000
 
-enum Menu : short
+enum Menu : uint8_t
 {
   Main,
   Dht,
@@ -20,11 +20,11 @@ enum Menu : short
 } currentMenu;
 
 //bool IsBusy = false;
-short mainMenuPos = 0;
-short historyMenuPos = 0;
-short scheduleMenuPos = 0;
-short rotateCountMenuPos = 0;
-short startAngleMenuPos = 0;
+int8_t mainMenuPos = 0;
+int8_t historyMenuPos = 0;
+int8_t scheduleMenuPos = 0;
+int8_t rotateCountMenuPos = 0;
+int8_t startAngleMenuPos = 0;
 
 static void PrintTime(const Print &print, const short &timeInSeconds, const char &sep = ' ', const bool &showUnitName = true, const bool &showMinsIfZero = false, const bool &showSecsIfZero = true)
 {  
