@@ -323,8 +323,7 @@ void loop()
 
         digitalWrite(PAW_LED_PIN, LOW);
         
-        SaveSettings();
-        ShowLastAction();      
+        SaveSettings();        
       }
       else
       {
@@ -335,8 +334,10 @@ void loop()
         PrintTime(lcd, (PAW_BTN_AVALIABLE_AFTER  - (current - pawBtnAvaliabilityTicks)) / 1000);
         lcd.print("...");
 
-        delay(700);
+        delay(2000);
       }
+
+      ShowLastAction();
     }
     else
     if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
@@ -480,6 +481,8 @@ int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxP
 
   settings.FeedScheduler.SetNextAlarm(rtc.now());
 
+  ShowNextFeedTime();
+
   return pos;
 }
 
@@ -598,8 +601,8 @@ const bool SetCurrentDateTime(const String &value, DS323x &realTimeClock)
 
 void PrintToSerialDateTime()
 {
-  /*S_INF  ("SYS DT: ");*/ S_INFO3(__DATE__, " ", __TIME__);
-  S_INFO(rtc.now().timestamp());  
+  /*S_INF  ("SYS DT: ");*/ S_TRACE3(__DATE__, " ", __TIME__);
+  S_TRACE(rtc.now().timestamp());  
 }
 
 void PrintToSerialStatus()
@@ -650,11 +653,6 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
     {
       ShowDht();
     }
-
-    if(currentMenu != Menu::History)
-    {
-      ShowNextFeedTime();      
-    }   
 
     if(currentMenu == Menu::History && settings.GetStatusByIndex(historyMenuPos).DHT > 0)
     {

@@ -65,9 +65,6 @@ namespace Feed
 
       volatile auto nextAlarmDtValue = FeedDateTime::GetTotalValueWithoutSeconds(NextAlarm);
       volatile auto currentDtValue   = FeedDateTime::GetTotalValueWithoutSeconds(current);
-
-      //S_TRACE("Next Alarm < Current: ", nextAlarmDtValue, " Cur: ", currentDtValue);      
-      //S_TRACE("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
            
       if(nextAlarmDtValue < currentDtValue)
       {
@@ -81,6 +78,11 @@ namespace Feed
         S_TRACE4("Alarm: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());        
         SetNextAlarm(current);
         return true;        
+      }
+      else
+      {
+        //S_TRACE4("Next: ", nextAlarmDtValue, " Cur: ", currentDtValue);
+        //S_TRACE4("Next: ", NextAlarm.timestamp(), " Cur: ", current.timestamp());
       }
       return false;
     }

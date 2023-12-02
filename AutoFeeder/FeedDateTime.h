@@ -56,14 +56,14 @@ namespace Feed
     }
 
     public:
-    const long GetTotalValueWithoutSeconds() const
+    const uint32_t GetTotalValueWithoutSeconds() const
     {
-      return (year() * 32140800L) + (month() * 2678400L) + time2long(day(), hour(), minute(), 0);
+      return (32140800L * (year() - 2000)) + (2678400L * month()) + (86400L * day()) + (3600L * hour()) + (60 * minute());  //time2long(day(), hour(), minute(), 0);
     }
 
-    static const long GetTotalValueWithoutSeconds(const DateTime &dt)
+    static const uint32_t GetTotalValueWithoutSeconds(const DateTime &dt)
     {
-      return (dt.year() * 32140800L) + (dt.month() * 2678400L) + time2long(dt.day(), dt.hour(), dt.minute(), 0);
+      return (32140800L * (dt.year() - 2000)) + (2678400L * dt.month()) + (86400L * dt.day()) + (3600L * dt.hour()) + (60 * dt.minute());  //time2long(day(), hour(), minute(), 0);
     }    
   };
 
