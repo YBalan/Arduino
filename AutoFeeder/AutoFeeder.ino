@@ -285,7 +285,7 @@ void loop()
       {    
         if(DoFeed(settings.RotateCount, Feed::Status::MANUAL, MOTOR_SHOW_PROGRESS))
         {
-          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow, GetCombinedDht()));
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::MANUAL, dtNow, GetCombinedDht(/*force:*/true)));
         }
 
         SaveSettings();
@@ -300,7 +300,7 @@ void loop()
 
       if(DoFeed(settings.RotateCount, Feed::Status::REMOUTE, MOTOR_SHOW_PROGRESS))
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow, GetCombinedDht()));
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::REMOUTE, dtNow, GetCombinedDht(/*force:*/true)));
       }
 
       SaveSettings();
@@ -316,7 +316,7 @@ void loop()
 
         if(DoFeed(settings.RotateCount, Feed::Status::PAW, MOTOR_SHOW_PROGRESS))
         {
-          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow, GetCombinedDht()));
+          settings.SetLastStatus(Feed::StatusInfo(Feed::Status::PAW, dtNow, GetCombinedDht(/*force:*/true)));
         }
 
         pawBtnAvaliabilityTicks = current;
@@ -347,7 +347,7 @@ void loop()
 
       if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow, GetCombinedDht()));
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow, GetCombinedDht(/*force:*/true)));
       }    
 
       SaveSettings();
@@ -432,11 +432,12 @@ const bool ShowDhtForHistory(const uint16_t &dht)
   return false;
 }
 
-const uint16_t GetCombinedDht()
+const uint16_t GetCombinedDht(const bool &force)
 {
   #ifdef USE_DHT
+  float h = dht.readHumidity(force);
   float t = dht.readTemperature();
-  float h = dht.readHumidity();
+  
   if(isnan(t) && isnan(h)) return 0;
   return Feed::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
   #endif
@@ -552,7 +553,8 @@ void HandleDebugSerialCommands()
     if(SetCurrentDateTime(readFromSerial, rtc))
     {      
       PrintToSerialDateTime();
-      settings.FeedScheduler.SetNextAlarm(rtc.now());
+      settings.FeedScheduler.SetNextAlarm(rtc.now());      
+      ShowNextFeedTime();
     }
     else
     {    
