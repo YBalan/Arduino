@@ -23,18 +23,18 @@ namespace Feed
 {
   class FeedMotor
   {
-    short _pin;
+    uint8_t _pin;
     Servo _servo;
     Print * const _printProgress = 0;
   public:
-    FeedMotor(const short &pin) : _pin(pin)
+    FeedMotor(const uint8_t &pin) : _pin(pin)
     { }
-    FeedMotor(const short &pin, const Print &print) : _pin(pin), _servo(), _printProgress(&print)
+    FeedMotor(const uint8_t &pin, const Print &print) : _pin(pin), _servo(), _printProgress(&print)
     { }
 
     const short &Init() const { return _printProgress != 0 ? _printProgress->write("", /*Helpers::LcdProgressCommands::Init*/4) : 0; }
 
-    const bool DoFeed(unsigned short &currentPosition, const short &startPosition, const short &feedCount, const bool &showProgress, const ezButton &cancelButton)
+    const bool DoFeed(uint8_t &currentPosition, const uint8_t &startPosition, const uint8_t &feedCount, const bool &showProgress, const ezButton &cancelButton)
     {
       if(!Attach()) return false;
       
@@ -44,22 +44,22 @@ namespace Feed
 
       if(showProgress && _printProgress != 0) _printProgress->write("", /*Helpers::LcdProgressCommands::Clear*/5);
 
-      const short totalCount = (MOTOR_MAX_POS - startPosition) * feedCount;
-      short pctValue = 0;
+      const uint8_t totalCount = (MOTOR_MAX_POS - startPosition) * feedCount;
+      uint8_t pctValue = 0;
       bool cancel = false;
 
       currentPosition = currentPosition == MOTOR_MAX_POS ? MOTOR_MAX_POS : startPosition;
 
-      for(short feed = 1; feed <= feedCount; feed++)
+      for(uint8_t feed = 1; feed <= feedCount; feed++)
       {   
         cancelButton.loop();
         if(cancel || cancelButton.isPressed())
         { S_TRACE("Cancel!"); break; }
 
-        short pos = currentPosition;
-        short endPos = pos >= MOTOR_MAX_POS ? startPosition : MOTOR_MAX_POS;
-        const short rotate = pos >= MOTOR_MAX_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
-        const short rotateBack = pos >= MOTOR_MAX_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
+        uint8_t pos = currentPosition;
+        uint8_t endPos = pos >= MOTOR_MAX_POS ? startPosition : MOTOR_MAX_POS;
+        const uint8_t rotate = pos >= MOTOR_MAX_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
+        const uint8_t rotateBack = pos >= MOTOR_MAX_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
 
         S_TRACE2("   Feed No: ", feed);
         S_TRACE2("CurrentPos: ", pos);
@@ -82,7 +82,7 @@ namespace Feed
             if(showProgress && _printProgress != 0)
             {              
               S_TRACE2("  PctValue: ", pctValue);
-              short pct = map(pctValue, 0, totalCount, 0, 100);         
+              uint8_t pct = map(pctValue, 0, totalCount, 0, 100);         
               _printProgress->write(pct);
               pctValue += abs(rotate);
             }
@@ -91,7 +91,7 @@ namespace Feed
 
             if(MOTOR_STEP_BACK_MODE)
             {
-              short stepBackPos = pos - rotateBack;
+              uint8_t stepBackPos = pos - rotateBack;
               if(stepBackPos >= startPosition + MOTOR_STEP_BACK_VALUE && stepBackPos <= MOTOR_MAX_POS - MOTOR_STEP_BACK_VALUE)
               {
                 cancelButton.loop();
