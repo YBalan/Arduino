@@ -5,10 +5,10 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-//#define RELEASE
-#define TRACE
+#define RELEASE
+//#define TRACE
 //#define INFO
-//#define USE_DHT
+#define USE_DHT
 
 #ifdef DEBUG
   #define INFO
@@ -190,11 +190,11 @@ void loop()
     S_INFO4("BACK ", BUTTON_IS_PRESSED_MSG, " menu: ", currentMenuItem->GetMenu());
     BacklightOn();
 
-    // if(currentMenu != Menu::Main && currentMenu != Menu::Dht && currentMenu != Menu::History)
-    // {
-    //   SaveSettings();
-    // }
-    //currentMenu = Menu::Main;
+    if(currentMenuItem->IsSaveSettingsRequired())
+    {
+      SaveSettings();
+    }
+    currentMenuItem = &mainMenuItem;
     settings.FeedScheduler.SetNextAlarm(dtNow);
     ShowLastAction();
   }
@@ -205,11 +205,9 @@ void loop()
     if(btnOK.isLongPress())
     {
       S_INFO2("Ok ", BUTTON_IS_LONGPRESSED_MSG);
-      //if(currentMenuItem->GetMenu() == Menu::Main)
-      {
-        currentMenuItem = currentMenuItem->GetNextMenu();
-        currentMenuItem->Show();
-      }
+      
+      currentMenuItem = currentMenuItem->GetNextMenu();
+      currentMenuItem->Show(-10);      
 
       // if(currentMenu == Menu::Main)
       // {
@@ -484,7 +482,7 @@ const uint16_t GetCombinedDht(const bool &force)
 }
 
 const bool ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
-{
+{ 
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
   const uint8_t idx = maxPositions - pos - 1;
@@ -510,6 +508,7 @@ const bool ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &ma
 
 const bool ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
+  pos = pos == -10 ? settings.FeedScheduler.Set : pos;
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
   ClearRow(0);
@@ -695,7 +694,7 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
       ShowDht();
     }
 
-    if(*currentMenuItem == Menu::History/* && settings.GetStatusByIndex(historyMenuPos).DHT > 0*/)
+    if(*currentMenuItem == Menu::History && settings.GetStatusByIndex(historyMenuItem.GetPosition()).DHT > 0)
     {
       return;
     }

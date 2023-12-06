@@ -41,7 +41,7 @@ namespace Feed
       return FeedHistory[0];
     }
 
-    const Feed::StatusInfo &GetStatusByIndex(const short &idx) const
+    const Feed::StatusInfo &GetStatusByIndex(const uint8_t &idx) const
     {
       if(idx >= 0 && idx < FEEDS_STATUS_HISTORY_COUNT)
       {
