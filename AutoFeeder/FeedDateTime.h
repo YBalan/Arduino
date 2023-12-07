@@ -13,10 +13,18 @@ namespace Feed
     { }
 
     FeedDateTime(const DateTime &dt) : DateTime(dt)
-    { }
+    { 
+      S_TRACE2("Copy from ", "DateTime");
+    }
+
+    FeedDateTime(const FeedDateTime &dt) : DateTime(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second())
+    { 
+      S_TRACE3("Copy from ", "Feed", "DateTime");
+    }
 
     FeedDateTime& operator= (const FeedDateTime &other)
     {
+      S_TRACE3("operator = ", "Feed", "DateTime");
       if (this != &other) {  // Check for self-assignment
           yOff = other.yOff;
           m = other.m;
@@ -24,6 +32,20 @@ namespace Feed
           hh = other.hh;
           mm = other.mm;
           ss = other.ss;          
+      }
+      return *this;  // Return a reference to this object
+    }    
+
+    FeedDateTime& operator= (const DateTime &other)
+    {
+      S_TRACE2("operator = ", "DateTime");
+      if (this != &other) {  // Check for self-assignment
+          yOff = other.yearOffset();
+          m = other.month();
+          d = other.day();
+          hh = other.hour();
+          mm = other.minute();
+          ss = other.second();          
       }
       return *this;  // Return a reference to this object
     }    
@@ -38,14 +60,14 @@ namespace Feed
     {
         return right < *this;
     }
-    bool operator<=(const DateTime& right) const
-    {
-        return !(*this > right);
-    }
-    bool operator>=(const DateTime& right) const
-    {
-        return !(*this < right);
-    }
+    // bool operator<=(const DateTime& right) const
+    // {
+    //     return !(*this > right);
+    // }
+    // bool operator>=(const DateTime& right) const
+    // {
+    //     return !(*this < right);
+    // }
     bool operator==(const DateTime& right) const
     {
         return GetTotalValueWithoutSeconds() == GetTotalValueWithoutSeconds(right);
@@ -58,12 +80,12 @@ namespace Feed
     public:
     const uint32_t GetTotalValueWithoutSeconds() const
     {
-      return (32140800L * (year() - 2000)) + (2678400L * month()) + (86400L * day()) + (3600L * hour()) + (60 * minute());  //time2long(day(), hour(), minute(), 0);
+      return (32140800L * yearOffset()) + (2678400L * month()) + (86400L * day()) + (3600L * hour()) + (60 * minute());  //time2long(day(), hour(), minute(), 0);
     }
 
     static const uint32_t GetTotalValueWithoutSeconds(const DateTime &dt)
     {
-      return (32140800L * (dt.year() - 2000)) + (2678400L * dt.month()) + (86400L * dt.day()) + (3600L * dt.hour()) + (60 * dt.minute());  //time2long(day(), hour(), minute(), 0);
+      return (32140800L * dt.yearOffset()) + (2678400L * dt.month()) + (86400L * dt.day()) + (3600L * dt.hour()) + (60 * dt.minute());  //time2long(day(), hour(), minute(), 0);
     }    
   };
 

@@ -93,7 +93,7 @@ void setup()
   Serial.println();
   Serial.println();
   Serial.println("!!!! Start Auto Feeder !!!!");
-  Serial.print(__DATE__); Serial.print(" "); Serial.println(__TIME__);  
+  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(" "); Serial.println(__TIME__);  
 
   lcd.init();
   lcd.init();
@@ -109,9 +109,9 @@ void setup()
 #ifdef USE_DHT
   dht.begin();
 #endif
-
   
   ShowLcdTime(1000, rtc.now());
+  Serial.println(rtc.now().timestamp());
 
   btnOK.setDebounceTime(DEBOUNCE_TIME);
   btnUp.setDebounceTime(DEBOUNCE_TIME);
@@ -340,14 +340,14 @@ void loop()
       ShowLastAction();
     }
     else
-    if(settings.FeedScheduler.IsTimeToAlarm(dtNow))
+    if(settings.FeedScheduler.IsTimeToAlarm(rtc.now()))
     {
       //S_INFO2("Schedule at: ", dtNow.timestamp(DateTime::TIMESTAMP_TIME));
       BacklightOn();
 
       if(DoFeed(settings.RotateCount, Feed::Status::SCHEDULE, MOTOR_SHOW_PROGRESS))
       {
-        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, dtNow, GetCombinedDht(/*force:*/true)));
+        settings.SetLastStatus(Feed::StatusInfo(Feed::Status::SCHEDULE, rtc.now(), GetCombinedDht(/*force:*/true)));
       }    
 
       SaveSettings();
@@ -552,9 +552,11 @@ void HandleDebugSerialCommands()
 
     if(SetCurrentDateTime(readFromSerial, rtc))
     {      
-      PrintToSerialDateTime();
+      PrintToSerialDateTime();      
       settings.FeedScheduler.SetNextAlarm(rtc.now());      
+      SaveSettings();
       ShowNextFeedTime();
+      PrintToSerialStatus(); 
     }
     else
     {    
@@ -609,10 +611,11 @@ void PrintToSerialDateTime()
 
 void PrintToSerialStatus()
 {
-  S_INFO2("CurrentPos: ", settings.CurrentPosition);
-  S_INFO2("Sched: ", settings.FeedScheduler.SetToString());
-  S_INFO2("Next Alarm: ", settings.FeedScheduler.GetNextAlarm().timestamp());  
-  S_INFO2("Rotate Count: ", settings.RotateCount);  
+  //S_INFO2("CurrentPos: ", settings.CurrentPosition);
+  S_TRACE2("Sched: ", settings.FeedScheduler.SetToString());
+  S_TRACE4("Next: ", settings.FeedScheduler.GetNextAlarm().timestamp(), " ", settings.FeedScheduler.GetNextAlarm().GetTotalValueWithoutSeconds());  
+  S_TRACE4("Curr: ", rtc.now().timestamp(), " ", Feed::FeedDateTime::GetTotalValueWithoutSeconds(rtc.now()));  
+  //S_INFO2("Rotate Count: ", settings.RotateCount);  
 }
 
 void BacklightOn()
