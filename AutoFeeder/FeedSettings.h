@@ -18,15 +18,16 @@
 namespace Feed
 {
   struct Settings
-  {    
-    unsigned short Delay;
-    uint8_t RotateCount = 1;
-    uint8_t CurrentPosition = MOTOR_START_POS;
-    uint8_t StartAngle = MOTOR_START_POS;
+  { 
     Scheduler FeedScheduler;
-    uint8_t Reserved1 = 0;
-    uint8_t Reserved2 = 0;
+    unsigned short CurrentPosition = MOTOR_START_POS;       
+    unsigned short Delay;
+    uint8_t RotateCount = 1;    
+    uint8_t StartAngle = MOTOR_START_POS;    
+    uint8_t Reserved1 = 1;
+    uint8_t Reserved2 = 2;
     uint8_t Reserved3 = 3;
+    uint8_t Reserved4 = 4;
     
     //private:
     Feed::StatusInfo FeedHistory[FEEDS_STATUS_HISTORY_COUNT];
@@ -41,7 +42,7 @@ namespace Feed
       return FeedHistory[0];
     }
 
-    const Feed::StatusInfo &GetStatusByIndex(const uint8_t &idx) const
+    const Feed::StatusInfo &GetStatusByIndex(const short &idx) const
     {
       if(idx >= 0 && idx < FEEDS_STATUS_HISTORY_COUNT)
       {
@@ -57,7 +58,7 @@ namespace Feed
       RotateCount = MIN_FEED_COUNT;
       StartAngle = MOTOR_START_POS;
       FeedScheduler.Reset();
-      for(int8_t idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
+      for(short idx = 0; idx < FEEDS_STATUS_HISTORY_COUNT; idx++)
       {
         FeedHistory[idx] = Feed::StatusInfo();
       }
