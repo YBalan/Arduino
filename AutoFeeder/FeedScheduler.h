@@ -2,6 +2,8 @@
 #ifndef FEED_SCHEDULER_H
 #define FEED_SCHEDULER_H
 
+#include <DS323x.h>
+
 namespace Feed
 {
   enum ScheduleSet : uint8_t
@@ -59,39 +61,41 @@ namespace Feed
 
     const String SetToString(const bool &shortView = false) const { return GetSchedulerSetString(Set, shortView); }
 
-    const bool IsTimeToAlarm(const DateTime &current)
+    const bool IsTimeToAlarm(const DS323x &rtc)
     {
-      if(Set == ScheduleSet::NotSet) return false;   
-
-      uint32_t nextAlarmDtValue = FeedDateTime::GetTotalValueWithoutSeconds(NextAlarm);
-      uint32_t currentDtValue   = FeedDateTime::GetTotalValueWithoutSeconds(current);
-           
-      if(nextAlarmDtValue < currentDtValue)
+      if(Set != ScheduleSet::NotSet && rtc.hasAlarmed(DS323x::AlarmSel::A2))
       {
-        S_TRACE4("Next Alarm < Current: ", nextAlarmDtValue, "Curr: ", currentDtValue);
-        S_TRACE4("Next Alarm < Current: ", NextAlarm.timestamp(), "Curr: ", current.timestamp());     
-        SetNextAlarm(current);
-        return false;
-      }
-
-      if(nextAlarmDtValue == currentDtValue)
-      {       
-        S_TRACE4("Alarm: ", NextAlarm.timestamp(), "Curr: ", current.timestamp());        
-        SetNextAlarm(current);
-        return true;        
-      }
-      else
-      {
-        //S_TRACE4("Next: ", nextAlarmDtValue, "Curr: ", currentDtValue);
-        //S_TRACE4("Next: ", NextAlarm.timestamp(), "Curr: ", current.timestamp());
+        SetNextAlarm(rtc);
+        return true;
       }
       return false;
     }
-
-    void SetNextAlarm(const DateTime &current)
+    
+    void SetNextAlarm(const DS323x &rtc)
     {
-      NextAlarm = GetNextTime(current);      
-    }
+      if(Set == ScheduleSet::NotSet)
+      {
+        rtc.clearAlarm(DS323x::AlarmSel::A2);
+        rtc.enableAlarm2(false);
+        return;
+      }
+
+      NextAlarm = GetNextTime(rtc.now());
+      
+      rtc.clearAlarm(DS323x::AlarmSel::A2);      
+      rtc.format(DS323x::AlarmSel::A2, DS323x::Format::HOUR_24);
+      rtc.dydt(DS323x::AlarmSel::A2, DS323x::DYDT::DYDT_DATE);
+      rtc.ampm(DS323x::AlarmSel::A2, DS323x::AMPM::AMPM_PM);
+      rtc.day(DS323x::AlarmSel::A2, NextAlarm.day());
+      rtc.hour(DS323x::AlarmSel::A2, NextAlarm.hour());
+      rtc.minute(DS323x::AlarmSel::A2, NextAlarm.minute());
+      rtc.second(DS323x::AlarmSel::A2, 0);
+      rtc.rate(DS323x::A2Rate::MATCH_MINUTE_HOUR);
+
+      rtc.enableAlarm2(true);
+
+      S_TRACE4("RTC Alarm: ", rtc.alarm(DS323x::AlarmSel::A2).timestamp(), " rate: ", (uint8_t)rtc.rateA2());
+    }   
 
     const FeedDateTime &GetNextAlarm() const
     {
@@ -107,8 +111,6 @@ namespace Feed
     private:
     const FeedDateTime GetNextTime(const DateTime &current) const
     {
-      //return current + TimeSpan(0, 0, 4, 0);
-
       if(Set == ScheduleSet::NotSet) return current;
       bool isDayNight = false;
       const uint8_t count = GetSchedulerSetCount(Set, isDayNight);
@@ -120,7 +122,7 @@ namespace Feed
     {
       if(count == 0) return current;
       const auto currentDay = current.day();
-      FeedDateTime nextTime = DateTime(current.year(), current.month(), currentDay);      
+      FeedDateTime nextTime = DateTime(current.year(), current.month(), currentDay, 0, 0, 0);      
       float stepFloat = (float)(endHour - startHour) / count;
       const auto timeSpan = TimeSpan( (int32_t)( stepFloat * 3600L ));
       const auto step = TimeSpan(0, timeSpan.hours(), timeSpan.minutes() ,0);
