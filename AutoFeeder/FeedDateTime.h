@@ -4,6 +4,14 @@
 
 #include "DateTime.h"
 
+//#define ENABLE_TRACE_FEEDDATETIME
+
+#ifdef ENABLE_TRACE_FEEDDATETIME
+#define FEEDDATETIME_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define FEEDDATETIME_TRACE(...) {}
+#endif
+
 namespace Feed
 {
   class FeedDateTime : public DateTime
@@ -14,13 +22,13 @@ namespace Feed
 
     FeedDateTime(const DateTime &dt) : DateTime(dt)
     { 
-      S_TRACE2("Copy from ", "DateTime");
+      FEEDDATETIME_TRACE("Copy from ", "DateTime");
     }
         
     FeedDateTime& operator= (const FeedDateTime &other)
     {      
       if (this != &other) {  // Check for self-assignment
-        S_TRACE3("operator = ", "Feed", "DateTime");
+        FEEDDATETIME_TRACE("operator = ", "Feed", "DateTime");
           yOff = other.yOff;
           m = other.m;
           d = other.d;

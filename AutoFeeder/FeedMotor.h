@@ -6,6 +6,14 @@
 #include "ezButton.h"
 #include "DEBUGHelper.h"
 
+//#define ENABLE_TRACE_MOTOR
+
+#ifdef ENABLE_TRACE_MOTOR
+#define MOTOR_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define MOTOR_TRACE(...) {}
+#endif
+
 
 //#define MOTOR_DS3218MG_270
 
@@ -38,7 +46,7 @@ namespace Feed
     {
       if(!Attach()) return false;
       
-      S_INFO2("Servo read: ", _servo.readMicroseconds());      
+      MOTOR_TRACE("Servo read: ", _servo.readMicroseconds());      
 
       bool res = false;
 
@@ -54,17 +62,17 @@ namespace Feed
       {   
         cancelButton.loop();
         if(cancel || cancelButton.isPressed())
-        { S_INFO("Cancel!"); break; }
+        { MOTOR_TRACE("Cancel!"); break; }
 
         short pos = currentPosition;
         short endPos = pos >= MOTOR_MAX_POS ? startPosition : MOTOR_MAX_POS;
         const int8_t rotate = pos >= MOTOR_MAX_POS ? -MOTOR_ROTATE_VALUE : MOTOR_ROTATE_VALUE;
         const int8_t rotateBack = pos >= MOTOR_MAX_POS ? -MOTOR_STEP_BACK_VALUE : MOTOR_STEP_BACK_VALUE;
 
-        S_INFO2("   Feed No: ", feed);
-        S_INFO2("CurrentPos: ", pos);
-        S_INFO2("    EndPos: ", endPos);
-        S_INFO2("    Rotate: ", rotate);
+        MOTOR_TRACE("   Feed No: ", feed);
+        MOTOR_TRACE("CurrentPos: ", pos);
+        MOTOR_TRACE("    EndPos: ", endPos);
+        MOTOR_TRACE("    Rotate: ", rotate);
 
         if(feed > 1) pos += rotate;
 
@@ -73,15 +81,15 @@ namespace Feed
           while (rotate > 0 ? pos <= endPos : pos >= endPos)
           {
             currentPosition = pos;
-            S_INFO2("CurrentPos: ", currentPosition);
+            MOTOR_TRACE("CurrentPos: ", currentPosition);
 
             cancelButton.loop();
             if(cancelButton.isPressed())
-            { S_INFO("Cancel!"); cancel = true; break; }
+            { MOTOR_TRACE("Cancel!"); cancel = true; break; }
             
             if(showProgress && _printProgress != 0)
             {              
-              S_INFO2("  PctValue: ", pctValue);
+              MOTOR_TRACE("  PctValue: ", pctValue);
               uint8_t pct = map(pctValue, 0, totalCount, 0, 100);         
               _printProgress->write(pct);
               pctValue += abs(rotate);
@@ -96,7 +104,7 @@ namespace Feed
               {
                 cancelButton.loop();
                 if(cancelButton.isPressed())
-                { S_INFO("Cancel!"); cancel = true; break; }
+                { MOTOR_TRACE("Cancel!"); cancel = true; break; }
 
                 delay(MOTOR_ROTATE_DELAY);
                 _servo.write(stepBackPos);
@@ -105,7 +113,7 @@ namespace Feed
 
             cancelButton.loop();
             if(cancelButton.isPressed())
-            { S_INFO("Cancel!"); cancel = true; break; }       
+            { MOTOR_TRACE("Cancel!"); cancel = true; break; }       
 
             pos += rotate;
             delay(MOTOR_ROTATE_DELAY);
@@ -116,7 +124,7 @@ namespace Feed
         res = true;
       }      
 
-      S_INFO2("Servo read: ", _servo.readMicroseconds());
+      MOTOR_TRACE("Servo read: ", _servo.readMicroseconds());
       Detach();
       return res;
     }
@@ -128,13 +136,13 @@ namespace Feed
         //if(_servo.attach(_pin, MOTOR_MIN_US, MOTOR_MAX_US) != INVALID_SERVO)
         if(_servo.attach(_pin) != INVALID_SERVO)
         {
-          S_INFO2("Attached: ", _pin);
+          MOTOR_TRACE("Attached: ", _pin);
           return true;
         }
-        S_INFO2("INVALID SERVO: ", _pin);
+        MOTOR_TRACE("INVALID SERVO: ", _pin);
         return false;
       }
-      S_INFO3("Attached: ", _pin, " already");
+      MOTOR_TRACE("Attached: ", _pin, " already");
       return true;
     }
 
@@ -143,7 +151,7 @@ namespace Feed
       if(_servo.attached())
       {
         _servo.detach();
-        S_INFO2("Detached: ", _pin);
+        MOTOR_TRACE("Detached: ", _pin);
         return true;
       }
       return false;

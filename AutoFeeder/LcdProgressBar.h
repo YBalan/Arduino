@@ -6,6 +6,15 @@
 
 #define LCD_PROGRESS_BAR_TRACE_NAME "PBar: "
 
+//#define ENABLE_TRACE_LCD_PROGRESS
+
+#ifdef ENABLE_TRACE_LCD_PROGRESS
+#define LCD_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define LCD_TRACE(...) {}
+#endif
+
+
 namespace Helpers
 {
   enum LcdProgressCommands : uint8_t
@@ -71,7 +80,7 @@ namespace Helpers
       {
         if(size == LcdProgressCommands::Init)
         {
-          S_INFO2(LCD_PROGRESS_BAR_TRACE_NAME, "Init");
+          LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, "Init");
 
           _lcd->createChar(0, bar0);
           _lcd->createChar(1, bar1);
@@ -82,7 +91,7 @@ namespace Helpers
         }else
         if(size == LcdProgressCommands::Clear)
         {
-          S_INFO2(LCD_PROGRESS_BAR_TRACE_NAME, "Clear");
+          LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, "Clear");
 
           _lcd->setCursor(_startPos, _row);
           for(uint8_t ch = _startPos; ch < _maxSymbolsCount; ch++) 
@@ -98,7 +107,7 @@ namespace Helpers
   private:
     static void ShowProgress(LiquidCrystal_I2C * const lcd, const uint8_t &value, const uint8_t &row, const uint8_t &startPos, const uint8_t &maxSymbolsCount, const LcdProgressSettings &settings)
     {
-      S_INFO3(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
+      LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
 
       if(lcd != 0)
       {

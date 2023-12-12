@@ -4,6 +4,14 @@
 
 #include <DS323x.h>
 
+//#define ENABLE_TRACE_FEEDSCHEDULER
+
+#ifdef ENABLE_TRACE_FEEDSCHEDULER
+#define FEEDSCHEDULER_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define FEEDSCHEDULER_TRACE(...) {}
+#endif
+
 namespace Feed
 {
   enum ScheduleSet : uint8_t
@@ -94,7 +102,7 @@ namespace Feed
 
       rtc.enableAlarm2(true);
 
-      S_TRACE4("RTC Alarm: ", rtc.alarm(DS323x::AlarmSel::A2).timestamp(), " rate: ", (uint8_t)rtc.rateA2());
+      FEEDSCHEDULER_TRACE("RTC Alarm: ", rtc.alarm(DS323x::AlarmSel::A2).timestamp(), " rate: ", (uint8_t)rtc.rateA2());
     }   
 
     const FeedDateTime &GetNextAlarm() const
@@ -127,8 +135,8 @@ namespace Feed
       const auto timeSpan = TimeSpan( (int32_t)( stepFloat * 3600L ));
       const auto step = TimeSpan(0, timeSpan.hours(), timeSpan.minutes() ,0);
 
-      S_TRACE6("Step: ", stepFloat, " ", step.hours(), ":", step.minutes());
-      //S_TRACE(step.totalseconds());
+      FEEDSCHEDULER_TRACE("Step: ", stepFloat, " ", step.hours(), ":", step.minutes());
+      //FEEDSCHEDULER_TRACE(step.totalseconds());
       
       for(nextTime = nextTime + TimeSpan(0, startHour, 0, 0); nextTime.hour() < endHour && nextTime.day() == currentDay; nextTime = nextTime + step)
       {
@@ -145,7 +153,7 @@ namespace Feed
         return GetNextDateTime(nextDayStart, startHour, endHour, count);
       }
 
-      S_TRACE2("Get Next Alarm: ", nextTime.timestamp());
+      FEEDSCHEDULER_TRACE("Get Next Alarm: ", nextTime.timestamp());
       return nextTime;
     }
   };

@@ -11,7 +11,7 @@
 #define MIN_FEED_COUNT 1
 #define MAX_FEED_COUNT 5
 #define MOTOR_START_POS 30 //Impact on portion size
-#define MOTOR_START_POS_INCREMENT 10
+#define MOTOR_START_POS_INCREMENT 5
 
 #include "FeedScheduler.h"
 
