@@ -5,7 +5,7 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VER 1.10
+#define VER 1.11
 #define RELEASE
 
 #define ENABLE_TRACE
@@ -87,7 +87,7 @@ unsigned long pawBtnAvaliabilityTicks = 0;
 Button btnOK(OK_PIN);
 ezButton btnUp(UP_PIN);
 ezButton btnDw(DW_PIN);
-ezButton btnRt(RT_PIN);
+Button btnRt(RT_PIN);
 
 Button btnManualFeed(MANUAL_FEED_PIN);
 ezButton btnRemoteFeed(REMOTE_FEED_PIN);
@@ -194,6 +194,18 @@ void loop()
     INFO("Ok ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);
     if(btnOK.isLongPress())
     {
+      btnOK.resetTicks();
+      if(btnRt.isLongPress())
+      {
+        btnRt.resetTicks();
+
+        INFO("Ok ", " ", "BACK ", BUTTON_IS_LONGPRESSED_MSG);
+        ChangeTimeMenu(rtc, lcd, btnOK, btnUp, btnDw, btnRt);
+        BacklightOn();
+        ShowLastAction();        
+        return;
+      }
+
       INFO("Ok ", BUTTON_IS_LONGPRESSED_MSG);
       if(currentMenu == Menu::Main)
       {
@@ -224,8 +236,7 @@ void loop()
         currentMenu = Menu::RotateCount;
         ShowRotateCount(rotateCountMenuPos = settings.RotateCount - 1);
       }
-      else currentMenu == Menu::Main;
-      btnOK.resetTicks();
+      else currentMenu == Menu::Main;      
     }
   }
 

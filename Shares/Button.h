@@ -5,23 +5,23 @@
 
 
 
-class Button
+class Button : public ezButton
 {
 private:
-  ezButton _btn;
-  unsigned long _startTicks = 0;
-  short  _longPressValue;
+  //ezButton _btn;
+  uint32_t _startTicks = 0;
+  uint16_t  _longPressValue;
 
 public:
-  Button(const short & pin, const short &longPressValue = 2000) : _btn(pin), _longPressValue(longPressValue)
+  Button(const uint8_t &pin, const uint16_t &longPressValue = 2000) : ezButton(pin), _longPressValue(longPressValue)
   {
 
   }
-  void loop(){ _btn.loop();  }
+  void loop(){ ezButton::loop();  }
 
   const bool isPressed() 
   {
-     if(_btn.isPressed())  
+     if(ezButton::isPressed())  
      {
        _startTicks = millis();
        return true;
@@ -31,7 +31,7 @@ public:
 
   const bool isReleased()
   {
-     if(_btn.isReleased())
+     if(ezButton::isReleased())
      {      
       return true;
      }
@@ -42,7 +42,7 @@ public:
   {
     while(true)
     {
-      _btn.loop();
+      ezButton::loop();
       if(isReleased())
       {
         break;
@@ -50,8 +50,8 @@ public:
     }
   }
   
-  const short &GetLongPressValue() const { return _longPressValue; }
-  const short &SetLongPressValue(const short &longPressValue) { _longPressValue = longPressValue; return _longPressValue; }  
+  const uint16_t &GetLongPressValue() const { return _longPressValue; }
+  const uint16_t &SetLongPressValue(const uint16_t &longPressValue) { _longPressValue = longPressValue; return _longPressValue; }  
 
   const unsigned long getTicks() { return millis() - _startTicks; }
 
@@ -61,15 +61,15 @@ public:
 
   void resetTicks(){ _startTicks = 0; }
 
-  const int getCount(){ return _btn.getCount(); }
+  //const int getCount(){ return _btn.getCount(); }
 
-  void setDebounceTime(const unsigned long & time ){ _btn.setDebounceTime(time); }
+  //void setDebounceTime(const unsigned long & time ){ _btn.setDebounceTime(time); }
 
-  void resetCount(){ _btn.resetCount(); }
+  //void resetCount(){ _btn.resetCount(); }
 
   //const short &getStateRaw(){ return _btn.getStateRaw(); }
 
-  const short getState(){ return _btn.getState(); }
+  //const short getState(){ return _btn.getState(); }
 };
 
 #endif

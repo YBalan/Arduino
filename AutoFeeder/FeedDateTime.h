@@ -40,6 +40,13 @@ namespace Feed
     }        
 
     const String GetTimeWithoutSeconds() { return timestamp(DateTime::TIMESTAMP_TIME).substring(0, 5); }   
+
+    const uint8_t DayInMonth(const uint8_t &month, const uint16_t &year) const
+    {
+      if(month < 1 || month > 12 ) return 31;
+      bool leap = month == 2 && year % 4 == 0;
+      return daysInMonth[month - 1] + (leap ? 1 : 0);
+    }
   };
 
   class StoreHelper
