@@ -5,7 +5,7 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VER 1.11
+#define VER 1.12
 #define RELEASE
 
 #define ENABLE_TRACE
@@ -187,7 +187,7 @@ void loop()
     currentMenu = Menu::Main;
     settings.FeedScheduler.SetNextAlarm(rtc);
     ShowLastAction();
-  }
+  }  
 
   if(btnOK.isReleased())
   {
@@ -284,6 +284,12 @@ void loop()
     {
       ShowRotateCount(--rotateCountMenuPos);
     }    
+  }
+
+  if(btnRt.isReleased())
+  {
+    INFO("BACK ", BUTTON_IS_RELEASED_MSG);
+    btnRt.resetTicks();
   }
 
   if(currentMenu == Menu::Main)
