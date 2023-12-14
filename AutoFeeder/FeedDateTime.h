@@ -4,28 +4,31 @@
 
 #include "DateTime.h"
 
+//#define ENABLE_TRACE_FEEDDATETIME
+
+#ifdef ENABLE_TRACE_FEEDDATETIME
+#define FEEDDATETIME_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define FEEDDATETIME_TRACE(...) {}
+#endif
+
 namespace Feed
 {
   class FeedDateTime : public DateTime
   { 
     public:
-    FeedDateTime() : DateTime(1, 1, 1, 0, 0, 0)
+    FeedDateTime() : DateTime(0, 0, 0, 0, 0, 0)
     { }
 
     FeedDateTime(const DateTime &dt) : DateTime(dt)
     { 
-      S_TRACE2("Copy from ", "DateTime");
+      FEEDDATETIME_TRACE("Copy from ", "DateTime");
     }
-
-    FeedDateTime(const FeedDateTime &dt) : DateTime(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second())
-    { 
-      S_TRACE3("Copy from ", "Feed", "DateTime");
-    }
-
+        
     FeedDateTime& operator= (const FeedDateTime &other)
-    {
-      S_TRACE3("operator = ", "Feed", "DateTime");
+    {      
       if (this != &other) {  // Check for self-assignment
+        FEEDDATETIME_TRACE("operator = ", "Feed", "DateTime");
           yOff = other.yOff;
           m = other.m;
           d = other.d;
@@ -34,59 +37,16 @@ namespace Feed
           ss = other.ss;          
       }
       return *this;  // Return a reference to this object
-    }    
+    }        
 
-    FeedDateTime& operator= (const DateTime &other)
-    {
-      S_TRACE2("operator = ", "DateTime");
-      if (this != &other) {  // Check for self-assignment
-          yOff = other.yearOffset();
-          m = other.month();
-          d = other.day();
-          hh = other.hour();
-          mm = other.minute();
-          ss = other.second();          
-      }
-      return *this;  // Return a reference to this object
-    }    
+    const String GetTimeWithoutSeconds() { return timestamp(DateTime::TIMESTAMP_TIME).substring(0, 5); }   
 
-    const String GetTimeWithoutSeconds() { return timestamp(DateTime::TIMESTAMP_TIME).substring(0, 5); }    
-
-    bool operator<(const DateTime& right) const
+    const uint8_t DayInMonth(const uint8_t &month, const uint16_t &year) const
     {
-        return GetTotalValueWithoutSeconds() < GetTotalValueWithoutSeconds(right);
+      if(month < 1 || month > 12 ) return 31;
+      bool leap = month == 2 && year % 4 == 0;
+      return daysInMonth[month - 1] + (leap ? 1 : 0);
     }
-    bool operator>(const DateTime& right) const
-    {
-        return right < *this;
-    }
-    // bool operator<=(const DateTime& right) const
-    // {
-    //     return !(*this > right);
-    // }
-    // bool operator>=(const DateTime& right) const
-    // {
-    //     return !(*this < right);
-    // }
-    bool operator==(const DateTime& right) const
-    {
-        return GetTotalValueWithoutSeconds() == GetTotalValueWithoutSeconds(right);
-    }
-    bool operator!=(const DateTime& right) const
-    {
-        return !(*this == right);
-    }
-
-    public:
-    const uint32_t GetTotalValueWithoutSeconds() const
-    {
-      return (32140800L * yearOffset()) + (2678400L * month()) + (86400L * day()) + (3600L * hour()) + (60 * minute());  //time2long(day(), hour(), minute(), 0);
-    }
-
-    static const uint32_t GetTotalValueWithoutSeconds(const DateTime &dt)
-    {
-      return (32140800L * dt.yearOffset()) + (2678400L * dt.month()) + (86400L * dt.day()) + (3600L * dt.hour()) + (60 * dt.minute());  //time2long(day(), hour(), minute(), 0);
-    }    
   };
 
   class StoreHelper
