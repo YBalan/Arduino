@@ -5,7 +5,7 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VER 1.12
+#define VER 1.13
 #define RELEASE
 
 #define ENABLE_TRACE
@@ -18,6 +18,7 @@
 #define USE_DHT
 
 #include "DEBUGHelper.h"
+#include "Helpers.h"
 
 #include "../../Shares/Button.h"
 #include "FeedStatusInfo.h"
@@ -465,8 +466,8 @@ const bool ShowDhtForHistory(const uint16_t &dht)
   if(dht > 0)
   {
     uint8_t t = 0, h = 0;
-    Feed::StoreHelper::ExtractFromUint16(dht, t, h);
-    ClearRow(1, 8, LCD_COLS, 8);
+    Helpers::StoreHelper::ExtractFromUint16(dht, t, h);
+    ClearRow(1, 8, LCD_COLS, 9);
     lcd.print(t); lcd.print('C'); lcd.print(" "); lcd.print(h); lcd.print('%');
     return true;
   }
@@ -480,9 +481,9 @@ const uint16_t GetCombinedDht(const bool &force)
   float t = dht.readTemperature();
   
   if(!isnan(t) && !isnan(h))
-    return Feed::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
+    return Helpers::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
   #endif
-  return Feed::StoreHelper::CombineToUint16((uint8_t)rtc.temperature(), 0);
+  return Helpers::StoreHelper::CombineToUint16((uint8_t)rtc.temperature(), 0);
 }
 
 int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
@@ -490,15 +491,17 @@ int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPo
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
   const uint8_t idx = maxPositions - pos - 1;
-  const Feed::StatusInfo &status = settings.GetStatusByIndex(pos);
-  TRACE("Hist: ", idx + 1, ": ", status.ToString());
+  const Feed::StatusInfo &status = settings.GetStatusByIndex(pos);  
+
+  TRACE("Hist: ", idx + 1, ": ", status.ToString(), "Count per day: ", settings.GetFeedCountPerDay(status.DT.monthDay()));
 
   ClearRow(0);
   if(status.Status != Feed::Status::Unknown)
-  {    
+  { 
+    const uint8_t countPerDay = settings.GetFeedCountPerDay(status.DT.monthDay());
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
     ClearNextTime();
-    lcd.print(status.GetDateString());
+    lcd.print(status.GetDateString()); lcd.print(' '); lcd.print(countPerDay);
     ShowDhtForHistory(status.DHT);
   } 
   else

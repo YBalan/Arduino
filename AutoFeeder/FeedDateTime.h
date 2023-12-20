@@ -3,6 +3,7 @@
 #define FEED_DATETIME_H
 
 #include "DateTime.h"
+#include "Helpers.h"
 
 //#define ENABLE_TRACE_FEEDDATETIME
 
@@ -47,25 +48,7 @@ namespace Feed
       bool leap = month == 2 && year % 4 == 0;
       return daysInMonth[month - 1] + (leap ? 1 : 0);
     }
-  };
-
-  class StoreHelper
-  {
-    public:    
-    static const uint16_t CombineToUint16(const uint8_t &first, const uint8_t &second)
-    {
-      return (first << 8) | second; // Store first digit in higher bits and second digit in lower bits
-    }
-
-    static void ExtractFromUint16(const uint16_t &combined, uint8_t &first, uint8_t &second)
-    {
-      // Extract the first digit (higher bits)
-      first = (combined >> 8) & 0xFF; // Shift right to get the first digit and mask other bits
-
-      // Extract the second digit (lower bits)
-      second = combined & 0xFF; // Mask higher bits to get the second digit
-    }
-  };
+  };  
 
   class FeedDateTimeStore
   {
@@ -77,8 +60,8 @@ namespace Feed
     { }
 
     FeedDateTimeStore(const DateTime &dt) 
-      : _monthDay(Feed::StoreHelper::CombineToUint16(dt.month(), dt.day()))
-      , _hourMinute(Feed::StoreHelper::CombineToUint16(dt.hour(), dt.minute()))
+      : _monthDay(Helpers::StoreHelper::CombineToUint16(dt.month(), dt.day()))
+      , _hourMinute(Helpers::StoreHelper::CombineToUint16(dt.hour(), dt.minute()))
     { }
 
     FeedDateTimeStore& operator= (const FeedDateTimeStore &other)
@@ -90,31 +73,36 @@ namespace Feed
       return *this;  // Return a reference to this object
     }
 
+    const uint16_t &monthDay() const
+    {
+      return _monthDay;
+    }
+
     const uint8_t month() const
     {
       uint8_t m = 0, d = 0; 
-      StoreHelper::ExtractFromUint16(_monthDay, m, d);
+      Helpers::StoreHelper::ExtractFromUint16(_monthDay, m, d);
       return m;
     }
 
     const uint8_t day() const
     {
       uint8_t m = 0, d = 0; 
-      StoreHelper::ExtractFromUint16(_monthDay, m, d);
+      Helpers::StoreHelper::ExtractFromUint16(_monthDay, m, d);
       return d;
     }
 
     const uint8_t hour() const
     {
       uint8_t h = 0, m = 0; 
-      StoreHelper::ExtractFromUint16(_hourMinute, h, m);
+      Helpers::StoreHelper::ExtractFromUint16(_hourMinute, h, m);
       return h;
     }
 
     const uint8_t minute() const
     {
       uint8_t h = 0, m = 0; 
-      StoreHelper::ExtractFromUint16(_hourMinute, h, m);
+      Helpers::StoreHelper::ExtractFromUint16(_hourMinute, h, m);
       return m;
     }    
   };  
