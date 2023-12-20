@@ -702,6 +702,9 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
     backlightStartTicks = 0;
     currentMenu = Menu::Main;
     lcd.noBacklight();
+    btnOK.resetTicks();
+    btnRt.resetTicks();
+    btnManualFeed.resetTicks();
     ShowLastAction();     
     return true;
   }
