@@ -108,7 +108,7 @@ void setup()
   Serial.println();
   Serial.println();
   Serial.println("!!!! Start Auto Feeder !!!!");
-  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(" "); Serial.print(__TIME__); Serial.print(" Version: "); Serial.println(VER);
+  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
 
   lcd.init();
   lcd.init();
@@ -207,6 +207,8 @@ void loop()
         return;
       }
 
+      btnRt.resetTicks();
+
       INFO("Ok ", BUTTON_IS_LONGPRESSED_MSG);
       if(currentMenu == Menu::Main)
       {
@@ -239,6 +241,19 @@ void loop()
       }
       else currentMenu == Menu::Main;      
     }
+  }
+  else
+  if(btnRt.isReleased())
+  {
+    INFO("BACK ", BUTTON_IS_RELEASED_MSG);
+
+    if(btnRt.isLongPress())
+    {
+      INFO("BACK ", BUTTON_IS_LONGPRESSED_MSG_MSG);
+      ClearRow(0);
+      lcd.print("V:"); lcd.print(VER); lcd.print("   "); lcd.print(__DATE__);      
+    }    
+    btnRt.resetTicks();
   }
 
   if(btnUp.isReleased())
@@ -285,13 +300,7 @@ void loop()
     {
       ShowRotateCount(--rotateCountMenuPos);
     }    
-  }
-
-  if(btnRt.isReleased())
-  {
-    INFO("BACK ", BUTTON_IS_RELEASED_MSG);
-    btnRt.resetTicks();
-  }
+  } 
 
   if(currentMenu == Menu::Main)
   {  

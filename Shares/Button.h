@@ -57,7 +57,7 @@ public:
 
   const bool isLongPress() const { auto res = _startTicks != 0 && getTicks() >= _longPressValue; return res; }
   
-  const bool isLongPress(const short &longPressValue) const{ auto res = _startTicks != 0 && (millis() - longPressValue) >= _longPressValue; return res; }
+  const bool isLongPress(const short &longPressValue) const{ auto res = _startTicks != 0 && (millis() - _startTicks) >= _longPressValue; return res; }
 
   void resetTicks(){ _startTicks = 0; }
 
