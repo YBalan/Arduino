@@ -52,6 +52,10 @@ void printDetail(uint8_t type, int value);
 
 #define BTN_OPEN_PIN 2
 ezButton openBtn(BTN_OPEN_PIN);
+#define BTN_PLAY_PIN 4
+ezButton playBtn(BTN_PLAY_PIN);
+#define BTN_STOP_PIN 3
+ezButton stopBtn(BTN_STOP_PIN);
 
 struct Settings
 {
@@ -68,6 +72,8 @@ void setup()
   Serial.begin(9600);
 
   openBtn.setDebounceTime(DEBOUNCE_TIME);
+  playBtn.setDebounceTime(DEBOUNCE_TIME);
+  stopBtn.setDebounceTime(DEBOUNCE_TIME);
   
   Serial.println();
   Serial.println(F("MP3 Music Box Started"));
@@ -80,9 +86,9 @@ void setup()
     DFP_TRACE(F("Unable to begin:"));
     DFP_TRACE(F("1.Please recheck the connection!"));
     DFP_TRACE(F("2.Please insert the SD card!"));
-    while(true){
-      delay(0); // Code to compatible with ESP8266 watch dog.
-    }
+    // while(true){
+    //   delay(0); // Code to compatible with ESP8266 watch dog.
+    // }
   }
   DFP_TRACE(F("DFPlayer Mini online.")); 
   
@@ -97,10 +103,12 @@ void loop()
   static unsigned long timer = millis();
 
   openBtn.loop();
+  playBtn.loop();
+  stopBtn.loop();
 
   if(openBtn.isPressed())
   {
-    INFO("Open ", BUTTON_IS_PRESSED_MSG);
+    INFO("Open ", BUTTON_IS_PRESSED_MSG, " V:", myDFPlayer.readVolume());
     myDFPlayer.stop();
     //PrintStatusToSerial();
     settings.CurrentVolume = myDFPlayer.readVolume();
@@ -109,10 +117,28 @@ void loop()
 
   if(openBtn.isReleased())
   {
-    INFO("Open ", BUTTON_IS_RELEASED_MSG);
+    INFO("Open ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
     SetVolume(settings.CurrentVolume);
-    myDFPlayer.start();
-    //myDFPlayer.play(1);
+    myDFPlayer.start();    
+    //PrintStatusToSerial();
+    settings.CurrentVolume = myDFPlayer.readVolume();
+    SaveSettings();
+  }
+
+  if(playBtn.isReleased())
+  {
+    INFO("Play ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
+    SetVolume(settings.CurrentVolume);
+    myDFPlayer.start();    
+    //PrintStatusToSerial();
+    settings.CurrentVolume = myDFPlayer.readVolume();
+    SaveSettings();
+  }  
+
+  if(stopBtn.isReleased())
+  {
+    INFO("Stop ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
+    myDFPlayer.stop();
     //PrintStatusToSerial();
     settings.CurrentVolume = myDFPlayer.readVolume();
     SaveSettings();
