@@ -9,7 +9,7 @@ DFPlayer - A Mini MP3 Player For Arduino
 
  ****************************************************/
 
-#define VER 1.0
+#define VER 1.1
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 #define ENABLE_TRACE_MAIN
@@ -63,6 +63,8 @@ struct Settings
   void Reset() { CurrentVolume = 16; } 
 }settings;
 
+bool IsDFOk = true;
+
 void setup()
 {
   //pinMode(10, INPUT_PULLUP);
@@ -86,14 +88,18 @@ void setup()
     DFP_TRACE(F("Unable to begin:"));
     DFP_TRACE(F("1.Please recheck the connection!"));
     DFP_TRACE(F("2.Please insert the SD card!"));
+
+    IsDFOk = false;
     // while(true){
     //   delay(0); // Code to compatible with ESP8266 watch dog.
     // }
   }
-  DFP_TRACE(F("DFPlayer Mini online.")); 
+  DFP_TRACE("DFPlayer Mini ", IsDFOk ? "online." : "offline."); 
   
   LoadSettings();
-  SetVolume(settings.CurrentVolume); 
+
+  if(IsDFOk)
+    SetVolume(settings.CurrentVolume); 
 
   PrintStatusToSerial();
 }
@@ -108,40 +114,59 @@ void loop()
 
   if(openBtn.isPressed())
   {
-    INFO("Open ", BUTTON_IS_PRESSED_MSG, " V:", myDFPlayer.readVolume());
+    INFO("Open ", BUTTON_IS_PRESSED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
     myDFPlayer.stop();
     //PrintStatusToSerial();
-    settings.CurrentVolume = myDFPlayer.readVolume();
-    SaveSettings();
+    if(IsDFOk)
+    {
+      settings.CurrentVolume = myDFPlayer.readVolume();
+      SaveSettings();
+    }
   }
 
   if(openBtn.isReleased())
   {
-    INFO("Open ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
-    SetVolume(settings.CurrentVolume);
+    INFO("Open ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+
+    if(IsDFOk)    
+      SetVolume(settings.CurrentVolume);
+
     myDFPlayer.start();    
     //PrintStatusToSerial();
-    settings.CurrentVolume = myDFPlayer.readVolume();
-    SaveSettings();
+    if(IsDFOk)
+    {
+      settings.CurrentVolume = myDFPlayer.readVolume();
+      SaveSettings();
+    }
   }
 
   if(playBtn.isReleased())
   {
-    INFO("Play ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
-    SetVolume(settings.CurrentVolume);
+    INFO("Play ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+
+    if(IsDFOk)
+      SetVolume(settings.CurrentVolume);
+
     myDFPlayer.start();    
     //PrintStatusToSerial();
-    settings.CurrentVolume = myDFPlayer.readVolume();
-    SaveSettings();
+    if(IsDFOk)
+    {
+      settings.CurrentVolume = myDFPlayer.readVolume();
+      SaveSettings();
+    }
   }  
 
   if(stopBtn.isReleased())
   {
-    INFO("Stop ", BUTTON_IS_RELEASED_MSG, " V:", myDFPlayer.readVolume());
+    INFO("Stop ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
     myDFPlayer.stop();
     //PrintStatusToSerial();
-    settings.CurrentVolume = myDFPlayer.readVolume();
-    SaveSettings();
+
+    if(IsDFOk)
+    {
+      settings.CurrentVolume = myDFPlayer.readVolume();
+      SaveSettings();
+    }
   }
   
   if (myDFPlayer.available()) {
@@ -193,7 +218,9 @@ void SetEQNext()
 
 void SetVolume(const uint8_t &volume)
 {
+  INFO("SetVolume");
   auto currentVolume = myDFPlayer.readVolume();
+  INFO("from:", currentVolume, " to:", volume);
 
   if(currentVolume == volume) return;
 
@@ -207,6 +234,8 @@ void SetVolume(const uint8_t &volume)
 
     delay(50);
   }  
+
+  INFO("SetVolume", ":", myDFPlayer.readVolume());
 }
 
 void SaveSettings()
@@ -234,12 +263,15 @@ void LoadSettings()
 
 void PrintStatusToSerial()
 {
-  Serial.println(myDFPlayer.readState()); //read mp3 state
-  Serial.println(myDFPlayer.readVolume()); //read current volume
-  Serial.println(myDFPlayer.readEQ()); //read EQ setting
-  Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
-  Serial.println(myDFPlayer.readCurrentFileNumber()); //read current play file number
-  //Serial.println(myDFPlayer.readFileCountsInFolder(3)); //read file counts in folder SD:/03
+  if(IsDFOk)
+  {
+    Serial.println(myDFPlayer.readState()); //read mp3 state
+    Serial.println(myDFPlayer.readVolume()); //read current volume
+    Serial.println(myDFPlayer.readEQ()); //read EQ setting
+    Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
+    Serial.println(myDFPlayer.readCurrentFileNumber()); //read current play file number
+    //Serial.println(myDFPlayer.readFileCountsInFolder(3)); //read file counts in folder SD:/03
+  }
 }
 
 void printDetail(uint8_t type, int value){
