@@ -60,7 +60,8 @@ ezButton stopBtn(BTN_STOP_PIN);
 struct Settings
 {
   uint8_t CurrentVolume = 16;
-  void Reset() { CurrentVolume = 16; } 
+  uint16_t CurrentTrack = 0;
+  void Reset() { CurrentVolume = 16; CurrentTrack = 0; } 
 }settings;
 
 bool IsDFOk = true;
@@ -99,7 +100,11 @@ void setup()
   LoadSettings();
 
   if(IsDFOk)
+  {
     SetVolume(settings.CurrentVolume); 
+    myDFPlayer.enableLoop();
+    myDFPlayer.enableLoopAll();
+  }
 
   PrintStatusToSerial();
 }
@@ -114,7 +119,7 @@ void loop()
 
   if(openBtn.isPressed())
   {
-    INFO("Open ", BUTTON_IS_PRESSED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+    INFO("OPEN ", BUTTON_IS_PRESSED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
     myDFPlayer.stop();
     //PrintStatusToSerial();
     if(IsDFOk)
@@ -126,7 +131,7 @@ void loop()
 
   if(openBtn.isReleased())
   {
-    INFO("Open ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+    INFO("OPEN ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
 
     if(IsDFOk)    
       SetVolume(settings.CurrentVolume);
@@ -142,12 +147,26 @@ void loop()
 
   if(playBtn.isReleased())
   {
-    INFO("Play ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+    INFO("PLAY ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
 
     if(IsDFOk)
-      SetVolume(settings.CurrentVolume);
+      SetVolume(settings.CurrentVolume);    
+    
+    INFO("CurrentTrack: ", settings.CurrentTrack);
 
-    myDFPlayer.start();    
+    if(settings.CurrentTrack == 0)
+    {
+      settings.CurrentTrack = IsDFOk ? myDFPlayer.readCurrentFileNumber() : 1;
+      myDFPlayer.start();    
+    }
+    else
+    {
+      settings.CurrentTrack = 0;
+      myDFPlayer.pause();    
+    }
+
+    INFO("CurrentTrack: ", settings.CurrentTrack);
+
     //PrintStatusToSerial();
     if(IsDFOk)
     {
@@ -158,9 +177,11 @@ void loop()
 
   if(stopBtn.isReleased())
   {
-    INFO("Stop ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
+    INFO("STOP ", BUTTON_IS_RELEASED_MSG, " V:", IsDFOk ? myDFPlayer.readVolume() : -1);
     myDFPlayer.stop();
     //PrintStatusToSerial();
+
+    settings.CurrentTrack = 0;
 
     if(IsDFOk)
     {
@@ -176,9 +197,12 @@ void loop()
   if(Serial.available() > 0)
   {
     const auto debug = Serial.readString().toInt();
-    TRACE(debug);
+    TRACE("Debug input:", debug);
     switch(debug)
     {
+      case 0:
+        PrintStatusToSerial();
+      break;
       case 1:
         TRACE("Pause...");
         myDFPlayer.pause();        
@@ -218,9 +242,9 @@ void SetEQNext()
 
 void SetVolume(const uint8_t &volume)
 {
-  INFO("SetVolume");
+  DFP_TRACE("SetVolume");
   auto currentVolume = myDFPlayer.readVolume();
-  INFO("from:", currentVolume, " to:", volume);
+  DFP_TRACE("from:", currentVolume, " to:", volume);
 
   if(currentVolume == volume) return;
 
@@ -235,7 +259,7 @@ void SetVolume(const uint8_t &volume)
     delay(50);
   }  
 
-  INFO("SetVolume", ":", myDFPlayer.readVolume());
+  DFP_TRACE("SetVolume", ":", myDFPlayer.readVolume());
 }
 
 void SaveSettings()
@@ -244,9 +268,7 @@ void SaveSettings()
 
   TRACE("Max:", EEPROM.length(), " Total: ", sizeof(settings));
 
-  EEPROM.put(EEPROM_SETTINGS_ADDR, settings); 
-
-  delay(500);  
+  EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
 }
 
 void LoadSettings()
@@ -265,11 +287,12 @@ void PrintStatusToSerial()
 {
   if(IsDFOk)
   {
-    Serial.println(myDFPlayer.readState()); //read mp3 state
-    Serial.println(myDFPlayer.readVolume()); //read current volume
-    Serial.println(myDFPlayer.readEQ()); //read EQ setting
-    Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
-    Serial.println(myDFPlayer.readCurrentFileNumber()); //read current play file number
+    Serial.print("State: "); Serial.println(myDFPlayer.readState()); //read mp3 state
+    Serial.print("Volume: "); Serial.println(myDFPlayer.readVolume()); //read current volume
+    Serial.print("EQ: "); Serial.println(myDFPlayer.readEQ()); //read EQ setting
+    Serial.print("Files Count: "); Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
+    Serial.print("DFP CurrentTrack: ");Serial.println(myDFPlayer.readCurrentFileNumber()); //read current play file number
+    Serial.print("EEPROM CurrentTrack: ");Serial.println(settings.CurrentTrack);
     //Serial.println(myDFPlayer.readFileCountsInFolder(3)); //read file counts in folder SD:/03
   }
 }
@@ -284,13 +307,19 @@ void printDetail(uint8_t type, int value){
       break;
     case DFPlayerCardInserted:
       DFP_TRACE(F("Card Inserted!"));
-      LoadSettings();
+      if(IsDFOk)
+        SetVolume(settings.CurrentVolume);
+      PrintStatusToSerial();      
       break;
     case DFPlayerCardRemoved:
       DFP_TRACE(F("Card Removed!"));
+      //PrintStatusToSerial();
       break;
     case DFPlayerCardOnline:
       DFP_TRACE(F("Card Online!"));
+      if(IsDFOk)
+        SetVolume(settings.CurrentVolume);
+      PrintStatusToSerial();
       break;
     case DFPlayerUSBInserted:
       DFP_TRACE("USB Inserted!");
@@ -300,6 +329,9 @@ void printDetail(uint8_t type, int value){
       break;
     case DFPlayerPlayFinished:
       DFP_TRACE(F("Number:"), value, " ", "Play Finished!");      
+      break;
+    case DFPlayerFeedBack:
+      DFP_TRACE(F("Number:"), value, " ", "Play Feedback!");
       break;
     case DFPlayerError:
       DFP_TRACE(F("DFPlayerError:"));
@@ -330,6 +362,7 @@ void printDetail(uint8_t type, int value){
       }
       break;
     default:
+      DFP_TRACE("Default: ", " type:", type, " value:", value);
       break;
   }  
 }
