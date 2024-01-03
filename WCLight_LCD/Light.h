@@ -88,17 +88,21 @@ public:
     {  
       if(!fromStart)
       {  
-        unsigned long lastTime = _startTicks > 0 ? (millis() - _startTicks) / 1000 : settings.LastTime;
+        auto currentTicks = millis();
+        if(currentTicks > _startTicks) //unsigned long millis() - not overloaded
+        {
+          unsigned long lastTime = _startTicks > 0 ? (currentTicks - _startTicks) / 1000 : settings.LastTime;
+          
+          if(lastTime > IGNORE_LESS_THEN_SEC)
+          { 
+            statistic.Max = lastTime > statistic.Max ? lastTime : statistic.Max;
+            statistic.Min = lastTime < statistic.Min || statistic.Min == 0 ? lastTime : statistic.Min;
+            statistic.Calc(lastTime);        
+            settings.LastTime = lastTime;
+          }
         
-        if(lastTime > IGNORE_LESS_THEN_SEC)
-        { 
-          statistic.Max = lastTime > statistic.Max ? lastTime : statistic.Max;
-          statistic.Min = lastTime < statistic.Min || statistic.Min == 0 ? lastTime : statistic.Min;
-          statistic.Calc(lastTime);        
-          settings.LastTime = lastTime;
+          settings.TotalTime += lastTime;
         }
-      
-        settings.TotalTime += lastTime;
       }
       _startTicks = 0;     
     }

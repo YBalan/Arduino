@@ -3,25 +3,25 @@
 
 #include <ezButton.h>
 
-struct Button
-{
-  const int LongPressValue = 2000;
 
-  Button(const short & pin) : _btn(pin)
+
+class Button : public ezButton
+{
+private:
+  //ezButton _btn;
+  uint32_t _startTicks = 0;
+  uint16_t  _longPressValue;
+
+public:
+  Button(const uint8_t &pin, const uint16_t &longPressValue = 2000) : ezButton(pin), _longPressValue(longPressValue)
   {
 
   }
-
-private:
-  ezButton _btn;
-  unsigned long _startTicks = 0;
-
-public:
-  void loop(){ _btn.loop();  }
+  void loop(){ ezButton::loop();  }
 
   const bool isPressed() 
   {
-     if(_btn.isPressed())  
+     if(ezButton::isPressed())  
      {
        _startTicks = millis();
        return true;
@@ -31,7 +31,7 @@ public:
 
   const bool isReleased()
   {
-     if(_btn.isReleased())
+     if(ezButton::isReleased())
      {      
       return true;
      }
@@ -42,29 +42,34 @@ public:
   {
     while(true)
     {
-      _btn.loop();
+      ezButton::loop();
       if(isReleased())
       {
         break;
       }
     }
   }
+  
+  const uint16_t &GetLongPressValue() const { return _longPressValue; }
+  const uint16_t &SetLongPressValue(const uint16_t &longPressValue) { _longPressValue = longPressValue; return _longPressValue; }  
 
   const unsigned long getTicks() { return millis() - _startTicks; }
 
-  const bool isLongPress(){ auto res = _startTicks != 0 && getTicks() >= LongPressValue; return res; }
+  const bool isLongPress() const { auto res = _startTicks != 0 && getTicks() >= _longPressValue; return res; }
+  
+  const bool isLongPress(const short &longPressValue) const{ auto res = _startTicks != 0 && (millis() - _startTicks) >= _longPressValue; return res; }
 
   void resetTicks(){ _startTicks = 0; }
 
-  const int getCount(){ return _btn.getCount(); }
+  //const int getCount(){ return _btn.getCount(); }
 
-  void setDebounceTime(const unsigned long & time ){ _btn.setDebounceTime(time); }
+  //void setDebounceTime(const unsigned long & time ){ _btn.setDebounceTime(time); }
 
-  void resetCount(){ _btn.resetCount(); }
+  //void resetCount(){ _btn.resetCount(); }
 
   //const short &getStateRaw(){ return _btn.getStateRaw(); }
 
-  const short getState(){ return _btn.getState(); }
+  //const short getState(){ return _btn.getState(); }
 };
 
 #endif
