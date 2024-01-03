@@ -72,7 +72,10 @@ void setup()
   //pinMode(11, INPUT_PULLUP);
 
   mySoftwareSerial.begin(9600);
+  while (!mySoftwareSerial);
+  
   Serial.begin(9600);
+  while (!Serial);
 
   openBtn.setDebounceTime(DEBOUNCE_TIME);
   playBtn.setDebounceTime(DEBOUNCE_TIME);
