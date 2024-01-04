@@ -2,6 +2,7 @@
  * Created by Yurii Balan
  *
  * This example code is in the private domain
+ * YouTube: https://youtube.com/shorts/Uko7_9OD-78
  *
  * Tutorial page: https://arduinogetstarted.com/tutorials/arduino-button-servo-motor https://arduinogetstarted.com/tutorials/arduino-servo-motor
  */
