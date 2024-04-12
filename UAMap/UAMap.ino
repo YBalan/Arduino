@@ -7,149 +7,150 @@
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
-//define your default values here, if there are different values in config.json, they are overwritten.
-char api_token[34] = "YOUR_API_TOKEN";
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 
-//flag for saving data
-bool shouldSaveConfig = false;
+#define FASTLED_ESP8266_RAW_PIN_ORDER
+#include <FastLED.h>
 
-//callback notifying us of the need to save config
-void saveConfigCallback () {
-  Serial.println("Should save config");
-  shouldSaveConfig = true;
-}
+#define VER 1.0
+#define RELEASE
+
+#define ENABLE_TRACE
+//#define ENABLE_TRACE_MAIN
+#define ENABLE_INFO_MAIN
+
+/*#define ENABLE_INFO_ALARMS
+#define ENABLE_TRACE_ALARMS
+
+#define ENABLE_INFO_WIFI
+#define ENABLE_TRACE_WIFI*/
+
+#include "DEBUGHelper.h"
+#include "AlarmsApi.h"
+#include "WiFiOps.h"
+
+#ifdef ENABLE_INFO_MAIN
+#define INFO(...) SS_TRACE(__VA_ARGS__)
+#else
+#define INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_MAIN
+#define TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define TRACE(...) {}
+#endif
+
+#define ALARMS_UPDATE_TIMEOUT 30000
+#define ALARMS_CHECK_WITHOUT_STATUS true
+#define PIN_RESET_BTN D5
+#define PIN_LED_STRIP D6
+#define LED_COUNT 24
+
+AlarmsApi api;
+CRGB leds[LED_COUNT];
+
+byte ledsMap[LED_COUNT] = 
+    {
+      9999, //Idx: 0 - "Crimea"
+      23,   //Idx: 1 - "Kherson"
+      12,   //Idx: 2 - "Zap"
+      28,   //Idx: 3 - "Don"
+      16,   //Idx: 4 - "Luh"
+      //....
+    };
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   Serial.println();
 
-  //clean FS, for testing
-  //SPIFFS.format();
+  Serial.println("!!!! Start UA Map !!!!");
+  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
 
-  //read configuration from FS json
-  Serial.println("mounting FS...");
+  TryToConnect();
 
-  if (SPIFFS.begin()) {
-    Serial.println("mounted file system");
-    if (SPIFFS.exists("/config.json")) {
-      //file exists, reading and loading
-      Serial.println("reading config file");
-      File configFile = SPIFFS.open("/config.json", "r");
-      if (configFile) {
-        Serial.println("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
+  api.setApiKey(api_token);
 
-        configFile.readBytes(buf.get(), size);
-
- #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
-        DynamicJsonDocument json(1024);
-        auto deserializeError = deserializeJson(json, buf.get());
-        serializeJson(json, Serial);
-        if ( ! deserializeError ) {
-#else
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-#endif
-          Serial.println("\nparsed json");         
-          strcpy(api_token, json["api_token"]);
-        } else {
-          Serial.println("failed to load json config");
-        }
-        configFile.close();
-      }
-    }
-  } else {
-    Serial.println("failed to mount FS");
-  }
-  //end read
-
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
-  WiFiManagerParameter custom_api_token("apikey", "API token", api_token, 32);
-
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  //set static ip
-  wifiManager.setSTAStaticIPConfig(IPAddress(10, 0, 1, 99), IPAddress(10, 0, 1, 1), IPAddress(255, 255, 255, 0));
-
-  //add all your parameters here
-  wifiManager.addParameter(&custom_api_token);
-
-  //reset settings - for testing
-  //wifiManager.resetSettings();
-
-  //set minimu quality of signal so it ignores AP's under that quality
-  //defaults to 8%
-  //wifiManager.setMinimumSignalQuality();
-
-  //sets timeout until configuration portal gets turned off
-  //useful to make it all retry or go to sleep
-  //in seconds
-  //wifiManager.setTimeout(120);
-
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
-  if (!wifiManager.autoConnect("AutoConnectAP", "password")) {
-    Serial.println("failed to connect and hit timeout");
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    ESP.restart();
-    delay(5000);
-  }
-
-  //if you get here you have connected to the WiFi
-  Serial.println("connected...yeey :)");
-
-  //read updated parameters
-  strcpy(api_token, custom_api_token.getValue());
-  Serial.println("The values in the file are: ");
-  Serial.println("\tapi_token : " + String(api_token));
-
-  //save the custom parameters to FS
-  if (shouldSaveConfig) {
-    Serial.println("saving config");
- #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
-    DynamicJsonDocument json(1024);
-#else
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
-#endif
-    json["api_token"] = api_token;
-
-    File configFile = SPIFFS.open("/config.json", "w");
-    if (!configFile) {
-      Serial.println("failed to open config file for writing");
-    }
-
-#if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
-    serializeJson(json, Serial);
-    serializeJson(json, configFile);
-#else
-    json.printTo(Serial);
-    json.printTo(configFile);
-#endif
-    configFile.close();
-    //end save
-  }
-
-  Serial.println("local ip");
-  Serial.println(WiFi.localIP());
+  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT);
+  FastLED.setBrightness(50);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() 
+{
+  static uint32_t current = millis();
+  current = millis();
 
+  CheckAndUpdateALarms(current);
+  
+  HandleDebugSerialCommands();
+}
+
+uint32_t alarmsTicks = 0;
+const bool &CheckAndUpdateALarms(const unsigned long &currentTicks)
+{
+  if(alarmsTicks == 0 || currentTicks - alarmsTicks >= ALARMS_UPDATE_TIMEOUT)
+  {      
+    alarmsTicks = currentTicks;
+
+    // wait for WiFi connection
+    AlarmsApiStatus status = AlarmsApiStatus::NoWiFi;
+    if ((WiFi.status() == WL_CONNECTED)) 
+    {      
+      bool statusChanged = api.IsStatusChanged(status);
+      if(status == AlarmsApiStatus::OK)
+      {
+        INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
+        if(statusChanged || ALARMS_CHECK_WITHOUT_STATUS)
+        {
+          auto regions = api.getAlarmedRegions(status);    
+          if(status == AlarmsApiStatus::OK)
+          {
+            for(auto rId : regions)
+            {
+              INFO("regionId:", rId);
+            }
+          }          
+        }
+      }                 
+    }
+
+    SetStatusLED(status);
+
+    INFO("");
+    INFO("Waiting ", ALARMS_UPDATE_TIMEOUT, "ms. before the next round...");
+    
+    return true;
+  }
+  return false;
+}
+
+void SetStatusLED(const AlarmsApiStatus &status)
+{
+  if(status != AlarmsApiStatus::OK)
+  {
+    INFO("Status: ", status == AlarmsApiStatus::WRONG_API ? "Anauthorized" : (status == AlarmsApiStatus::NoWiFi ? "No WiFi" : "No Connection"));
+  }
+}
+
+
+uint8_t debugButtonFromSerial = 0;
+void HandleDebugSerialCommands()
+{
+  if(debugButtonFromSerial == 1) // SHOW DateTime
+  {
+    TryToConnect(/*resetSettings:*/true);   
+    api.setApiKey(api_token);
+  }
+
+  debugButtonFromSerial = 0;
+  if(Serial.available() > 0)
+  {
+    auto readFromSerial = Serial.readString();
+
+    INFO("Input: ", readFromSerial);
+
+    debugButtonFromSerial = readFromSerial.toInt(); 
+  }
 }
