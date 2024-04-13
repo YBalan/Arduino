@@ -95,23 +95,22 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
         INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
         if(statusChanged || ALARMS_CHECK_WITHOUT_STATUS)
         {
-          auto regions = api.getAlarmedRegions(status, statusMsg);    
-          INFO("Alarmed regions count: ", regions.size());
+          std::vector<uint8_t> alarmedLedIdx;
+          auto alarmedRegions = api.getAlarmedRegions(status, statusMsg);    
+          INFO("Alarmed regions count: ", alarmedRegions.size());
           if(status == AlarmsApiStatus::OK)
           {
-            for(auto rId : regions)
+            for(auto rId : alarmedRegions)
             {
               auto ledIdx = api.getLedIndexByRegionId(rId);
               INFO("regionId:", rId, "\tled index: ", ledIdx);
-              
+              alarmedLedIdx.push_back(ledIdx);
             }
+
+            SetAlarmedLED(alarmedLedIdx);
           }          
         }
       }                 
-    }
-    else
-    {
-      status = AlarmsApiStatus::NoWiFi;
     }
 
     SetStatusLED(status, statusMsg);
@@ -122,6 +121,23 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
     return true;
   }
   return false;
+}
+
+void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
+{
+  for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
+  {
+    auto &led = leds[ledIdx];
+    if(std::find(alarmedLedIdx.begin(), alarmedLedIdx.end(), ledIdx) != alarmedLedIdx.end())
+    {
+      led = CRGB(CRGB::Red);
+    }
+    else
+    {
+      led = CRGB(CRGB::Yellow);
+    }
+  }
+  FastLED.show();
 }
 
 void SetStatusLED(const AlarmsApiStatus &status, const String &msg)
