@@ -16,6 +16,7 @@
 #define VER 1.0
 #define RELEASE
 
+#define NETWORK_STATISTIC
 #define ENABLE_TRACE
 //#define ENABLE_TRACE_MAIN
 #define ENABLE_INFO_MAIN
@@ -51,6 +52,12 @@
 AlarmsApi api;
 CRGB leds[LED_COUNT];
 
+#ifdef NETWORK_STATISTIC
+#include <map>
+struct NetworkStatInfo{ int code; int count; String description; };
+std::map<int, NetworkStatInfo> networkStat;
+#endif
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -85,12 +92,12 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
     alarmsTicks = currentTicks;
 
     // wait for WiFi connection
-    AlarmsApiStatus status = AlarmsApiStatus::NoWiFi;
+    int status = AlarmsApiStatus::NO_WIFI;
     String statusMsg;
     if ((WiFi.status() == WL_CONNECTED)) 
     {      
       bool statusChanged = api.IsStatusChanged(status, statusMsg);
-      if(status == AlarmsApiStatus::OK)
+      if(status == AlarmsApiStatus::API_OK)
       {
         INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
         if(statusChanged || ALARMS_CHECK_WITHOUT_STATUS)
@@ -98,7 +105,7 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
           std::vector<uint8_t> alarmedLedIdx;
           auto alarmedRegions = api.getAlarmedRegions(status, statusMsg);    
           INFO("Alarmed regions count: ", alarmedRegions.size());
-          if(status == AlarmsApiStatus::OK)
+          if(status == AlarmsApiStatus::API_OK)
           {
             for(auto rId : alarmedRegions)
             {
@@ -117,6 +124,7 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
 
     INFO("");
     INFO("Waiting ", ALARMS_UPDATE_TIMEOUT, "ms. before the next round...");
+    PrintNetworkStatToSerial();
     
     return true;
   }
@@ -140,14 +148,35 @@ void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
   FastLED.show();
 }
 
-void SetStatusLED(const AlarmsApiStatus &status, const String &msg)
+void SetStatusLED(const int &status, const String &msg)
 {
-  if(status != AlarmsApiStatus::OK)
+  FillNetworkStat(status, status != AlarmsApiStatus::API_OK ? msg : "OK (200)");
+  if(status != AlarmsApiStatus::API_OK)
   {
-    INFO("Status: ", status == AlarmsApiStatus::WRONG_API ? "Unauthorized" : (status == AlarmsApiStatus::NoWiFi ? "No WiFi" : "No Connection"), " | ", msg);
+    INFO("Status: ", status == AlarmsApiStatus::WRONG_API_KEY ? "Unauthorized" : (status == AlarmsApiStatus::NO_WIFI ? "No WiFi" : "No Connection"), " | ", msg);
   }
 }
 
+void FillNetworkStat(const int& code, const String &desc)
+{
+  #ifdef NETWORK_STATISTIC
+  networkStat[code].count++;
+  networkStat[code].code = code;
+  if(networkStat[code].description == "")
+    networkStat[code].description = desc;
+  #endif
+}
+
+void PrintNetworkStatToSerial()
+{
+  #ifdef NETWORK_STATISTIC
+  for(auto de : networkStat)
+  {
+    Serial.print("[\""); Serial.print(std::get<1>(de).description); Serial.print("\": "); Serial.print(std::get<1>(de).count); Serial.print("]; ");    
+  }
+  Serial.println();
+  #endif
+}
 
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()

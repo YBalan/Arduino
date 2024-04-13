@@ -26,12 +26,13 @@
 
 #define ALARMS_API_BASE_URI "https://api.ukrainealarm.com/api/v3/"
 
-enum class AlarmsApiStatus : byte
-{
-  OK,
-  WRONG_API,
-  NO_CONNECTION,
-  NoWiFi,
+enum AlarmsApiStatus
+{   
+  API_OK = 200,
+  WRONG_API_KEY = 401,  
+  NO_CONNECTION = 1000,
+  READ_TIMEOUT,
+  NO_WIFI,  
   UNKNOWN,
 };
 
@@ -83,10 +84,10 @@ class AlarmsApi
     AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), _apiKey(apiKey) {}
     void setApiKey(const char *apiKey) { _apiKey = apiKey; }
     
-    const bool IsStatusChanged(AlarmsApiStatus &status, String &statusMsg)
+    const bool IsStatusChanged(int &status, String &statusMsg)
     {      
       auto httpRes = sendRequest("alerts/status", _apiKey, status);
-      if(status == AlarmsApiStatus::OK)
+      if(status == AlarmsApiStatus::API_OK)
       {
         auto newActionIndex = ParseJsonLasActionIndex(httpRes);
         bool isStatusChanged = lastActionIndex < newActionIndex;
@@ -95,15 +96,15 @@ class AlarmsApi
         lastActionIndex = newActionIndex;
         return isStatusChanged;
       }
-      statusMsg = status != AlarmsApiStatus::OK ? httpRes : "";
+      statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
       return true;
     }
 
-    const std::vector<uint16_t> getAlarmedRegions(AlarmsApiStatus &status, String &statusMsg)
+    const std::vector<uint16_t> getAlarmedRegions(int &status, String &statusMsg)
     {
       std::vector<uint16_t> res;
       auto httpRes = sendRequest("alerts", _apiKey, status);
-      if(status == AlarmsApiStatus::OK)
+      if(status == AlarmsApiStatus::API_OK)
       {
         DynamicJsonDocument doc(2048);
         auto deserializeError = deserializeJson(doc, httpRes);
@@ -122,7 +123,7 @@ class AlarmsApi
           }
         }
       }
-      statusMsg = status != AlarmsApiStatus::OK ? httpRes : "";
+      statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
       return std::move(res);
     }
 
@@ -159,7 +160,7 @@ class AlarmsApi
         return "";
     }
 
-    const String sendRequest(const String& resource, const String &apiKey, AlarmsApiStatus &status)
+    const String sendRequest(const String& resource, const String &apiKey, int &status)
     {
       status = AlarmsApiStatus::UNKNOWN;
       // Ignore SSL certificate validation
@@ -188,7 +189,7 @@ class AlarmsApi
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
           {
-            status = AlarmsApiStatus::OK;
+            status = AlarmsApiStatus::API_OK;
             String payload = https.getString();            
             ALARMS_TRACE(payload);
             https.end();
@@ -196,8 +197,20 @@ class AlarmsApi
           }          
         }
         
-        status = httpCode == HTTP_CODE_UNAUTHORIZED ? AlarmsApiStatus::WRONG_API : AlarmsApiStatus::NO_CONNECTION;
-        auto error = https.errorToString(httpCode);
+        status = httpCode;
+        switch(httpCode)
+        {
+          case HTTP_CODE_UNAUTHORIZED:
+            status = AlarmsApiStatus::WRONG_API_KEY;
+            break;
+          case HTTPC_ERROR_READ_TIMEOUT:
+            status = AlarmsApiStatus::READ_TIMEOUT;
+            break;       
+          case HTTPC_ERROR_CONNECTION_FAILED:
+            status = AlarmsApiStatus::NO_CONNECTION;
+            break;
+        }
+        auto error = String(https.errorToString(httpCode)) + "(" + httpCode + ")";
         ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", error);
         https.end();
 
