@@ -170,12 +170,21 @@ void FillNetworkStat(const int& code, const String &desc)
 void PrintNetworkStatToSerial()
 {
   #ifdef NETWORK_STATISTIC
+  if(networkStat.count(AlarmsApiStatus::API_OK) > 0)
+    PrintNetworkStatInfoToSerial(networkStat[AlarmsApiStatus::API_OK]);
   for(auto de : networkStat)
   {
-    Serial.print("[\""); Serial.print(std::get<1>(de).description); Serial.print("\": "); Serial.print(std::get<1>(de).count); Serial.print("]; ");    
+    auto &info = std::get<1>(de);
+    if(info.code != AlarmsApiStatus::API_OK)
+      PrintNetworkStatInfoToSerial(info);
   }
   Serial.println();
   #endif
+}
+
+void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
+{
+  Serial.print("[\""); Serial.print(info.description); Serial.print("\": "); Serial.print(info.count); Serial.print("]; ");
 }
 
 uint8_t debugButtonFromSerial = 0;
