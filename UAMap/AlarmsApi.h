@@ -67,6 +67,7 @@ class AlarmsApi
       13,   //Idx: 23 - "Ivano-Frank"
       11,   //Idx: 24 - "Zakarpat"      
       //....
+      31,   //Idx: 25 - "Kyiv"
     };
 
   private:

@@ -134,7 +134,7 @@ void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
     }
     else
     {
-      led = CRGB(CRGB::Yellow);
+      led = CRGB(CRGB::Yellow);      
     }
   }
   FastLED.show();

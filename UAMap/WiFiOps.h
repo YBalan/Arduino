@@ -16,10 +16,9 @@
 #define WIFI_TRACE(...) {}
 #endif
 
-
-
+#define API_TOKEN_LENGTH 42
 //define your default values here, if there are different values in config.json, they are overwritten.
-char api_token[42] = "YOUR_API_TOKEN";
+char api_token[API_TOKEN_LENGTH] = "YOUR_API_TOKEN";
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -37,54 +36,16 @@ void ClearFSSettings()
 }
 
 void SaveFSSettings(const char* const apiToken);
+void LoadFSSettings(char* const apiToken);
 
 void TryToConnect(const bool &resetSettings = false)
 {
-  //read configuration from FS json
-  WIFI_INFO("mounting FS...");
-
-  if (SPIFFS.begin()) {
-    WIFI_TRACE("mounted file system");
-    if (SPIFFS.exists("/config.json")) {
-      //file exists, reading and loading
-      WIFI_TRACE("reading config file");
-      File configFile = SPIFFS.open("/config.json", "r");
-      if (configFile) {
-        WIFI_TRACE("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-
- #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
-        DynamicJsonDocument json(1024);
-        auto deserializeError = deserializeJson(json, buf.get());
-        serializeJson(json, Serial);
-        if ( ! deserializeError ) {
-#else
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-#endif
-          WIFI_TRACE("parsed json");         
-          strcpy(api_token, json["api_token"]);
-        } else {
-          WIFI_TRACE("failed to load json config");
-        }
-        configFile.close();
-      }
-    }
-  } else {
-    WIFI_TRACE("failed to mount FS");
-  }
-  //end read
+  LoadFSSettings(api_token);
 
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
-  WiFiManagerParameter custom_api_token("apikey", "Alarms API token", api_token, 42);
+  WiFiManagerParameter custom_api_token("apikey", "Alarms API token", api_token, API_TOKEN_LENGTH);
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -135,7 +96,7 @@ void TryToConnect(const bool &resetSettings = false)
   //read updated parameters
   strcpy(api_token, custom_api_token.getValue());
   WIFI_TRACE("The values in the file are: ");
-  WIFI_TRACE("\tapi_token : " + String(api_token));
+  WIFI_TRACE("\tapi_token : ", String(api_token));
 
   SaveFSSettings(api_token);
 
@@ -171,6 +132,50 @@ void SaveFSSettings(const char* const apiToken)
     configFile.close();
     //end save
   }
+}
+
+//read configuration from FS json
+void LoadFSSettings(char* const apiToken)
+{ 
+  WIFI_INFO("mounting FS...");
+
+  if (SPIFFS.begin()) {
+    WIFI_TRACE("mounted file system");
+    if (SPIFFS.exists("/config.json")) {
+      //file exists, reading and loading
+      WIFI_TRACE("reading config file");
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        WIFI_TRACE("opened config file");
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+
+ #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
+        DynamicJsonDocument json(1024);
+        auto deserializeError = deserializeJson(json, buf.get());
+        serializeJson(json, Serial);
+        if ( ! deserializeError ) {
+#else
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject(buf.get());
+        json.printTo(Serial);
+        if (json.success()) {
+#endif
+          WIFI_TRACE("parsed json");         
+          strcpy(apiToken, json["api_token"]);
+        } else {
+          WIFI_TRACE("failed to load json config");
+        }
+        configFile.close();
+      }
+    }
+  } else {
+    WIFI_TRACE("failed to mount FS");
+  }
+  //end read
 }
 
 #endif //WIFI_OPS_H
