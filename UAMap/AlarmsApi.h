@@ -1,3 +1,4 @@
+#include <algorithm>
 #pragma once
 #ifndef ALARMS_API_H
 #define ALARMS_API_H
@@ -25,7 +26,7 @@
 
 #define ALARMS_API_BASE_URI "https://api.ukrainealarm.com/api/v3/"
 
-enum class AlarmsApiStatus
+enum class AlarmsApiStatus : byte
 {
   OK,
   WRONG_API,
@@ -35,7 +36,40 @@ enum class AlarmsApiStatus
 };
 
 class AlarmsApi
-{
+{  
+  private:
+    static const constexpr uint8_t ledsMapCount = 25;
+    static const constexpr uint8_t alarmsLedsMap[] = 
+    {
+      127,  //Idx: 0 - "Crimea" //9999
+      23,   //Idx: 1 - "Kherson"
+      12,   //Idx: 2 - "Zap"
+      28,   //Idx: 3 - "Don"
+      16,   //Idx: 4 - "Luh"
+      22,   //Idx: 5 - "Khar"
+       9,   //Idx: 6 - "Dnopro"
+      17,   //Idx: 7 - "Mykol"
+      18,   //Idx: 8 - "Odesa"
+       4,   //Idx: 9 - "Vinn"
+      15,   //Idx: 10 - "Kirovograd"
+      19,   //Idx: 11 - "Poltava"
+      20,   //Idx: 12 - "Summ"
+      25,   //Idx: 13 - "Chernihiv"
+      24,   //Idx: 14 - "Cherkas"
+      14,   //Idx: 15 - "Kyivska"
+      10,   //Idx: 16 - "Gitom"
+       3,   //Idx: 17 - "Khmel"
+      26,   //Idx: 18 - "Chernivetska"
+      21,   //Idx: 19 - "Ternopil"
+       5,   //Idx: 20 - "Rivne"
+       8,   //Idx: 21 - "Volin"
+      27,   //Idx: 22 - "Lviv" 
+      13,   //Idx: 23 - "Ivano-Frank"
+      11,   //Idx: 24 - "Zakarpat"      
+      //....
+    };
+
+  private:
     std::unique_ptr<BearSSL::WiFiClientSecure> client;    
     
     //create an HTTPClient instance
@@ -48,27 +82,27 @@ class AlarmsApi
     AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), _apiKey(apiKey) {}
     void setApiKey(const char *apiKey) { _apiKey = apiKey; }
     
-    const bool IsStatusChanged(AlarmsApiStatus &status)
+    const bool IsStatusChanged(AlarmsApiStatus &status, String &statusMsg)
     {      
-      auto res = sendRequest("alerts/status", _apiKey, status);
-      if(status == AlarmsApiStatus::OK && res != "")
+      auto httpRes = sendRequest("alerts/status", _apiKey, status);
+      if(status == AlarmsApiStatus::OK)
       {
-        auto newActionIndex = ParseJsonLasActionIndex(res);
+        auto newActionIndex = ParseJsonLasActionIndex(httpRes);
         bool isStatusChanged = lastActionIndex < newActionIndex;
         ALARMS_TRACE("LAST: ", lastActionIndex);
         ALARMS_TRACE(" NEW: ", newActionIndex);
         lastActionIndex = newActionIndex;
         return isStatusChanged;
       }
-
+      statusMsg = status != AlarmsApiStatus::OK ? httpRes : "";
       return true;
     }
 
-    std::vector<uint16_t> getAlarmedRegions(AlarmsApiStatus &status)
+    const std::vector<uint16_t> getAlarmedRegions(AlarmsApiStatus &status, String &statusMsg)
     {
       std::vector<uint16_t> res;
       auto httpRes = sendRequest("alerts", _apiKey, status);
-      if(status == AlarmsApiStatus::OK && httpRes != "")
+      if(status == AlarmsApiStatus::OK)
       {
         DynamicJsonDocument doc(2048);
         auto deserializeError = deserializeJson(doc, httpRes);
@@ -87,7 +121,26 @@ class AlarmsApi
           }
         }
       }
+      statusMsg = status != AlarmsApiStatus::OK ? httpRes : "";
       return std::move(res);
+    }
+
+    const int8_t getLedIndexByRegionId(const uint16_t &regionId) const
+    {
+      int8_t res = -1;
+      const int alarmsLedsMapLength = sizeof(alarmsLedsMap) / sizeof(alarmsLedsMap[0]);
+      ALARMS_INFO("LED Map Count: ", alarmsLedsMapLength)
+      for(uint8_t idx = 0; idx < alarmsLedsMapLength; idx++)
+      {
+        auto mapValue = alarmsLedsMap[idx];
+        if(mapValue == (regionId == 9999 ? 127 : regionId))
+        {
+          res = idx;
+          break;
+        }
+      }
+      ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", res);
+      return res;
     }
 
     private:
@@ -99,7 +152,7 @@ class AlarmsApi
         if ( ! deserializeError ) {
           String last(json["lastActionIndex"]);
           //ALARMS_TRACE("LAST: ", last);
-          return last;
+          return std::move(last);
           //return atoi(json["lastActionIndex"]);
         }
         return "";
@@ -110,6 +163,7 @@ class AlarmsApi
       status = AlarmsApiStatus::UNKNOWN;
       // Ignore SSL certificate validation
       client->setInsecure();
+      
       https.setTimeout(15000);
 
       ALARMS_TRACE("[HTTPS] begin: ", resource);   
@@ -126,7 +180,8 @@ class AlarmsApi
         // start connection and send HTTP header
         int httpCode = https.GET();
         // httpCode will be negative on error
-        if (httpCode > 0) {
+        if (httpCode > 0) 
+        {
           // HTTP header has been send and Server response header has been handled
           ALARMS_TRACE("[HTTPS] RES GET: ", resource, "... code: ", httpCode);
           // file found at server
@@ -135,31 +190,23 @@ class AlarmsApi
             status = AlarmsApiStatus::OK;
             String payload = https.getString();            
             ALARMS_TRACE(payload);
-            return payload;
-          }
-          else
-          {
-            status = AlarmsApiStatus::WRONG_API;
-            auto error = https.errorToString(httpCode);
-            ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", error);
-            return error;
-          }
+            https.end();
+            return std::move(payload);
+          }          
         }
-        else 
-        {
-          status = AlarmsApiStatus::WRONG_API;
-          auto error = https.errorToString(httpCode);
-          ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", error);
-          return error;
-        }
-
+        
+        status = httpCode == HTTP_CODE_UNAUTHORIZED ? AlarmsApiStatus::WRONG_API : AlarmsApiStatus::NO_CONNECTION;
+        auto error = https.errorToString(httpCode);
+        ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", error);
         https.end();
+
+        return std::move(error);                
       } else 
       {
-        status = AlarmsApiStatus::NO_CONNECTION;
+        status = AlarmsApiStatus::UNKNOWN;
         ALARMS_TRACE("[HTTPS] Unable to connect");
-      }
-      return "";
+        return std::move("[HTTPS] Unable to connect");
+      }      
     }    
 };
 

@@ -20,11 +20,11 @@
 //#define ENABLE_TRACE_MAIN
 #define ENABLE_INFO_MAIN
 
-/*#define ENABLE_INFO_ALARMS
-#define ENABLE_TRACE_ALARMS
+//#define ENABLE_INFO_ALARMS
+//#define ENABLE_TRACE_ALARMS
 
-#define ENABLE_INFO_WIFI
-#define ENABLE_TRACE_WIFI*/
+//#define ENABLE_INFO_WIFI
+//#define ENABLE_TRACE_WIFI
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -46,20 +46,10 @@
 #define ALARMS_CHECK_WITHOUT_STATUS true
 #define PIN_RESET_BTN D5
 #define PIN_LED_STRIP D6
-#define LED_COUNT 24
+#define LED_COUNT 25
 
 AlarmsApi api;
 CRGB leds[LED_COUNT];
-
-byte ledsMap[LED_COUNT] = 
-    {
-      9999, //Idx: 0 - "Crimea"
-      23,   //Idx: 1 - "Kherson"
-      12,   //Idx: 2 - "Zap"
-      28,   //Idx: 3 - "Don"
-      16,   //Idx: 4 - "Luh"
-      //....
-    };
 
 void setup() {
   // put your setup code here, to run once:
@@ -88,7 +78,7 @@ void loop()
 }
 
 uint32_t alarmsTicks = 0;
-const bool &CheckAndUpdateALarms(const unsigned long &currentTicks)
+const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
 {
   if(alarmsTicks == 0 || currentTicks - alarmsTicks >= ALARMS_UPDATE_TIMEOUT)
   {      
@@ -96,27 +86,35 @@ const bool &CheckAndUpdateALarms(const unsigned long &currentTicks)
 
     // wait for WiFi connection
     AlarmsApiStatus status = AlarmsApiStatus::NoWiFi;
+    String statusMsg;
     if ((WiFi.status() == WL_CONNECTED)) 
     {      
-      bool statusChanged = api.IsStatusChanged(status);
+      bool statusChanged = api.IsStatusChanged(status, statusMsg);
       if(status == AlarmsApiStatus::OK)
       {
         INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
         if(statusChanged || ALARMS_CHECK_WITHOUT_STATUS)
         {
-          auto regions = api.getAlarmedRegions(status);    
+          auto regions = api.getAlarmedRegions(status, statusMsg);    
+          INFO("Alarmed regions count: ", regions.size());
           if(status == AlarmsApiStatus::OK)
           {
             for(auto rId : regions)
             {
-              INFO("regionId:", rId);
+              auto ledIdx = api.getLedIndexByRegionId(rId);
+              INFO("regionId:", rId, "\tled index: ", ledIdx);
+              
             }
           }          
         }
       }                 
     }
+    else
+    {
+      status = AlarmsApiStatus::NoWiFi;
+    }
 
-    SetStatusLED(status);
+    SetStatusLED(status, statusMsg);
 
     INFO("");
     INFO("Waiting ", ALARMS_UPDATE_TIMEOUT, "ms. before the next round...");
@@ -126,11 +124,11 @@ const bool &CheckAndUpdateALarms(const unsigned long &currentTicks)
   return false;
 }
 
-void SetStatusLED(const AlarmsApiStatus &status)
+void SetStatusLED(const AlarmsApiStatus &status, const String &msg)
 {
   if(status != AlarmsApiStatus::OK)
   {
-    INFO("Status: ", status == AlarmsApiStatus::WRONG_API ? "Anauthorized" : (status == AlarmsApiStatus::NoWiFi ? "No WiFi" : "No Connection"));
+    INFO("Status: ", status == AlarmsApiStatus::WRONG_API ? "Unauthorized" : (status == AlarmsApiStatus::NoWiFi ? "No WiFi" : "No Connection"), " | ", msg);
   }
 }
 
@@ -138,7 +136,7 @@ void SetStatusLED(const AlarmsApiStatus &status)
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
-  if(debugButtonFromSerial == 1) // SHOW DateTime
+  if(debugButtonFromSerial == 1) // Reset WiFi
   {
     TryToConnect(/*resetSettings:*/true);   
     api.setApiKey(api_token);
