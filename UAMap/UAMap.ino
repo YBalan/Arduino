@@ -5,27 +5,24 @@
   #include <SPIFFS.h>
 #endif
 
-#include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
-
-#include <ESP8266HTTPClient.h>
-#include <WiFiClientSecureBearSSL.h>
-
 #define FASTLED_ESP8266_RAW_PIN_ORDER
+//#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
+//#define FASTLED_ESP8266_D1_PIN_ORDER
 #include <FastLED.h>
 
-#define VER 1.0
+#define VER 1.1
 #define RELEASE
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
-//#define ENABLE_TRACE_MAIN
+#define ENABLE_TRACE_MAIN
 #define ENABLE_INFO_MAIN
 
 //#define ENABLE_INFO_ALARMS
 //#define ENABLE_TRACE_ALARMS
 
-//#define ENABLE_INFO_WIFI
-//#define ENABLE_TRACE_WIFI
+#define ENABLE_INFO_WIFI
+#define ENABLE_TRACE_WIFI
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -43,35 +40,54 @@
 #define TRACE(...) {}
 #endif
 
-#define ALARMS_UPDATE_TIMEOUT 30000
-#define ALARMS_CHECK_WITHOUT_STATUS true
-#define PIN_RESET_BTN D5
-#define PIN_LED_STRIP D6
-#define LED_COUNT 25
-
-AlarmsApi api;
-CRGB leds[LED_COUNT];
-
 #ifdef NETWORK_STATISTIC
 #include <map>
 struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 
+#define ALARMS_UPDATE_TIMEOUT 30000
+#define ALARMS_CHECK_WITHOUT_STATUS true
+#define PIN_RESET_BTN D5
+#define PIN_LED_STRIP D6
+#define LED_COUNT 25
+#define BRIGHTNESS_STEP 10
+
+#define LED_STATUS_IDX 0;
+#define LED_PORTAL_MODE_COLOR CRGB::Green
+#define LED_PORTAL_MODE_TIMEOUT 10
+
+WiFiOps::WiFiOps wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
+AlarmsApi api;
+CRGBArray<LED_COUNT> leds;
+
+
+struct Settings
+{
+  uint8_t Brightness = 5;
+} _settings;
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  Serial.println();
+  while (!Serial);
 
+  Serial.println();
   Serial.println("!!!! Start UA Map !!!!");
   Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
 
-  TryToConnect();
+  
+  /*wifiOps
+  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN")
+  .AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");*/
+
+  wifiOps.TryToConnectOrOpenConfigPortal();
 
   api.setApiKey(api_token);
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT);
-  FastLED.setBrightness(50);
+  FastLED.clear();
+  SetBrightness();
 }
 
 void loop() 
@@ -133,19 +149,23 @@ const bool CheckAndUpdateALarms(const unsigned long &currentTicks)
 
 void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
 {
+  TRACE("SetAlarmedLED: ", alarmedLedIdx.size());
   for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
-  {
+  {   
     auto &led = leds[ledIdx];
     if(std::find(alarmedLedIdx.begin(), alarmedLedIdx.end(), ledIdx) != alarmedLedIdx.end())
     {
-      led = CRGB(CRGB::Red);
+      //TRACE("RED: ", ledIdx);
+      led = CRGB::Red;
     }
     else
     {
-      led = CRGB(CRGB::Yellow);      
+      //TRACE("BLUE: ", ledIdx);
+      led = CRGB::Blue;      
     }
+    FastLED.show(_settings.Brightness);
   }
-  FastLED.show();
+  FastLED.show(_settings.Brightness);
 }
 
 void SetStatusLED(const int &status, const String &msg)
@@ -170,6 +190,7 @@ void FillNetworkStat(const int& code, const String &desc)
 void PrintNetworkStatToSerial()
 {
   #ifdef NETWORK_STATISTIC
+  Serial.print("Network Statistic: ");
   if(networkStat.count(AlarmsApiStatus::API_OK) > 0)
     PrintNetworkStatInfoToSerial(networkStat[AlarmsApiStatus::API_OK]);
   for(auto de : networkStat)
@@ -184,7 +205,9 @@ void PrintNetworkStatToSerial()
 
 void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
 {
+  #ifdef NETWORK_STATISTIC
   Serial.print("[\""); Serial.print(info.description); Serial.print("\": "); Serial.print(info.count); Serial.print("]; ");
+  #endif
 }
 
 uint8_t debugButtonFromSerial = 0;
@@ -192,8 +215,13 @@ void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 1) // Reset WiFi
   {
-    TryToConnect(/*resetSettings:*/true);   
+    wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
     api.setApiKey(api_token);
+  }
+
+  if(debugButtonFromSerial == 2) // Show Network Statistic
+  {
+    PrintNetworkStatToSerial();
   }
 
   debugButtonFromSerial = 0;
@@ -201,8 +229,39 @@ void HandleDebugSerialCommands()
   {
     auto readFromSerial = Serial.readString();
 
+    uint8_t minusCount = std::count(readFromSerial.begin(), readFromSerial.end(), '-');
+    if(minusCount > 0)
+    {
+      auto step = minusCount * BRIGHTNESS_STEP;
+      if(_settings.Brightness - step > 0)
+        _settings.Brightness -= step;
+      else
+        _settings.Brightness = 5;
+
+      SetBrightness();
+    }
+
+    uint8_t plusCount = std::count(readFromSerial.begin(), readFromSerial.end(), '+');
+    if(plusCount > 0)
+    {
+      auto step = plusCount * BRIGHTNESS_STEP;
+      if(_settings.Brightness + step < 255)
+        _settings.Brightness += step;
+      else
+        _settings.Brightness = 255;
+
+      SetBrightness();
+    }
+
     INFO("Input: ", readFromSerial);
 
     debugButtonFromSerial = readFromSerial.toInt(); 
   }
+}
+
+void SetBrightness()
+{
+  FastLED.setBrightness(_settings.Brightness);
+  FastLED.show(_settings.Brightness);
+  INFO("BR: ", _settings.Brightness);
 }

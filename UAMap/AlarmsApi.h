@@ -1,10 +1,11 @@
-#include <algorithm>
 #pragma once
 #ifndef ALARMS_API_H
 #define ALARMS_API_H
 
 #include <Arduino.h>
 #include <vector>
+#include <algorithm>
+
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
 #include <ESP8266HTTPClient.h>
