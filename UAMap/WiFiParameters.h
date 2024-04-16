@@ -1,17 +1,27 @@
 #pragma once
-#ifndef SETTINGS_H
-#define SETTINGS_H
+#ifndef WIFI_PARAMETERS_H
+#define WIFI_PARAMETERS_H
 
 #include <vector>
+
+#ifdef ENABLE_INFO_WIFI
+#define WIFIP_INFO(...) SS_TRACE("[WiFi PARAMS INFO] ", __VA_ARGS__)
+#else
+#define WIFIP_INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_WIFI
+#define WIFIP_TRACE(...) SS_TRACE("[WiFi PARAMS TRACE] ", __VA_ARGS__)
+#else
+#define WIFIP_TRACE(...) {}
+#endif
+
 
 class WiFiParameter
 {
   public:
-  String Name;
-  String Label;
-  String JsonPropertyName;
-  String Value;
-  uint8_t Place;
+  WiFiManagerParameter Parameter;
+  String JsonPropertyName;  
 
   protected:
   WiFiParameter(){}
@@ -23,16 +33,35 @@ class WiFiParameter
   {}
   
   WiFiParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &place)
-  : Name(name)
-  , Label(label)
-  , JsonPropertyName(json)
-  , Value(defaultValue)
-  , Place(place)
+  : Parameter(name, label, defaultValue, 100)  
+  , JsonPropertyName(json)  
   {}
+
+   WiFiParameter(const WiFiParameter &copy)
+   : Parameter(copy.Parameter)
+   , JsonPropertyName(copy.JsonPropertyName)
+   {
+    WIFIP_TRACE("WiFIParameter copy ctor");
+   }
 
   void SetValue(const char *const value)
   {    
-    Value = value == 0 ? "" : value;
+    Parameter.setValue(value, strlen(value));
+  }
+
+  const String GetValue() const
+  {
+    return Parameter.getValue();
+  }
+
+  const String GetName() const
+  {
+    return Parameter.getID();
+  }
+
+  WiFiManagerParameter* GetParameter()
+  {
+    return &Parameter;
   }
 
   /*WiFiParameter(WiFiParameter&& other) noexcept  
@@ -73,7 +102,7 @@ public:
 public:
   WiFiParameters &AddParameter(const WiFiParameter &param)
   {
-    _parameters.push_back(std::move(param));
+    _parameters.push_back(param);
     return *this;
   }
 
@@ -82,7 +111,7 @@ public:
     for(int i = 0; i < Count(); i++)
     {
       auto &p = _parameters[i];
-      if(p.Name == value)
+      if(p.GetName() == value)
         return p;
     }
     return NullParam;
@@ -114,4 +143,4 @@ public:
 };
 
 
-#endif //SETTINGS_H
+#endif //WIFI_PARAMETERS_H

@@ -167,7 +167,7 @@ class AlarmsApi
       // Ignore SSL certificate validation
       client->setInsecure();
       
-      https.setTimeout(15000);
+      https.setTimeout(1000);
 
       ALARMS_TRACE("[HTTPS] begin: ", resource);   
       ALARMS_TRACE("[HTTPS] apiKey: ", apiKey); 

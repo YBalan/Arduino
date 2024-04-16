@@ -92,6 +92,8 @@ class WiFiOps
 
     const WiFiParameters &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
     {
+      WIFI_TRACE("TryToConnectOrOpenConfigPortal...");
+
       LoadFSSettings(api_token, _parameters);
 
       // The extra parameters to be configured (can be either global or just in the setup)
@@ -114,20 +116,16 @@ class WiFiOps
 
       //wifiManager.setHttpPort(8080);
 
+      WIFI_TRACE("Adding parameters...");
       //add all your parameters here
       wifiManager.addParameter(&custom_api_token);
-      std::vector<WiFiManagerParameter> mgrParamsRepo;
-      for(const auto &parameter : _parameters)
+      
+      for(uint8_t pIdx = 0; pIdx < _parameters.Count(); pIdx++)
       {
-        WIFI_TRACE("Adding parameter: ", parameter.Name);
-        WiFiManagerParameter custom(parameter.Name.c_str(), parameter.Label.c_str(), parameter.Value.c_str(), 42);
-        mgrParamsRepo.push_back(custom);
-      }
-
-      for(auto custom : mgrParamsRepo)
-      {
-        wifiManager.addParameter(&custom); 
-      }
+        auto &parameter = _parameters.GetAt(pIdx);
+        WIFI_TRACE("Adding parameter: ", parameter.GetName());
+        wifiManager.addParameter(parameter.GetParameter()); 
+      }     
 
       WIFI_TRACE("WiFiManager parameters count: ", wifiManager.getParametersCount());
 
@@ -169,16 +167,6 @@ class WiFiOps
       WIFI_TRACE("The values in the file are: ");
       WIFI_TRACE("\tapi_token : ", String(api_token));
 
-      WIFI_TRACE("The values in the file are: ");
-      WiFiManagerParameter **wifiMgrParameters = wifiManager.getParameters();
-      for(int mgrPIdx = 0; mgrPIdx < wifiManager.getParametersCount(); mgrPIdx++)
-      {
-        WiFiManagerParameter * wifiMgrParam = wifiMgrParameters[mgrPIdx];
-        auto &p = _parameters.GetParameterById(wifiMgrParam->getID());        
-        p.SetValue(wifiMgrParam->getValue());
-        WIFI_TRACE("\t", p.IsNull() ? String("Parameter Not Found: ") + wifiMgrParam->getID() : p.JsonPropertyName, ": ", p.Value);
-      }      
-
       SaveFSSettings(api_token, _parameters);
 
       WIFI_INFO("local ip");
@@ -205,7 +193,7 @@ class WiFiOps
 
         for(const auto &p : parametersToSave)
         {
-          json[p.JsonPropertyName] = p.Value;
+          json[p.JsonPropertyName] = p.GetValue();
         }
 
         File configFile = SPIFFS.open("/config.json", "w");
@@ -263,7 +251,7 @@ class WiFiOps
               for(int pIdx = 0; pIdx < parametersToLoad.Count(); pIdx++)
               {                
                 auto &p = parametersToLoad.GetAt(pIdx);
-                WIFI_TRACE("Load parameter: ", p.Name, " json property: ", p.JsonPropertyName);
+                WIFI_TRACE("Load parameter: ", p.GetName(), " json property: ", p.JsonPropertyName);
                 p.SetValue(json[p.JsonPropertyName]);
               }
 
