@@ -83,7 +83,8 @@ class AlarmsApi
   public:
     AlarmsApi() : client(new BearSSL::WiFiClientSecure){}
     AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), _apiKey(apiKey) {}
-    void setApiKey(const char *apiKey) { _apiKey = apiKey; }
+    void setApiKey(const char *const apiKey) { _apiKey = apiKey; }
+    void setApiKey(const String &apiKey) { _apiKey = apiKey; }
     
     const bool IsStatusChanged(int &status, String &statusMsg)
     {      

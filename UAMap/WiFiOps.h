@@ -24,9 +24,9 @@
 #define WIFI_TRACE(...) {}
 #endif
 
-#define API_TOKEN_LENGTH 42
+//#define API_TOKEN_LENGTH 42
 //define your default values here, if there are different values in config.json, they are overwritten.
-char api_token[API_TOKEN_LENGTH] = "YOUR_API_TOKEN";
+//char api_token[API_TOKEN_LENGTH] = "YOUR_API_TOKEN";
 
 namespace WiFiOps
 {
@@ -87,22 +87,28 @@ class WiFiOps
       _lastPlace++;
       return *this;
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue) 
+    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
     {
       WIFI_TRACE("AddParameter...");
-      WiFiParameter p(name, label, json, defaultValue, _lastPlace);
+      WiFiParameter p(name, label, json, defaultValue, length, _lastPlace);
       _parameters.AddParameter(p);
       _lastPlace++;
       return *this;      
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &place)
+    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)
     {
       WIFI_TRACE("AddParameter...");
-      WiFiParameter p(name, label, json, defaultValue, place);
+      WiFiParameter p(name, label, json, defaultValue, length, place);
       _parameters.AddParameter(p);
       _lastPlace = place + 1;
       return *this;
     }
+
+    const String &GetParameterValueById(const String &id) const
+    {
+      return _parameters.GetParameterById(id).GetValue();
+    }
+
   public:
     void ClearFSSettings()
     {
@@ -119,12 +125,12 @@ class WiFiOps
     {
       WIFI_TRACE("TryToConnectOrOpenConfigPortal...");
 
-      LoadFSSettings(api_token, _parameters);
+      LoadFSSettings(_parameters);
 
       // The extra parameters to be configured (can be either global or just in the setup)
       // After connecting, parameter.getValue() will get you the configured value
       // id/name placeholder/prompt default length
-      WiFiManagerParameter custom_api_token("apikey", "Alarms API token", api_token, API_TOKEN_LENGTH);
+      //WiFiManagerParameter custom_api_token("apikey", "Alarms API token", api_token, API_TOKEN_LENGTH);
 
       //WiFiManager
       //Local intialization. Once its business is done, there is no need to keep it around
@@ -143,7 +149,7 @@ class WiFiOps
 
       WIFI_TRACE("Adding parameters to WiFiManager...");
       //add all your parameters here
-      wifiManager.addParameter(&custom_api_token);
+      //wifiManager.addParameter(&custom_api_token);
       
       for(uint8_t pIdx = 0; pIdx < _parameters.Count(); pIdx++)
       {
@@ -188,11 +194,11 @@ class WiFiOps
       WIFI_INFO("connected...yeey :)");
 
       //read updated parameters
-      strcpy(api_token, custom_api_token.getValue());
-      WIFI_TRACE("The values in the file are: ");
-      WIFI_TRACE("\tapi_token : ", String(api_token));      
+      //strcpy(api_token, custom_api_token.getValue());
+      //WIFI_TRACE("The values in the file are: ");
+      //WIFI_TRACE("\tapi_token : ", String(api_token));      
 
-      SaveFSSettings(api_token, _parameters);
+      SaveFSSettings(_parameters);
 
       WIFI_TRACE("The values in the file are: ");
       for(const auto &p : _parameters)
@@ -209,7 +215,7 @@ class WiFiOps
     }
 
     //save the custom parameters to FS
-    void SaveFSSettings(const char* const apiToken, WiFiParameters<PARAMS_COUNT> &parametersToSave)
+    void SaveFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToSave)
     {  
       WIFI_TRACE("Save Settings...");
       if (SaveCallback::_shouldSaveConfig) {
@@ -220,7 +226,7 @@ class WiFiOps
         DynamicJsonBuffer jsonBuffer;
         JsonObject& json = jsonBuffer.createObject();
     #endif
-        json["api_token"] = apiToken;
+        //json["api_token"] = apiToken;
 
         for(int pIdx = 0; pIdx < parametersToSave.Count(); pIdx++)
         {                
@@ -248,7 +254,7 @@ class WiFiOps
     }
 
     //read configuration from FS json
-    void LoadFSSettings(char * const apiToken, WiFiParameters<PARAMS_COUNT> &parametersToLoad)
+    void LoadFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToLoad)
     { 
       WIFI_TRACE("Load Settings...");
       WIFI_TRACE("mounting FS...");
@@ -280,7 +286,7 @@ class WiFiOps
             if (json.success()) {
     #endif
               WIFI_TRACE("parsed json");         
-              strcpy(apiToken, json["api_token"]);
+              //strcpy(apiToken, json["api_token"]);
 
               for(int pIdx = 0; pIdx < parametersToLoad.Count(); pIdx++)
               {                

@@ -1,5 +1,6 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include <EEPROM.h>
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -18,6 +19,9 @@
 #define ENABLE_TRACE_MAIN
 #define ENABLE_INFO_MAIN
 
+#define ENABLE_INFO_BOT
+#define ENABLE_TRACE_BOT
+
 //#define ENABLE_INFO_ALARMS
 //#define ENABLE_TRACE_ALARMS
 
@@ -29,6 +33,7 @@
 #include "LedState.h"
 #include "Settings.h"
 #include "WiFiOps.h"
+#include "TelegramBot.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -60,6 +65,19 @@ CRGBArray<LED_COUNT> leds;
 std::vector<uint8_t> alarmedLedIdx;
 std::map<uint8_t, LedState> ledsState;
 
+void SaveSettings()
+{
+  INFO("Save Settings...");
+  //EEPROM.put(0, _settings);
+  EEPROM.put(sizeof(_settings), _botSettings.toStore);
+}
+
+void LoadSettings()
+{
+  INFO("Load Settings...");
+  //EEPROM.get(0, _settings);    
+  EEPROM.get(sizeof(_settings), _botSettings.toStore);  
+}
 
 void setup() {
   // put your setup code here, to run once:
@@ -73,12 +91,16 @@ void setup() {
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
 
   wifiOps
-  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN")
-  .AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");
+  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 42)
+  .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
+  .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
+  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30);
 
   wifiOps.TryToConnectOrOpenConfigPortal();
 
-  api.setApiKey(api_token);
+  api.setApiKey(wifiOps.GetParameterValueById("apiToken"));
+
+  LoadSettings();
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
   FastLED.clear();  
@@ -90,6 +112,13 @@ void setup() {
   SetAlarmedLED(alarmedLedIdx);
   CheckAndUpdateRealLeds(millis());
   SetBrightness(); 
+
+  //bot.setChatID(CHAT_ID);
+  bot.setToken(wifiOps.GetParameterValueById("telegramToken"));
+  _botSettings.botName = wifiOps.GetParameterValueById("telegramName");
+  _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
+  bot.attach(newMsg);
+  bot.setTextMode(FB_MARKDOWN); 
 }
 
 void loop() 
@@ -112,6 +141,7 @@ void loop()
 
   HandleDebugSerialCommands();    
 
+  bot.tick();
   firstRun = false;
 }
 
@@ -363,7 +393,7 @@ void HandleDebugSerialCommands()
     ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
     FastLEDShow(true);
     wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
-    api.setApiKey(api_token);
+    api.setApiKey(wifiOps.GetParameterValueById("apiToken"));
   }
 
   if(debugButtonFromSerial == 2) // Show Network Statistic
@@ -382,7 +412,7 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 100)
   {
-    wifiOps.AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN");
+    wifiOps.AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 42);
     TRACE("WifiOps parameters count: ", wifiOps.ParametersCount());
   //.AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");
   }

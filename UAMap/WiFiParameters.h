@@ -20,7 +20,7 @@
 class WiFiParameter : public WiFiManagerParameter
 {  
   //WiFiManagerParameter Parameter;
-  public:
+  private:
   String _id;
   String _label;
   String _value;
@@ -31,20 +31,20 @@ class WiFiParameter : public WiFiManagerParameter
 
   public:
   //WiFiParameter(WiFiParameter &){}
-  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue) 
-  : WiFiParameter(id, label, json, defaultValue, 0)   
+  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
+  : WiFiParameter(id, label, json, defaultValue, length, 0)   
   {
     WIFIP_TRACE("WiFiParameter ctor");    
   }
   
-  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &place)  
+  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)  
   : _id(id)
   , _label(label)
   , _value(defaultValue)
   , _json(json)
   {
     WIFIP_TRACE("WiFiParameter ctor with place");    
-    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), "", place);
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), length, "", WFM_LABEL_DEFAULT);
   }
 
   WiFiParameter(const WiFiParameter &other)   
@@ -55,7 +55,7 @@ class WiFiParameter : public WiFiManagerParameter
   {    
     WIFIP_TRACE("WiFiParameter copy ctor");   
 
-    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), other.getCustomHTML(), other.getLabelPlacement());
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), other.getValueLength(), other.getCustomHTML(), other.getLabelPlacement());
   }
 
  WiFiParameter(WiFiParameter&& other) noexcept  
@@ -66,7 +66,7 @@ class WiFiParameter : public WiFiManagerParameter
   {
     WIFIP_TRACE("WiFiParameter move ctor");
 
-    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), other.getCustomHTML(), other.getLabelPlacement());
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), other.getValueLength(), other.getCustomHTML(), other.getLabelPlacement());
   }
 
   void Init(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement)
@@ -82,7 +82,7 @@ class WiFiParameter : public WiFiManagerParameter
   void SetValue(const char *const value)
   { 
     _value = value;
-    setValue(_value.c_str(), _value.length());
+    setValue(_value.c_str(), getValueLength());
   }
 
   const String &ReadValue() 
@@ -141,9 +141,9 @@ public:
     WIFIP_TRACE("End AddParameter...");    
   }
 
-  WiFiParameter &GetParameterById(const String &value)
+  const WiFiParameter &GetParameterById(const String &value) const
   {
-    for(int i = 0; i < Count(); i++)
+    for(uint8_t i = 0; i < Count(); i++)
     {
       auto &p = _parameters[i];
       if(p.GetId() == value)
@@ -152,7 +152,7 @@ public:
     return NullParam;
   }
 
-  WiFiParameter &GetParameterByJsonName(const String &value)
+  const WiFiParameter &GetParameterByJsonName(const String &value) const
   {
     for(auto &p : _parameters)
     {
