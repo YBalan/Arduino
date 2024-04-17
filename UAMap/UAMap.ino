@@ -54,7 +54,7 @@ std::map<int, NetworkStatInfo> networkStat;
 #define BRIGHTNESS_STEP 10
 
 UAMap::Settings _settings;
-WiFiOps::WiFiOps wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
+WiFiOps::WiFiOps<3> wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
 AlarmsApi api;
 CRGBArray<LED_COUNT> leds;
 std::vector<uint8_t> alarmedLedIdx;
@@ -72,26 +72,29 @@ void setup() {
 
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
 
-  /*wifiOps
+  wifiOps
   .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN")
-  .AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");*/
+  .AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");
 
   wifiOps.TryToConnectOrOpenConfigPortal();
 
   api.setApiKey(api_token);
 
-  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT);
+  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
   FastLED.clear();  
 
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 1000, -1, false, false, _settings.NoConnectionColor};
   ledsState[0] = {0 /*Crymea*/, 0, 0, true, false, _settings.AlarmedColor};
   ledsState[4] = {4 /*Luh*/, 0, 0, true, false, _settings.AlarmedColor};
 
-  SetBrightness();
+  SetAlarmedLED(alarmedLedIdx);
+  CheckAndUpdateRealLeds(millis());
+  SetBrightness(); 
 }
 
 void loop() 
 {
+  static bool firstRun = true;
   static uint32_t currentTicks = millis();
   currentTicks = millis();
 
@@ -100,17 +103,19 @@ void loop()
     //FastLEDShow(true);
   }
 
-  if(CheckStatuses(currentTicks))
+  if(CheckAndUpdateRealLeds(currentTicks))
   {
-    //FastLEDShow(true);
+    FastLEDShow(true);
   }
-
-  FastLEDShow(false);
+  
+  FastLEDShow(false); 
 
   HandleDebugSerialCommands();    
+
+  firstRun = false;
 }
 
-const bool CheckStatuses(const unsigned long &currentTicks)
+const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
 {
   //INFO("CheckStatuses");
 
@@ -148,8 +153,12 @@ const bool CheckStatuses(const unsigned long &currentTicks)
 
     if(led.BlinkTotalTime == 0)
     {
-      changed = (changed || leds[led.Idx] != led.Color);
+      bool colorChanges = leds[led.Idx] == led.Color;
+      if(!colorChanges)
+        TRACE("Led idx: ", led.Idx, " Color Changed");
+      changed = (changed || !colorChanges);
       leds[led.Idx] = led.Color;   
+      //changed = true;      
     }
   }
   return changed;
@@ -171,7 +180,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
    
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
-      INFO("WIFi - CONNECTED");
+      INFO("WiFi - CONNECTED");
 
       bool statusChanged = api.IsStatusChanged(status, statusMsg);
       if(status == AlarmsApiStatus::API_OK)
@@ -181,7 +190,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
         if(statusChanged || _settings.alarmsCheckWithoutStatus)
         {              
           auto alarmedRegions = api.getAlarmedRegions(status, statusMsg);    
-          INFO("Alarmed regions count: ", alarmedRegions.size());
+          INFO("HTTP response Alarmed regions count: ", alarmedRegions.size());
           if(status == AlarmsApiStatus::API_OK)
           {            
             alarmedLedIdx.clear();
@@ -203,6 +212,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
     changed = (changed || statusChanged);
 
     INFO("");
+    INFO("Alarmed regions count: ", alarmedLedIdx.size());
     INFO("Waiting ", ALARMS_UPDATE_TIMEOUT, "ms. before the next round...");
     PrintNetworkStatToSerial();
   }
@@ -216,7 +226,7 @@ void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
   {   
     auto &led = ledsState[ledIdx];
     led.Idx = ledIdx;
-    if(alarmedLedIdx.size() > 0 && std::find(alarmedLedIdx.begin(), alarmedLedIdx.end(), ledIdx) != alarmedLedIdx.end())
+    if(std::find(alarmedLedIdx.begin(), alarmedLedIdx.end(), ledIdx) != alarmedLedIdx.end())
     {
       if(!led.IsAlarmed)
       {
@@ -230,32 +240,52 @@ void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
     {
       led.IsAlarmed = false;
       led.Color = _settings.NotAlarmedColor;      
-      led.setBrightness(GetNotAlarmedBrightness(LED_ALARMED_SCALE_FACTOR));
       led.StopBlink();
-    }   
+    }       
 
-    if(led.FixedBrightnessIfAlarmed)
-    {
-      led.setBrightness(GetNotAlarmedBrightness(LED_ALARMED_SCALE_FACTOR));
-    } 
+    RecalculateBrightness(led, false);    
   }  
 }
 
-const uint8_t GetNotAlarmedBrightness(const uint8_t& brScale)
+const uint8_t GetScaledBrightness(const uint8_t& brScale, const bool& scaleDown)
 {
-  return _settings.Brightness - (uint8_t)(float(_settings.Brightness / 100.0) * (float)brScale);
+  auto scale = (uint8_t)(float(_settings.Brightness / 100.0) * (float)brScale);
+  //int res = _settings.Brightness + (scaleDown ? -scale : scale);
+  int res = _settings.Brightness + (scaleDown ? -scale : scale);
+  return res < 0 ? 0 : (res > 255 ? 255 : res);
 }
 
-void RecalculateBrFactor()
+void RecalculateBrightness(LedState &led, const bool &showTrace)
+{
+  if(_settings.alarmedScale > 0)
+    {
+      if(_settings.alarmScaleDown)
+      {
+        if(!led.IsAlarmed || led.FixedBrightnessIfAlarmed)
+        {
+          auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
+          if(showTrace)
+            TRACE("Led: ", led.Idx, " Br: ", br);
+        }
+      }
+      else
+      {
+        if(led.IsAlarmed && !led.FixedBrightnessIfAlarmed)
+        {
+          auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
+          if(showTrace)
+            TRACE("Led: ", led.Idx, " Br: ", br);
+        } 
+      }
+    }
+}
+
+void RecalculateBrightness()
 {
   for(auto &ledKvp : ledsState)
   {
     auto &led = ledKvp.second;
-    if(!led.IsAlarmed || led.FixedBrightnessIfAlarmed)
-    {
-      auto br = led.setBrightness(GetNotAlarmedBrightness(LED_ALARMED_SCALE_FACTOR));
-      TRACE("Led: ", led.Idx, " Br: ", br);
-    }
+    RecalculateBrightness(led, true);
   }
 }
 
@@ -285,8 +315,7 @@ const bool SetStatusLED(const int &status, const String &msg)
     TRACE("STATUS OK STOP BLINK");
     auto &led = ledsState[LED_STATUS_IDX];
     led.Color = led.IsAlarmed ? _settings.AlarmedColor : _settings.NotAlarmedColor;
-    if(!led.IsAlarmed || led.FixedBrightnessIfAlarmed)
-      led.setBrightness(GetNotAlarmedBrightness(LED_ALARMED_SCALE_FACTOR));
+    RecalculateBrightness(led, false);
     led.StopBlink();   
   }
 
@@ -332,6 +361,7 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 1) // Reset WiFi
   {
     ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
+    FastLEDShow(true);
     wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
     api.setApiKey(api_token);
   }
@@ -339,6 +369,7 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 2) // Show Network Statistic
   {
     INFO("BR: ", _settings.Brightness);
+    INFO("Alarmed regions count: ", alarmedLedIdx.size());
     INFO("alarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus);
     PrintNetworkStatToSerial();
   }
@@ -352,6 +383,7 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 100)
   {
     wifiOps.AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN");
+    TRACE("WifiOps parameters count: ", wifiOps.ParametersCount());
   //.AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");
   }
 
@@ -399,7 +431,7 @@ void SetBrightness()
 {
   INFO("BR: ", _settings.Brightness);
   FastLED.setBrightness(_settings.Brightness);  
-  RecalculateBrFactor(); 
+  RecalculateBrightness(); 
   FastLEDShow(true); 
 }
 

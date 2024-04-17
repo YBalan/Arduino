@@ -17,72 +17,100 @@
 #endif
 
 
-class WiFiParameter
-{
+class WiFiParameter : public WiFiManagerParameter
+{  
+  //WiFiManagerParameter Parameter;
   public:
-  WiFiManagerParameter Parameter;
-  String JsonPropertyName;  
+  String _id;
+  String _label;
+  String _value;
+  String _json;  
 
-  protected:
+  public:
   WiFiParameter(){}
 
   public:
   //WiFiParameter(WiFiParameter &){}
-  WiFiParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue) 
-  : WiFiParameter(name, label, json, defaultValue, 0) 
-  {}
+  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue) 
+  : WiFiParameter(id, label, json, defaultValue, 0)   
+  {
+    WIFIP_TRACE("WiFiParameter ctor");    
+  }
   
-  WiFiParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &place)
-  : Parameter(name, label, defaultValue, 100)  
-  , JsonPropertyName(json)  
-  {}
+  WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &place)  
+  : _id(id)
+  , _label(label)
+  , _value(defaultValue)
+  , _json(json)
+  {
+    WIFIP_TRACE("WiFiParameter ctor with place");    
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), "", place);
+  }
 
-   WiFiParameter(const WiFiParameter &copy)
-   : Parameter(copy.Parameter)
-   , JsonPropertyName(copy.JsonPropertyName)
-   {
-    WIFIP_TRACE("WiFIParameter copy ctor");
-   }
+  WiFiParameter(const WiFiParameter &other)   
+   : _id(other._id)
+    , _label(other._label)
+    , _value(other._value)
+    , _json(other._json)
+  {    
+    WIFIP_TRACE("WiFiParameter copy ctor");   
+
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), other.getCustomHTML(), other.getLabelPlacement());
+  }
+
+ WiFiParameter(WiFiParameter&& other) noexcept  
+    : _id(std::move(other._id))
+    , _label(std::move(other._label))
+    , _value(std::move(other._value))
+    , _json(std::move(other._json))
+  {
+    WIFIP_TRACE("WiFiParameter move ctor");
+
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), _value.length(), other.getCustomHTML(), other.getLabelPlacement());
+  }
+
+  void Init(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement)
+  {
+    WIFIP_TRACE("\tId: ", id);
+    WIFIP_TRACE("\tLabel: ", label);
+    WIFIP_TRACE("\tValue: ", defaultValue, " Length: ", length);
+    WIFIP_TRACE("\tCustom: ", custom);
+    WIFIP_TRACE("\tLabelPlacement: ", labelPlacement);
+    init(id, label, defaultValue, length, custom, labelPlacement);
+  }
 
   void SetValue(const char *const value)
+  { 
+    _value = value;
+    setValue(_value.c_str(), _value.length());
+  }
+
+  const String &ReadValue() 
+  { 
+    _value = getValue();
+    return _value;
+  }
+
+  const String &GetValue() const
+  {     
+    return _value;
+  }
+
+  const String &GetId() const
   {    
-    Parameter.setValue(value, strlen(value));
+    return _id;
   }
 
-  const String GetValue() const
+  const String &GetJson() const
   {
-    return Parameter.getValue();
-  }
-
-  const String GetName() const
-  {
-    return Parameter.getID();
+    return _json;
   }
 
   WiFiManagerParameter* GetParameter()
   {
-    return &Parameter;
+    //return &Parameter;
+    return this;
   }
-
-  /*WiFiParameter(WiFiParameter&& other) noexcept  
-  : Name(std::move(other.Name))
-  , Label(std::move(other.Label))
-  , JsonPropertyName(std::move(other.JsonPropertyName))
-  , Value(std::move(other.Value))
-  , Place(other.Place)
-  {
-  }*/
-
-  /*WiFiParameter& operator=(WiFiParameter&& other) noexcept
-  {
-    Name = std::move(other.Name);
-    Label = std::move(other.Label);
-    JsonPropertyName = std::move(other.JsonPropertyName);
-    Value = std::move(other.Value);
-    Place = other.Place;
-
-    return *this;
-  }*/
 
   virtual bool IsNull() {return false;}
 };
@@ -94,16 +122,23 @@ class WiFiNullParameter : public WiFiParameter
   virtual bool IsNull() {return true;}
 };
 
+template <int PARAMS_COUNT>
 class WiFiParameters
 {
-  std::vector<WiFiParameter> _parameters;
+  std::vector<WiFiParameter> _parameters;  
 public:
   inline static WiFiNullParameter NullParam;
 public:
-  WiFiParameters &AddParameter(const WiFiParameter &param)
+
+  WiFiParameters() 
+  //: _parameters(PARAMS_COUNT)
+  {}
+
+  void AddParameter(const WiFiParameter &param)
   {
-    _parameters.push_back(param);
-    return *this;
+    WIFIP_TRACE("Start AddParameter...");
+    _parameters.push_back(param);    
+    WIFIP_TRACE("End AddParameter...");    
   }
 
   WiFiParameter &GetParameterById(const String &value)
@@ -111,7 +146,7 @@ public:
     for(int i = 0; i < Count(); i++)
     {
       auto &p = _parameters[i];
-      if(p.GetName() == value)
+      if(p.GetId() == value)
         return p;
     }
     return NullParam;
@@ -121,7 +156,7 @@ public:
   {
     for(auto &p : _parameters)
     {
-      if(p.JsonPropertyName == value)
+      if(p.GetJson() == value)
         return p;
     }
     return NullParam;

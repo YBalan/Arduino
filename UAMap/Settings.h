@@ -17,7 +17,7 @@
 #define LED_NEW_ALARMED_PERIOD 500
 #define LED_NEW_ALARMED_TOTALTIME 5500
 
-#define LED_ALARMED_SCALE_FACTOR 50//50% 
+#define LED_ALARMED_SCALE_FACTOR 0//50% 
 
 namespace UAMap
 {
@@ -28,10 +28,12 @@ namespace UAMap
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
     CRGB NotAlarmedColor = LED_NOT_ALARMED_COLOR;
     CRGB AlarmedColor = LED_ALARMED_COLOR;
-    uint8_t Brightness = 55;
+    uint8_t Brightness = 5;
 
     bool alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
     uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+    uint8_t alarmedScale = LED_ALARMED_SCALE_FACTOR;
+    bool alarmScaleDown = true;
   };
 };
 

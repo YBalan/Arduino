@@ -29,11 +29,11 @@ struct LedState
     TotalTimeTicks = 0;
   }
 
-  const uint8_t setBrightness(uint8_t br)
+  const uint8_t setBrightness(uint8_t brDown)
   {    
     CHSV _targetHSV = rgb2hsv_approximate(Color); // to use the current color of leds[0]      
     
-    _targetHSV.v = br;  // set the brightness 0 -> 255 , the limit is 255
+    _targetHSV.v = brDown;  // set the brightness 0 -> 255 , the limit is 255
 
     Color = _targetHSV;
     return _targetHSV.v;
