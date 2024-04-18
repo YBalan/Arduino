@@ -127,6 +127,7 @@ void setup() {
 #define BOT_COMMAND_BR "/br"
 #define BOT_COMMAND_RESET "/reset"
 #define BOT_COMMAND_RAINBOW "/rainbow"
+#define BOT_COMMAND_STROBE "/strobe"
 #define BOT_COMMAND_SCHEMA "/schema"
 const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
 { 
@@ -135,7 +136,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
   {
     auto br = value.toInt();
-    if(br > 0 && br <= 255)
+    br = br < 2 ? 2 : (br > 255 ? 255 : br);
+    //if(br > 0 && br <= 255)
        _settings.Brightness = br;
 
     SetBrightness();      
@@ -160,8 +162,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
-    value = "Rainbow started";
+    value = "Rainbow started...";
     _effect = Effect::Rainbow;   
+    effectStrtTicks = millis();
+  }else
+  if(GetCommandValue(BOT_COMMAND_STROBE, filtered, value))
+  {    
+    value = "Strobe started...";
+    _effect = Effect::Strobe;   
     effectStrtTicks = millis(); 
   }else
   if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
@@ -233,8 +241,20 @@ void loop()
   {    
     //fill_rainbow(leds, LED_COUNT, 0, 1);
     fill_rainbow_circular(leds, LED_COUNT, 0, 1);
-    //FastLEDShow(false);
-  }  
+    effectStarted = true;
+  }else
+  if(_effect == Effect::Strobe)
+  {    
+    if(!effectStarted)
+    {
+      for(uint8_t i = 0; i < LED_COUNT; i++)
+      {
+        ledsState[i].StartBlink(70, 15000);
+      }
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks);  
+  }
   
   FastLEDShow(false); 
 

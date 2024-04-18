@@ -21,10 +21,12 @@
 
 #define EFFECT_TIMEOUT 15000
 uint32_t effectStrtTicks = 0;
+bool effectStarted = false;
 enum Effect : uint8_t
 {
   Normal,
   Rainbow,
+  Strobe,
 
 } _effect;
 
@@ -43,7 +45,7 @@ namespace UAMap
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
     CRGB NotAlarmedColor = LED_NOT_ALARMED_COLOR;
     CRGB AlarmedColor = LED_ALARMED_COLOR;
-    uint8_t Brightness = 5;
+    uint8_t Brightness = 2;
 
     bool alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
     uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
