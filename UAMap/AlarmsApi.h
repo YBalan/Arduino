@@ -1,3 +1,4 @@
+#include <memory>
 #pragma once
 #ifndef ALARMS_API_H
 #define ALARMS_API_H
@@ -26,6 +27,14 @@
 #endif
 
 #define ALARMS_API_BASE_URI "https://api.ukrainealarm.com/api/v3/"
+#define ALARMS_API_ALERTS "alerts"
+#define ALARMS_API_REGIONS "regions"
+
+struct RegionInfo
+{
+  String Name;
+  uint16_t Id;
+};
 
 enum AlarmsApiStatus
 {   
@@ -34,6 +43,7 @@ enum AlarmsApiStatus
   NO_CONNECTION = 1000,
   READ_TIMEOUT,
   NO_WIFI,  
+  JSON_ERROR,
   UNKNOWN,
 };
 
@@ -74,21 +84,22 @@ class AlarmsApi
 
   private:
     std::unique_ptr<BearSSL::WiFiClientSecure> client;    
-    
+    std::unique_ptr<HTTPClient> https2;
     //create an HTTPClient instance
-    HTTPClient https;
+    //HTTPClient https;
     String lastActionIndex;
     String _apiKey;
 
   public:
-    AlarmsApi() : client(new BearSSL::WiFiClientSecure){}
-    AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), _apiKey(apiKey) {}
+    AlarmsApi() : client(new BearSSL::WiFiClientSecure), https2(new HTTPClient){}
+    AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), https2(new HTTPClient), _apiKey(apiKey) {}
+
     void setApiKey(const char *const apiKey) { _apiKey = apiKey; }
     void setApiKey(const String &apiKey) { _apiKey = apiKey; }
     
     const bool IsStatusChanged(int &status, String &statusMsg)
     {      
-      auto httpRes = sendRequest("alerts/status", _apiKey, status);
+      auto httpRes = sendRequest("alerts/status", _apiKey, status, /*closeHttp:*/false);
       if(status == AlarmsApiStatus::API_OK)
       {
         auto newActionIndex = ParseJsonLasActionIndex(httpRes);
@@ -98,20 +109,22 @@ class AlarmsApi
         lastActionIndex = newActionIndex;
         return isStatusChanged;
       }
+     
       statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
+      https2->end();
       return true;
     }
 
     const std::vector<uint16_t> getAlarmedRegions(int &status, String &statusMsg)
     {
       std::vector<uint16_t> res;
-      auto httpRes = sendRequest("alerts", _apiKey, status);
+      auto httpRes = sendRequest("alerts", _apiKey, status, /*closeHttp:*/false);
       if(status == AlarmsApiStatus::API_OK)
       {
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(httpRes.length());
         auto deserializeError = deserializeJson(doc, httpRes);
         //serializeJson(doc, Serial);
-        if ( ! deserializeError ) 
+        if (!deserializeError) 
         {
           JsonArray arr = doc.as<JsonArray>();
 
@@ -124,11 +137,223 @@ class AlarmsApi
             }
           }
         }
+        else
+        {          
+          ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+        }
       }
       statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
+      https2->end();
       return std::move(res);
+    }    
+
+    public:
+    const String ParseJsonLasActionIndex(const String &httpRes)
+    {      
+        DynamicJsonDocument json(38);
+        auto deserializeError = deserializeJson(json, httpRes);
+        //serializeJson(json, Serial);
+        if (!deserializeError) 
+        {
+          String last(json["lastActionIndex"]);
+          //ALARMS_TRACE("LAST: ", last);
+          return std::move(last);
+          //return atoi(json["lastActionIndex"]);
+        }        
+        ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+        return "";
     }
 
+    const std::map<uint16_t, RegionInfo> getAlarmedRegions2(int &status, String &statusMsg, const String &resource = ALARMS_API_ALERTS)
+    {
+      std::map<uint16_t, RegionInfo> res;
+      status = AlarmsApiStatus::UNKNOWN;
+      //HTTPClient https2;
+      //BearSSL::WiFiClientSecure client2;      
+
+      https2->setTimeout(3000);
+      //client2.setTimeout(3000);
+      //client2.setInsecure();
+      client->setInsecure();
+      https2->useHTTP10(true);
+      //https2.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      
+      ALARMS_TRACE("[HTTPS2] begin: ", resource);   
+      ALARMS_TRACE("[HTTPS2] apiKey: ", _apiKey); 
+      if (https2->begin(*client, ALARMS_API_BASE_URI + resource)) 
+      { // HTTPS        
+        https2->addHeader("Authorization", _apiKey);        
+        https2->addHeader("Accept", "application/json");      
+
+        ALARMS_TRACE("[HTTPS2] REQ GET: ", resource);
+        // start connection and send HTTP header
+        int httpCode = https2->GET();
+        // httpCode will be negative on error
+        if (httpCode > 0) 
+        {
+          // HTTP header has been send and Server response header has been handled
+          ALARMS_TRACE("[HTTPS2] RES GET: ", resource, "... code: ", httpCode);
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
+          {
+            const String &p = https2->getString();
+            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
+            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
+            ALARMS_TRACE("[HTTPS2] content-length: ", https2->getSize());
+            status = AlarmsApiStatus::API_OK;
+            DynamicJsonDocument doc(2048);
+            auto deserializeError = deserializeJson(doc, p);
+            //serializeJson(doc, Serial);
+            if (!deserializeError) 
+            {
+              JsonArray arr = resource == ALARMS_API_ALERTS ? doc.as<JsonArray>() : doc["states"].as<JsonArray>();              
+              
+              for (const JsonVariant &value : arr) 
+              {                
+                if(String(value["regionType"]) == "State")
+                {
+                  //ALARMS_TRACE(value.as<const char*>());
+
+                  RegionInfo rInfo;
+                  rInfo.Id = atoi(value["regionId"].as<const char*>());                  
+                  rInfo.Name = value["regionName"].as<const char*>();
+
+                  res[rInfo.Id] = rInfo;
+                  ALARMS_TRACE("\tRegion: ID: ", rInfo.Id, " Name: ", rInfo.Name);
+                }
+              }                            
+            }
+            else
+            {          
+              ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+              httpCode = AlarmsApiStatus::JSON_ERROR;
+              statusMsg = String("Json: ") + deserializeError.c_str();
+            }
+          }          
+        }
+
+        status = httpCode;
+        switch(httpCode)
+        {
+          case AlarmsApiStatus::API_OK:
+            ALARMS_TRACE("[HTTPS2] GET: OK");
+            statusMsg = "OK (200)";
+            break;
+          case HTTP_CODE_UNAUTHORIZED:
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+            status = AlarmsApiStatus::WRONG_API_KEY;
+            break;
+          case HTTPC_ERROR_READ_TIMEOUT:
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+            status = AlarmsApiStatus::READ_TIMEOUT;
+            break;       
+          case HTTPC_ERROR_CONNECTION_FAILED:
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+            status = AlarmsApiStatus::NO_CONNECTION;
+            break;
+          case AlarmsApiStatus::JSON_ERROR:
+            status = AlarmsApiStatus::JSON_ERROR;
+            //statusMsg = "Json error";
+            break;
+          default:
+            
+            break;
+        }
+
+        ALARMS_TRACE("[HTTPS2] GET: ", resource, "... status message: ", statusMsg);
+        
+        https2->end();
+           
+        return std::move(res);
+        
+      } else 
+      {
+        status = AlarmsApiStatus::UNKNOWN;
+        ALARMS_TRACE("[HTTPS] Unable to connect");
+        statusMsg = "Unknown";
+        return std::move(res);
+      }      
+    }
+
+    const String sendRequest(const String& resource, const String &apiKey, int &status, const bool &closeHttp)
+    {
+      status = AlarmsApiStatus::UNKNOWN;
+      // Ignore SSL certificate validation
+      client->setInsecure();
+      
+      //HTTPClient https;
+      https2->setTimeout(3000);      
+      //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+
+      ALARMS_TRACE("[HTTPS] begin: ", resource);   
+      ALARMS_TRACE("[HTTPS] apiKey: ", apiKey); 
+      if (https2->begin(*client, ALARMS_API_BASE_URI + resource)) 
+      {  // HTTPS
+        String payload;
+        https2->addHeader("Authorization", apiKey);        
+        https2->addHeader("Accept", "application/json");      
+
+        ALARMS_TRACE("[HTTPS] REQ GET: ", resource);
+        // start connection and send HTTP header
+        int httpCode = https2->GET();
+        // httpCode will be negative on error
+        if (httpCode > 0) 
+        {
+          // HTTP header has been send and Server response header has been handled
+          ALARMS_TRACE("[HTTPS] RES GET: ", resource, "... code: ", httpCode);
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
+          {
+            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
+            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
+            status = AlarmsApiStatus::API_OK;
+            payload = https2->getString();  
+
+            ALARMS_TRACE("[HTTPS] content-length: ", https2->getSize());          
+            //ALARMS_TRACE("[HTTPS] content: ", payload);
+           
+            //return "Ok";
+          }          
+        }
+
+        status = httpCode;
+        switch(httpCode)
+        {
+          case HTTP_CODE_UNAUTHORIZED:
+            status = AlarmsApiStatus::WRONG_API_KEY;
+            break;
+          case HTTPC_ERROR_READ_TIMEOUT:
+            status = AlarmsApiStatus::READ_TIMEOUT;
+            break;       
+          case HTTPC_ERROR_CONNECTION_FAILED:
+            status = AlarmsApiStatus::NO_CONNECTION;
+            break;
+        }
+
+        if(closeHttp)
+          https2->end();
+
+        String httpResultMsg = "OK (200)";
+        if(status == AlarmsApiStatus::API_OK)
+        {
+          ALARMS_TRACE("[HTTPS] GET: OK");
+          return std::move(payload);
+        }
+        else
+        {
+          httpResultMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+          ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", httpResultMsg);
+          return std::move(httpResultMsg);
+        }
+      } else 
+      {
+        status = AlarmsApiStatus::UNKNOWN;
+        ALARMS_TRACE("[HTTPS] Unable to connect");
+        return std::move("[HTTPS] Unable to connect");
+      }      
+    }   
+
+    public:
     const int8_t getLedIndexByRegionId(const uint16_t &regionId) const
     {
       int8_t res = -1;
@@ -145,85 +370,7 @@ class AlarmsApi
       }
       ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", res);
       return res;
-    }
-
-    private:
-    static const String ParseJsonLasActionIndex(const String &buf)
-    {      
-        DynamicJsonDocument json(1024);
-        auto deserializeError = deserializeJson(json, buf);
-        //serializeJson(json, Serial);
-        if ( ! deserializeError ) {
-          String last(json["lastActionIndex"]);
-          //ALARMS_TRACE("LAST: ", last);
-          return std::move(last);
-          //return atoi(json["lastActionIndex"]);
-        }
-        return "";
-    }
-
-    const String sendRequest(const String& resource, const String &apiKey, int &status)
-    {
-      status = AlarmsApiStatus::UNKNOWN;
-      // Ignore SSL certificate validation
-      client->setInsecure();
-      
-      https.setTimeout(2000);
-
-      ALARMS_TRACE("[HTTPS] begin: ", resource);   
-      ALARMS_TRACE("[HTTPS] apiKey: ", apiKey); 
-      if (https.begin(*client, ALARMS_API_BASE_URI + resource)) 
-      {  // HTTPS
-        
-        https.addHeader("Authorization", apiKey);
-        //https.addHeader("Authorization", "81ac3496:23fb7b9afd1eca3fd65cfb38ecb36954");
-        https.addHeader("Accept", "application/json");      
-
-        //https.setAuthorization("81ac3496:23fb7b9afd1eca3fd65cfb38ecb36954");
-        ALARMS_TRACE("[HTTPS] REQ GET: ", resource);
-        // start connection and send HTTP header
-        int httpCode = https.GET();
-        // httpCode will be negative on error
-        if (httpCode > 0) 
-        {
-          // HTTP header has been send and Server response header has been handled
-          ALARMS_TRACE("[HTTPS] RES GET: ", resource, "... code: ", httpCode);
-          // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
-          {
-            status = AlarmsApiStatus::API_OK;
-            String payload = https.getString();            
-            ALARMS_TRACE(payload);
-            https.end();
-            return std::move(payload);
-          }          
-        }
-        
-        status = httpCode;
-        switch(httpCode)
-        {
-          case HTTP_CODE_UNAUTHORIZED:
-            status = AlarmsApiStatus::WRONG_API_KEY;
-            break;
-          case HTTPC_ERROR_READ_TIMEOUT:
-            status = AlarmsApiStatus::READ_TIMEOUT;
-            break;       
-          case HTTPC_ERROR_CONNECTION_FAILED:
-            status = AlarmsApiStatus::NO_CONNECTION;
-            break;
-        }
-        auto error = String(https.errorToString(httpCode)) + "(" + httpCode + ")";
-        ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", error);
-        https.end();
-
-        return std::move(error);                
-      } else 
-      {
-        status = AlarmsApiStatus::UNKNOWN;
-        ALARMS_TRACE("[HTTPS] Unable to connect");
-        return std::move("[HTTPS] Unable to connect");
-      }      
-    }    
+    } 
 };
 
 #endif //ALARMS_API_H

@@ -2,7 +2,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define ALARMS_UPDATE_TIMEOUT 15000
+#define ALARMS_UPDATE_TIMEOUT 25000
 #define ALARMS_CHECK_WITHOUT_STATUS false
 
 #define LED_STATUS_IDX 15 //Kyivska
@@ -18,6 +18,21 @@
 #define LED_NEW_ALARMED_TOTALTIME 5500
 
 #define LED_ALARMED_SCALE_FACTOR 0//50% 
+
+#define EFFECT_TIMEOUT 15000
+uint32_t effectStrtTicks = 0;
+enum Effect : uint8_t
+{
+  Normal,
+  Rainbow,
+
+} _effect;
+
+enum ColorSchema : uint8_t
+{
+  Dark,
+  Light,
+};
 
 namespace UAMap
 {

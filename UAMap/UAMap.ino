@@ -1,10 +1,12 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-#include <EEPROM.h>
+//#include <EEPROM.h>
 
 #ifdef ESP32
   #include <SPIFFS.h>
 #endif
+
+#include <map>
 
 #define FASTLED_ESP8266_RAW_PIN_ORDER
 //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
@@ -12,21 +14,27 @@
 #include <FastLED.h>
 
 #define VER 1.1
-#define RELEASE
+//#define RELEASE
+#define DEBUG
 
+#ifdef DEBUG
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
-#define ENABLE_TRACE_MAIN
+
 #define ENABLE_INFO_MAIN
+//#define ENABLE_TRACE_MAIN
 
 #define ENABLE_INFO_BOT
-#define ENABLE_TRACE_BOT
+//#define ENABLE_TRACE_BOT
 
 //#define ENABLE_INFO_ALARMS
 //#define ENABLE_TRACE_ALARMS
 
-#define ENABLE_INFO_WIFI
-#define ENABLE_TRACE_WIFI
+//#define ENABLE_INFO_WIFI
+//#define ENABLE_TRACE_WIFI
+#endif
+
+#define USE_BOT
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -48,7 +56,6 @@
 #endif
 
 #ifdef NETWORK_STATISTIC
-#include <map>
 struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
@@ -59,48 +66,40 @@ std::map<int, NetworkStatInfo> networkStat;
 #define BRIGHTNESS_STEP 10
 
 UAMap::Settings _settings;
-WiFiOps::WiFiOps<3> wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
-AlarmsApi api;
+
+std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 CRGBArray<LED_COUNT> leds;
-std::vector<uint8_t> alarmedLedIdx;
+
+std::map<uint16_t, RegionInfo> alarmedLedIdx;
 std::map<uint8_t, LedState> ledsState;
-
-void SaveSettings()
-{
-  INFO("Save Settings...");
-  //EEPROM.put(0, _settings);
-  EEPROM.put(sizeof(_settings), _botSettings.toStore);
-}
-
-void LoadSettings()
-{
-  INFO("Load Settings...");
-  //EEPROM.get(0, _settings);    
-  EEPROM.get(sizeof(_settings), _botSettings.toStore);  
-}
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  while (!Serial);
+  while (!Serial); 
+
+  WiFiOps::WiFiOps<3> wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
 
   Serial.println();
   Serial.println("!!!! Start UA Map !!!!");
   Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
+  Serial.print(" HEAP: "); Serial.println(ESP.getFreeHeap());
+  Serial.print("STACK: "); Serial.println(ESP.getFreeContStack());
 
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
 
   wifiOps
-  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 42)
+  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 42)  
   .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
   .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
-  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30);
+  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
+  ;
 
   wifiOps.TryToConnectOrOpenConfigPortal();
 
-  api.setApiKey(wifiOps.GetParameterValueById("apiToken"));
+  api->setApiKey(wifiOps.GetParameterValueById("apiToken"));
 
-  LoadSettings();
+  //LoadSettings();
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
   FastLED.clear();  
@@ -113,13 +112,98 @@ void setup() {
   CheckAndUpdateRealLeds(millis());
   SetBrightness(); 
 
+  #ifdef USE_BOT
   //bot.setChatID(CHAT_ID);
-  bot.setToken(wifiOps.GetParameterValueById("telegramToken"));
+  LoadChannelIDs();
+  bot->setToken(wifiOps.GetParameterValueById("telegramToken"));
   _botSettings.botName = wifiOps.GetParameterValueById("telegramName");
   _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
-  bot.attach(newMsg);
-  bot.setTextMode(FB_MARKDOWN); 
+  bot->attach(HangleBotMessages);
+  bot->setTextMode(FB_MARKDOWN); 
+  #endif
 }
+
+#ifdef USE_BOT
+#define BOT_COMMAND_BR "/br"
+#define BOT_COMMAND_RESET "/reset"
+#define BOT_COMMAND_RAINBOW "/rainbow"
+#define BOT_COMMAND_SCHEMA "/schema"
+const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
+{ 
+  std::vector<String> messages;
+  String value;
+  if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
+  {
+    auto br = value.toInt();
+    if(br > 0 && br <= 255)
+       _settings.Brightness = br;
+
+    SetBrightness();      
+    value = String("Brightness changed to: ") + String(br);
+  }else
+  if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
+  {
+    ESP.resetHeap();
+    ESP.resetFreeContStack();
+
+    INFO(" HEAP: ", ESP.getFreeHeap());
+    INFO("STACK: ", ESP.getFreeContStack());
+
+    _settings.alarmsCheckWithoutStatus = true;
+
+    int status;
+    String statusMsg;
+    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);    
+    INFO("HTTP response regions count: ", regions.size(), " status: ", status, " msg: ", statusMsg);
+
+    value = String("Reseted: Heap: ") + String(ESP.getFreeHeap()) + " Stack: " + String(ESP.getFreeContStack());
+  }else
+  if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
+  {    
+    value = "Rainbow started";
+    _effect = Effect::Rainbow;   
+    effectStrtTicks = millis(); 
+  }else
+  if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
+  {    
+    uint8_t schema = value.toInt();
+    switch(schema)
+    {
+      case ColorSchema::Light:
+        _settings.AlarmedColor = CRGB::LightGreen;
+        _settings.NotAlarmedColor = CRGB::Green;
+        value = "Light";
+      break;
+      case ColorSchema::Dark: 
+      default:
+        _settings.AlarmedColor = LED_ALARMED_COLOR;
+        _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
+        value = "Dark";
+      break;
+    }
+
+    SetAlarmedLED(alarmedLedIdx);
+
+    value = String("Color Chema changed to: ") + value;
+  }
+
+
+  String answer = String("Alarmed regions count: ") + String(alarmedLedIdx.size());
+
+  if(value != "")
+    messages.push_back(value); 
+  messages.push_back(answer);   
+  
+  for(const auto &regionKvp : alarmedLedIdx)
+  {
+    const auto &region = regionKvp.second;
+    String regionMsg = region.Name + ": [" + String(region.Id) + "]";
+    messages.push_back(regionMsg);
+  } 
+
+  return std::move(messages);
+}
+#endif
 
 void loop() 
 {
@@ -127,21 +211,39 @@ void loop()
   static uint32_t currentTicks = millis();
   currentTicks = millis();
 
-  if(CheckAndUpdateAlarms(currentTicks))
+  if(effectStrtTicks > 0 && currentTicks - effectStrtTicks >= EFFECT_TIMEOUT)
   {
-    //FastLEDShow(true);
+    effectStrtTicks = 0;
+    _effect = Effect::Normal;
   }
 
-  if(CheckAndUpdateRealLeds(currentTicks))
+  if(_effect == Effect::Normal)
   {
-    FastLEDShow(true);
-  }
+    if(CheckAndUpdateAlarms(currentTicks))
+    {
+      //FastLEDShow(true);
+    }
+
+    if(CheckAndUpdateRealLeds(currentTicks))
+    {
+      //FastLEDShow(false);
+    }
+  }else
+  if(_effect == Effect::Rainbow)
+  {    
+    //fill_rainbow(leds, LED_COUNT, 0, 1);
+    fill_rainbow_circular(leds, LED_COUNT, 0, 1);
+    //FastLEDShow(false);
+  }  
   
   FastLEDShow(false); 
 
   HandleDebugSerialCommands();    
 
-  bot.tick();
+  #ifdef USE_BOT
+  bot->tick();
+  #endif
+
   firstRun = false;
 }
 
@@ -187,7 +289,7 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
       if(!colorChanges)
         TRACE("Led idx: ", led.Idx, " Color Changed");
       changed = (changed || !colorChanges);
-      leds[led.Idx] = led.Color;   
+      leds[led.Idx] = led.IsAlarmed ? _settings.AlarmedColor : _settings.NotAlarmedColor;   
       //changed = true;      
     }
   }
@@ -196,8 +298,8 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
 
 //uint32_t alarmsTicks = 0;
 const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
-{
-  //INFO("CheckAndUpdateAlarms");
+{  
+  //INFO("CheckAndUpdateAlarms");  
   static uint32_t alarmsTicks = 0;
   bool changed = false;
   if(alarmsTicks == 0 || currentTicks - alarmsTicks >= _settings.alarmsUpdateTimeout)
@@ -210,30 +312,43 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
    
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
-      INFO("WiFi - CONNECTED");
+      //INFO("WiFi - CONNECTED");
+      ESP.resetHeap();
+      ESP.resetFreeContStack();
+      INFO(" HEAP: ", ESP.getFreeHeap());
+      INFO("STACK: ", ESP.getFreeContStack());
 
-      bool statusChanged = api.IsStatusChanged(status, statusMsg);
+      bool statusChanged = api->IsStatusChanged(status, statusMsg);
       if(status == AlarmsApiStatus::API_OK)
       {        
         INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
+        INFO("AlarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus ? "true" : "false");
 
         if(statusChanged || _settings.alarmsCheckWithoutStatus)
         {              
-          auto alarmedRegions = api.getAlarmedRegions(status, statusMsg);    
+          auto alarmedRegions = api->getAlarmedRegions2(status, statusMsg);    
           INFO("HTTP response Alarmed regions count: ", alarmedRegions.size());
           if(status == AlarmsApiStatus::API_OK)
-          {            
+          { 
+            _settings.alarmsCheckWithoutStatus = false;           
             alarmedLedIdx.clear();
-            for(auto rId : alarmedRegions)
+            for(const auto &rId : alarmedRegions)
             {
-              auto ledIdx = api.getLedIndexByRegionId(rId);
-              INFO("regionId:", rId, "\tled index: ", ledIdx);
-              alarmedLedIdx.push_back(ledIdx);
+              auto ledIdx = api->getLedIndexByRegionId(rId.first);
+              INFO("regionId:", rId.first, "\tled index: ", ledIdx);
+              alarmedLedIdx[ledIdx] = std::move(rId.second);
             }
 
             SetAlarmedLED(alarmedLedIdx);        
             changed = true;
-          }          
+          } 
+
+          if(status == AlarmsApiStatus::JSON_ERROR)
+          {
+            _settings.alarmsCheckWithoutStatus = true;
+            ESP.resetHeap();
+            ESP.resetFreeContStack();
+          }         
         }       
       }                       
     }   
@@ -249,14 +364,14 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
   return changed;
 }
 
-void SetAlarmedLED(const std::vector<uint8_t> &alarmedLedIdx)
+void SetAlarmedLED(const std::map<uint16_t, RegionInfo> &alarmedLedIdx)
 {
   TRACE("SetAlarmedLED: ", alarmedLedIdx.size());
   for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
   {   
     auto &led = ledsState[ledIdx];
     led.Idx = ledIdx;
-    if(std::find(alarmedLedIdx.begin(), alarmedLedIdx.end(), ledIdx) != alarmedLedIdx.end())
+    if(alarmedLedIdx.count(ledIdx) > 0)
     {
       if(!led.IsAlarmed)
       {
@@ -327,12 +442,17 @@ const bool SetStatusLED(const int &status, const String &msg)
   prevStatus = status;
 
   FillNetworkStat(status, status != AlarmsApiStatus::API_OK ? msg : "OK (200)");
-  
+  auto &led = ledsState[LED_STATUS_IDX];
   if(status != AlarmsApiStatus::API_OK)
   {
     INFO("Status: ", status == AlarmsApiStatus::WRONG_API_KEY ? "Unauthorized" : (status == AlarmsApiStatus::NO_WIFI ? "No WiFi" : "No Connection"), " | ", msg);
     switch(status)
     {
+      case AlarmsApiStatus::JSON_ERROR:
+        TRACE("STATUS JSON ERROR START BLINK");
+        ledsState[LED_STATUS_IDX].Color = led.Color;
+        ledsState[LED_STATUS_IDX].StartBlink(200, LED_STATUS_NO_CONNECTION_TOTALTIME);
+      break;
       default:
         TRACE("STATUS NOT OK START BLINK");
         ledsState[LED_STATUS_IDX].Color = _settings.NoConnectionColor;
@@ -342,8 +462,7 @@ const bool SetStatusLED(const int &status, const String &msg)
   }
   else
   {
-    TRACE("STATUS OK STOP BLINK");
-    auto &led = ledsState[LED_STATUS_IDX];
+    TRACE("STATUS OK STOP BLINK");    
     led.Color = led.IsAlarmed ? _settings.AlarmedColor : _settings.NotAlarmedColor;
     RecalculateBrightness(led, false);
     led.StopBlink();   
@@ -378,12 +497,13 @@ void PrintNetworkStatToSerial()
   #endif
 }
 
+
+#ifdef NETWORK_STATISTIC  
 void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
-{
-  #ifdef NETWORK_STATISTIC
-  Serial.print("[\""); Serial.print(info.description); Serial.print("\": "); Serial.print(info.count); Serial.print("]; ");
-  #endif
+{  
+  Serial.print("[\""); Serial.print(info.description); Serial.print("\": "); Serial.print(info.count); Serial.print("]; ");   
 }
+#endif
 
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
@@ -392,15 +512,17 @@ void HandleDebugSerialCommands()
   {
     ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
     FastLEDShow(true);
-    wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
-    api.setApiKey(wifiOps.GetParameterValueById("apiToken"));
+    //wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
+    //api->setApiKey(wifiOps.GetParameterValueById("apiToken"));
   }
 
   if(debugButtonFromSerial == 2) // Show Network Statistic
   {
+    INFO(" HEAP: ", ESP.getFreeHeap());
+    INFO("STACK: ", ESP.getFreeContStack());
     INFO("BR: ", _settings.Brightness);
     INFO("Alarmed regions count: ", alarmedLedIdx.size());
-    INFO("alarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus);
+    INFO("alarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus);    
     PrintNetworkStatToSerial();
   }
 
@@ -408,14 +530,7 @@ void HandleDebugSerialCommands()
   {
     ledsState[LED_STATUS_IDX].Color = CRGB::Yellow;
     ledsState[LED_STATUS_IDX].StartBlink(200, 20000);
-  }
-
-  if(debugButtonFromSerial == 100)
-  {
-    wifiOps.AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 42);
-    TRACE("WifiOps parameters count: ", wifiOps.ParametersCount());
-  //.AddParameter("telegramToken", "Telegram Token", "telegram_token", "TELEGRAM_TOKEN");
-  }
+  }  
 
   if(debugButtonFromSerial == 101)
   {    
@@ -470,4 +585,87 @@ void FastLEDShow(const bool &showTrace)
   if(showTrace)
     INFO("FastLEDShow()");
   FastLED.show();  
+}
+
+void SaveChannelIDs()
+{
+  TRACE("SaveChannelIDs");
+  File configFile = SPIFFS.open("/channelIDs.json", "w");
+  if (configFile) 
+  {
+    TRACE("Write channelIDs file");
+
+    String store;
+    for(const auto &v : _botSettings.toStore.registeredChannelIDs)
+      store += v.first + ',';
+
+    configFile.write(store.c_str());
+    configFile.close();
+        //end save
+  }
+  else
+  {
+    TRACE("failed to open channelIDs file for writing");    
+  }
+}
+
+std::vector<String> split(const String &s, char delimiter) {
+    std::vector<String> tokens;
+    int startIndex = 0; // Index where the current token starts
+
+    // Loop through each character in the string
+    for (int i = 0; i < s.length(); i++) {
+        // If the current character is the delimiter or it's the last character in the string
+        if (s.charAt(i) == delimiter || i == s.length() - 1) {
+            // Extract the substring from startIndex to the current position
+            String token = s.substring(startIndex, i);
+            token.trim();
+            tokens.push_back(token);
+            startIndex = i + 1; // Update startIndex for the next token
+        }
+    }
+    return tokens;
+}
+
+void LoadChannelIDs()
+{
+  TRACE("LoadChannelIDs");
+  File configFile = SPIFFS.open("/channelIDs.json", "r");
+  if (configFile) 
+  {
+    TRACE("Read channelIDs file");    
+
+    auto read = configFile.readString();
+
+    TRACE("ChannelIDs in file: ", read);
+
+    for(const auto &r : split(read, ','))
+    {
+      TRACE("\tChannelID: ", r);
+      if(r != "")
+      {
+        _botSettings.toStore.registeredChannelIDs[r] = 1;
+      }      
+    }
+
+    configFile.close();
+  }
+  else
+  {
+    TRACE("failed to open channelIDs file for reading");    
+  }
+}
+
+void SaveSettings()
+{
+  INFO("Save Settings...");
+  //EEPROM.put(0, _settings);
+  //EEPROM.put(sizeof(_settings), _botSettings.toStore);
+}
+
+void LoadSettings()
+{
+  INFO("Load Settings...");
+  //EEPROM.get(0, _settings);    
+  //EEPROM.get(sizeof(_settings), _botSettings.toStore);  
 }
