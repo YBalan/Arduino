@@ -165,12 +165,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
     value = "Rainbow started...";
     _effect = Effect::Rainbow;   
     effectStrtTicks = millis();
+    effectStarted = false;
   }else
   if(GetCommandValue(BOT_COMMAND_STROBE, filtered, value))
   {    
     value = "Strobe started...";
     _effect = Effect::Strobe;   
-    effectStrtTicks = millis(); 
+    effectStrtTicks = millis();
+    effectStarted = false;
   }else
   if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
   {    
