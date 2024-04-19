@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include "StreamUtils.h"
 
@@ -48,10 +49,73 @@ enum AlarmsApiStatus
   UNKNOWN,
 };
 
+enum class UARegion : uint8_t
+{
+  Khmelnitska = 3,
+  Vinnytska = 4,
+  Rivnenska = 5,
+  Volynska = 8,
+  Dnipropetrovska = 9,
+  Zhytomyrska = 10,
+  Zakarpatska = 11,
+  Zaporizka = 12,
+  Ivano_Frankivska = 13,
+  Kyivska = 14,
+  Kirovohradska = 15,
+  Luhanska = 16,
+  Mykolaivska = 17,
+  Odeska = 18,
+  Poltavska = 18,
+  Sumska = 19,
+  Ternopilska =20,
+  Kharkivska = 22,
+  Khersonska = 23,
+  Cherkaska = 24,
+  Chernihivska = 25,
+  Chernivetska = 26,
+  Lvivska = 27,
+  Donetska = 28,
+  Krym = 127
+};
+
+
+#define MAX_LEDS_FOR_REGION 2
+typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
+typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
+AlarmsLedIndexesMap alarmsLedIndexesMap =
+{
+  { UARegion::Krym,                 {0} },
+  { UARegion::Khersonska,           {1} },
+  { UARegion::Zaporizka,            {2} },
+  { UARegion::Donetska,             {3} },
+  { UARegion::Luhanska,             {4} },
+  { UARegion::Kharkivska,           {5} },
+  { UARegion::Dnipropetrovska,      {6} },
+  { UARegion::Mykolaivska,          {7} },
+  { UARegion::Odeska,               {8, 9} },
+  { UARegion::Vinnytska,            {10} },
+  { UARegion::Kirovohradska,        {11} },
+  { UARegion::Poltavska,            {12} },
+  { UARegion::Sumska,               {13} },
+  { UARegion::Chernihivska,         {14} },
+  { UARegion::Cherkaska,            {15} },
+  { UARegion::Kyivska,              {16} },
+  { UARegion::Zhytomyrska,          {17} },
+  { UARegion::Khmelnitska,          {18} },
+  { UARegion::Chernivetska,         {19} },
+  { UARegion::Ternopilska,          {20} },
+  { UARegion::Rivnenska,            {21} },
+  { UARegion::Volynska,             {22} },
+  { UARegion::Lvivska,              {23} },
+  { UARegion::Ivano_Frankivska,     {24} },
+  { UARegion::Zakarpatska,          {25} },
+};
+
 class AlarmsApi
 {  
   private:
-    static const constexpr uint8_t ledsMapCount = 25;
+    static const constexpr uint8_t ledsMapCount = 25;  
+
     static const constexpr uint8_t alarmsLedsMap[] = 
     {
       127,  //Idx: 0 - "Crimea" //9999
@@ -60,7 +124,7 @@ class AlarmsApi
       28,   //Idx: 3 - "Don"
       16,   //Idx: 4 - "Luh"
       22,   //Idx: 5 - "Khar"
-       9,   //Idx: 6 - "Dnopro"
+       9,   //Idx: 6 - "Dnipro"
       17,   //Idx: 7 - "Mykol"
       18,   //Idx: 8 - "Odesa"
        4,   //Idx: 9 - "Vinn"
@@ -419,6 +483,33 @@ class AlarmsApi
       ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", res);
       return res;
     } 
+
+    static const std::vector<uint8_t> getLedIndexesByRegionId(const uint16_t &regionId)
+    {       
+      auto region = (UARegion)(regionId == 9999 ? 127 : regionId);
+
+      return getLedIndexesByRegion(region);
+    }   
+
+    static const std::vector<uint8_t> getLedIndexesByRegion(const UARegion &region) 
+    {
+      std::vector<uint8_t> res;
+      ALARMS_INFO("LED Map Count: ", alarmsLedIndexesMap.size());
+
+      if(alarmsLedIndexesMap.count(region) > 0)
+      {
+        const auto &ledRange = alarmsLedIndexesMap[region];        
+        for(uint8_t i = 0; i < ledRange.size(); i++)
+        {
+          if(i == 0 || ledRange[i] > 0)
+          {
+            res.push_back(ledRange[i]);
+            ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", ledRange[i]);      
+          }
+        }        
+      }
+      return std::move(res);
+    }
 };
 
 #endif //ALARMS_API_H

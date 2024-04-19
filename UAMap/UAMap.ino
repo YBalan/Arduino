@@ -75,6 +75,15 @@ std::map<uint8_t, LedState> ledsState;
 int32_t menuID = 0;
 byte depth = 0;
 
+void SetLedState(const UARegion &region, LedState &state)
+{
+  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  {
+    state.Idx = idx;
+    ledsState[idx] = state;
+  }
+}
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -411,6 +420,13 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
               auto ledIdx = api->getLedIndexByRegionId(rId.first);
               INFO("regionId:", rId.first, "\tled index: ", ledIdx);
               alarmedLedIdx[ledIdx] = std::move(rId.second);
+
+              // auto ledRange = AlarmsApi::getLedIndexesByRegionId(rId.first);
+              // for(const auto &ledIdx : ledRange)
+              // {
+              //   INFO("regionId:", rId.first, "\tled index: ", ledIdx);
+              //   alarmedLedIdx[ledIdx] = std::move(rId.second);
+              // }
             }
 
             SetAlarmedLED(alarmedLedIdx);        
