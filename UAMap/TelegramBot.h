@@ -20,6 +20,7 @@
 
 #define USER_CHAT_ID_LENGTH 9
 #define REGISTER_RETRY_COUNT 5
+#define BOT_MENU_NAME "UAMapMenu"
 #include <FastBot.h>
 
 #ifdef USE_BOT
@@ -41,7 +42,7 @@ struct BotSettings
   } toStore;
 } _botSettings;
 
-extern const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered);
+extern const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered);
 extern void SaveChannelIDs();
 
 const bool GetCommandValue(const String &command, const String &filteredMsg, String &value)
@@ -69,6 +70,7 @@ void HangleBotMessages(FB_msg& msg)
   BOT_TRACE("LastName: ", msg.last_name);  
   BOT_TRACE("ReplayText: ", msg.replyText);  
   BOT_TRACE("Query: ", msg.query); 
+  BOT_TRACE("Data: ", msg.data); 
 
   if(msg.text == "Close") bot->closeMenu();
 
@@ -76,8 +78,9 @@ void HangleBotMessages(FB_msg& msg)
 
   auto botNameIdx = -1;
   if(!msg.chatID.startsWith("-") //In private chat
-    || (botNameIdx = msg.text.indexOf(_botSettings.botName)) >= 0 //In Groups only if bot tagged
+    || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || msg.replyText.indexOf(REGISTRATION_MSG) >= 0 //In registration
+    || (msg.text == BOT_MENU_NAME && msg.data.length() > 0) //From BOT menu
     )
   {
     botNameIdx = botNameIdx == -1 ? 0 : (botNameIdx + _botSettings.botName.length());
@@ -105,7 +108,8 @@ void HangleBotMessages(FB_msg& msg)
       }else
       {
         //MENU
-        auto result = HandleBotMenu(msg, msg.text.substring(botNameIdx, msg.text.length()));
+        auto filtered = msg.text.substring(botNameIdx, msg.text.length());
+        auto result = HandleBotMenu(msg, filtered);
         if(result.size() > 0)
         {
           if(result.size() == 1)

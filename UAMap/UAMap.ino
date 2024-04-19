@@ -25,7 +25,7 @@
 //#define ENABLE_TRACE_MAIN
 
 #define ENABLE_INFO_BOT
-//#define ENABLE_TRACE_BOT
+#define ENABLE_TRACE_BOT
 
 //#define ENABLE_INFO_ALARMS
 //#define ENABLE_TRACE_ALARMS
@@ -72,6 +72,9 @@ CRGBArray<LED_COUNT> leds;
 
 std::map<uint16_t, RegionInfo> alarmedLedIdx;
 std::map<uint8_t, LedState> ledsState;
+
+int32_t menuID = 0;
+byte depth = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -120,6 +123,10 @@ void setup() {
   _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_MARKDOWN); 
+  // String menu1 = F("Alarms \n Max Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow");
+  // String call1 = F("/alarms, /br 255, /br 2, /schema 0, /schema 1, /strobe, /rainbow");
+  // bot->inlineMenuCallback("Menu", menu1, call1);
+  // menuID = bot->lastBotMsg();
   #endif
 }
 
@@ -129,22 +136,42 @@ void setup() {
 #define BOT_COMMAND_RAINBOW "/rainbow"
 #define BOT_COMMAND_STROBE "/strobe"
 #define BOT_COMMAND_SCHEMA "/schema"
-const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
-{ 
+#define BOT_COMMAND_TEST "/test"
+#define BOT_COMMAND_ALARMS "/alarms"
+#define BOT_COMMAND_MENU "/menu"
+const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
+{   
   std::vector<String> messages;
   String value;
+  bool answerCurrentAlarms = false;
+
+  bool hasData = msg.data.length() > 0 && filtered == BOT_MENU_NAME;
+  BOT_TRACE("Filtered: ", filtered);
+  filtered = hasData ? msg.data : filtered;
+  BOT_TRACE("Filtered: ", filtered);
+
+  if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
+  {    
+    String menu1 = F("Alarms \n Max Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow");
+    String call1 = F("/alarms, /br 255, /br 2, /schema 0, /schema 1, /strobe, /rainbow"); 
+    bot->inlineMenuCallback(BOT_MENU_NAME, menu1, call1, msg.chatID);
+    menuID = bot->lastBotMsg();
+  } else
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
   {
+    bot->sendTyping(msg.chatID);
     auto br = value.toInt();
-    br = br < 2 ? 2 : (br > 255 ? 255 : br);
+    br = br <= 0 ? 1 : (br > 255 ? 255 : br);
     //if(br > 0 && br <= 255)
        _settings.Brightness = br;
 
     SetBrightness();      
     value = String("Brightness changed to: ") + String(br);
+    answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
   {
+    bot->sendTyping(msg.chatID);
     ESP.resetHeap();
     ESP.resetFreeContStack();
 
@@ -154,23 +181,44 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
     _settings.alarmsCheckWithoutStatus = true;    
 
     value = String("Reseted: Heap: ") + String(ESP.getFreeHeap()) + " Stack: " + String(ESP.getFreeContStack());
+    answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
+    bot->sendTyping(msg.chatID);
     value = "Rainbow started...";
     _effect = Effect::Rainbow;   
     effectStrtTicks = millis();
     effectStarted = false;
+    answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_STROBE, filtered, value))
-  {    
+  {   
+    bot->sendTyping(msg.chatID);
     value = "Strobe started...";
     _effect = Effect::Strobe;   
     effectStrtTicks = millis();
     effectStarted = false;
+    answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_TEST, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    int status;
+    String statusMsg;
+    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);
+    Serial.println();
+    value = String("All regions count: ") + String(regions.size());// + " status: " + String(status) + " msg: " + statusMsg;
+    answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_ALARMS, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    answerCurrentAlarms = true;
   }else
   if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
   {    
+    bot->sendTyping(msg.chatID);
     uint8_t schema = value.toInt();
     switch(schema)
     {
@@ -190,21 +238,30 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
     SetAlarmedLED(alarmedLedIdx);
 
     value = String("Color Chema changed to: ") + value;
+    answerCurrentAlarms = false;
   }
 
-
-  String answer = String("Alarmed regions count: ") + String(alarmedLedIdx.size());
-
   if(value != "")
-    messages.push_back(value); 
-  messages.push_back(answer);   
-  
-  for(const auto &regionKvp : alarmedLedIdx)
+      messages.push_back(value);
+
+  if(answerCurrentAlarms)
   {
-    const auto &region = regionKvp.second;
-    String regionMsg = region.Name + ": [" + String(region.Id) + "]";
-    messages.push_back(regionMsg);
-  } 
+    String answer = String("Alarmed regions count: ") + String(alarmedLedIdx.size());
+     
+    messages.push_back(answer);   
+    
+    for(const auto &regionKvp : alarmedLedIdx)
+    {
+      const auto &region = regionKvp.second;
+      String regionMsg = region.Name + ": [" + String(region.Id) + "]";
+      messages.push_back(regionMsg);
+    } 
+  }
+
+  if(messages.size() == 0)
+  {
+    bot->answer("Use menu", FB_NOTIF); 
+  }
 
   return std::move(messages);
 }
@@ -330,8 +387,8 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
       //INFO("WiFi - CONNECTED");
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
+      //ESP.resetHeap();
+      //ESP.resetFreeContStack();
       INFO(" HEAP: ", ESP.getFreeHeap());
       INFO("STACK: ", ESP.getFreeContStack());
 
@@ -562,7 +619,8 @@ void HandleDebugSerialCommands()
 
     int status;
     String statusMsg;
-    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);    
+    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);
+    Serial.println();
     INFO("HTTP response regions count: ", regions.size(), " status: ", status, " msg: ", statusMsg);
 
     INFO(" HEAP: ", ESP.getFreeHeap());

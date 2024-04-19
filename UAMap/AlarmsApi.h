@@ -205,12 +205,13 @@ class AlarmsApi
             DynamicJsonDocument doc(2048);
             
             ALARMS_TRACE("[HTTPS2] Full Json content: "); //https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/
-            ReadLoggingStream loggingStream(https2->getStream(), Serial); Serial.println();        
+            ReadLoggingStream loggingStream(https2->getStream(), Serial);        
             
             DeserializationError deserializeError;
 
             if(resource == ALARMS_API_ALERTS ? loggingStream.find("[") : loggingStream.find("\"states\":["))
             {
+              Serial.println();
               StaticJsonDocument<32> filter;
               filter["regionType"] = true;
               filter["regionId"] = true;
