@@ -151,12 +151,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, const String &filtered)
     INFO(" HEAP: ", ESP.getFreeHeap());
     INFO("STACK: ", ESP.getFreeContStack());
 
-    _settings.alarmsCheckWithoutStatus = true;
-
-    int status;
-    String statusMsg;
-    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);    
-    INFO("HTTP response regions count: ", regions.size(), " status: ", status, " msg: ", statusMsg);
+    _settings.alarmsCheckWithoutStatus = true;    
 
     value = String("Reseted: Heap: ") + String(ESP.getFreeHeap()) + " Stack: " + String(ESP.getFreeContStack());
   }else
@@ -346,7 +341,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
         INFO("IsStatusChanged: ", statusChanged ? "true" : "false");
         INFO("AlarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus ? "true" : "false");
 
-        if(statusChanged || _settings.alarmsCheckWithoutStatus)
+        if(statusChanged || _settings.alarmsCheckWithoutStatus || ALARMS_CHECK_WITHOUT_STATUS)
         {              
           auto alarmedRegions = api->getAlarmedRegions2(status, statusMsg);    
           INFO("HTTP response Alarmed regions count: ", alarmedRegions.size());
@@ -548,16 +543,30 @@ void HandleDebugSerialCommands()
     PrintNetworkStatToSerial();
   }
 
-  if(debugButtonFromSerial == 15) // Blink Test
+  if(debugButtonFromSerial > 2 && debugButtonFromSerial < LED_COUNT) // Blink Test
   {
-    ledsState[LED_STATUS_IDX].Color = CRGB::Yellow;
-    ledsState[LED_STATUS_IDX].StartBlink(200, 20000);
+    ledsState[debugButtonFromSerial].Color = CRGB::Yellow;
+    ledsState[debugButtonFromSerial].StartBlink(50, 20000);
   }  
 
   if(debugButtonFromSerial == 101)
   {    
     _settings.alarmsCheckWithoutStatus = !_settings.alarmsCheckWithoutStatus;
     INFO("alarmsCheckWithoutStatus: ", _settings.alarmsCheckWithoutStatus);
+  }
+
+  if(debugButtonFromSerial == 102)
+  {
+    INFO(" HEAP: ", ESP.getFreeHeap());
+    INFO("STACK: ", ESP.getFreeContStack());
+
+    int status;
+    String statusMsg;
+    auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);    
+    INFO("HTTP response regions count: ", regions.size(), " status: ", status, " msg: ", statusMsg);
+
+    INFO(" HEAP: ", ESP.getFreeHeap());
+    INFO("STACK: ", ESP.getFreeContStack());
   }
 
   debugButtonFromSerial = 0;

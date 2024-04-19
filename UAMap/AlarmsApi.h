@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <vector>
 #include <algorithm>
+#include "StreamUtils.h"
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
@@ -172,11 +173,11 @@ class AlarmsApi
       //BearSSL::WiFiClientSecure client2;      
 
       https2->setTimeout(3000);
-      //client2.setTimeout(3000);
+      client->setTimeout(3000);
       //client2.setInsecure();
       client->setInsecure();
       https2->useHTTP10(true);
-      //https2.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
       ALARMS_TRACE("[HTTPS2] begin: ", resource);   
       ALARMS_TRACE("[HTTPS2] apiKey: ", _apiKey); 
@@ -196,17 +197,63 @@ class AlarmsApi
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
           {
-            const String &p = https2->getString();
+           // const String &p = https2->getString();
             ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
             ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
             ALARMS_TRACE("[HTTPS2] content-length: ", https2->getSize());
             status = AlarmsApiStatus::API_OK;
             DynamicJsonDocument doc(2048);
-            auto deserializeError = deserializeJson(doc, p);
+            
+            ALARMS_TRACE("[HTTPS2] Full Json content: "); //https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/
+            ReadLoggingStream loggingStream(https2->getStream(), Serial); Serial.println();        
+            
+            DeserializationError deserializeError;
+
+            if(resource == ALARMS_API_ALERTS ? loggingStream.find("[") : loggingStream.find("\"states\":["))
+            {
+              StaticJsonDocument<32> filter;
+              filter["regionType"] = true;
+              filter["regionId"] = true;
+              filter["regionName"] = true;
+              filter["regionEngName"] = true;
+
+              ALARMS_TRACE("[HTTPS2] Start Parse Json content");             
+              do
+              {
+                deserializeError = deserializeJson(doc, loggingStream, DeserializationOption::Filter(filter));
+                if(!deserializeError)
+                {
+                  if(String(doc["regionType"]) == "State")
+                  {
+                    ALARMS_TRACE(doc.as<const char*>());    
+
+                    const char *engNamePtr = doc["regionEngName"].as<const char*>();                
+
+                    RegionInfo rInfo;
+                    rInfo.Id = atoi(doc["regionId"].as<const char*>());                  
+                    rInfo.Name = engNamePtr != 0 && strlen(engNamePtr) > 0 ? engNamePtr : doc["regionName"].as<const char*>();
+
+                    res[rInfo.Id] = rInfo;
+                    ALARMS_TRACE("\tRegion: ID: ", rInfo.Id, " Name: ", rInfo.Name);
+                  }
+                }
+                else
+                {
+                  ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+                }
+              }while(loggingStream.findUntil(",","]"));
+            }
+            ALARMS_TRACE("[HTTPS2] End Parse Json content: ", deserializeError.c_str());
+
+            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
+            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
+            /*auto deserializeError = deserializeJson(doc, *client);
             //serializeJson(doc, Serial);
             if (!deserializeError) 
             {
-              JsonArray arr = resource == ALARMS_API_ALERTS ? doc.as<JsonArray>() : doc["states"].as<JsonArray>();              
+              JsonArray arr = resource == ALARMS_API_ALERTS ? doc.as<JsonArray>() : doc["states"].as<JsonArray>();  
+
+              ALARMS_TRACE("\tJson response size: ", arr.size());            
               
               for (const JsonVariant &value : arr) 
               {                
@@ -228,7 +275,7 @@ class AlarmsApi
               ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
               httpCode = AlarmsApiStatus::JSON_ERROR;
               statusMsg = String("Json: ") + deserializeError.c_str();
-            }
+            }*/
           }          
         }
 
