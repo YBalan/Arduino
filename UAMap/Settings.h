@@ -51,6 +51,25 @@ namespace UAMap
     uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
     uint8_t alarmedScale = LED_ALARMED_SCALE_FACTOR;
     bool alarmScaleDown = true;
+
+    int16_t resetFlag = 200;
+    int reserved = 0;
+
+    void reset()
+    {
+      PortalModeColor = LED_PORTAL_MODE_COLOR;
+      NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
+      NotAlarmedColor = LED_NOT_ALARMED_COLOR;
+      AlarmedColor = LED_ALARMED_COLOR;
+      Brightness = 2;
+
+      alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
+      alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+      alarmedScale = LED_ALARMED_SCALE_FACTOR;
+      alarmScaleDown = true;
+      resetFlag = 200;
+      reserved = 0;
+    }
   };
 };
 

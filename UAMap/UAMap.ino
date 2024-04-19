@@ -1,6 +1,5 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-//#include <EEPROM.h>
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -13,7 +12,7 @@
 //#define FASTLED_ESP8266_D1_PIN_ORDER
 #include <FastLED.h>
 
-#define VER 1.1
+#define VER 1.2
 //#define RELEASE
 #define DEBUG
 
@@ -24,8 +23,8 @@
 #define ENABLE_INFO_MAIN
 //#define ENABLE_TRACE_MAIN
 
-#define ENABLE_INFO_BOT
-#define ENABLE_TRACE_BOT
+//#define ENABLE_INFO_BOT
+//#define ENABLE_TRACE_BOT
 
 //#define ENABLE_INFO_ALARMS
 //#define ENABLE_TRACE_ALARMS
@@ -79,7 +78,7 @@ byte depth = 0;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  while (!Serial); 
+  while (!Serial);   
 
   WiFiOps::WiFiOps<3> wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
 
@@ -87,7 +86,7 @@ void setup() {
   Serial.println("!!!! Start UA Map !!!!");
   Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
   Serial.print(" HEAP: "); Serial.println(ESP.getFreeHeap());
-  Serial.print("STACK: "); Serial.println(ESP.getFreeContStack());
+  Serial.print("STACK: "); Serial.println(ESP.getFreeContStack());  
 
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
 
@@ -96,13 +95,13 @@ void setup() {
   .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
   .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
   .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
-  ;
+  ;  
 
-  wifiOps.TryToConnectOrOpenConfigPortal();
+  LoadSettings();
 
-  api->setApiKey(wifiOps.GetParameterValueById("apiToken"));
-
-  //LoadSettings();
+  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985);
+  _settings.resetFlag = 200;
+  api->setApiKey(wifiOps.GetParameterValueById("apiToken"));  
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
   FastLED.clear();  
@@ -236,6 +235,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     }
 
     SetAlarmedLED(alarmedLedIdx);
+    SetBrightness();
 
     value = String("Color Chema changed to: ") + value;
     answerCurrentAlarms = false;
@@ -586,8 +586,9 @@ void HandleDebugSerialCommands()
   {
     ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, _settings.PortalModeColor};
     FastLEDShow(true);
-    //wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/true);   
-    //api->setApiKey(wifiOps.GetParameterValueById("apiToken"));
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
   }
 
   if(debugButtonFromSerial == 2) // Show Network Statistic
@@ -667,6 +668,7 @@ void SetBrightness()
   FastLED.setBrightness(_settings.Brightness);  
   RecalculateBrightness(); 
   FastLEDShow(true); 
+  SaveSettings();
 }
 
 void FastLEDShow(const bool &showTrace)
@@ -678,7 +680,7 @@ void FastLEDShow(const bool &showTrace)
 
 void SaveChannelIDs()
 {
-  TRACE("SaveChannelIDs");
+  INFO("SaveChannelIDs");
   File configFile = SPIFFS.open("/channelIDs.json", "w");
   if (configFile) 
   {
@@ -718,7 +720,7 @@ std::vector<String> split(const String &s, char delimiter) {
 
 void LoadChannelIDs()
 {
-  TRACE("LoadChannelIDs");
+  INFO("LoadChannelIDs");
   File configFile = SPIFFS.open("/channelIDs.json", "r");
   if (configFile) 
   {
@@ -730,7 +732,7 @@ void LoadChannelIDs()
 
     for(const auto &r : split(read, ','))
     {
-      TRACE("\tChannelID: ", r);
+      INFO("\tChannelID: ", r);
       if(r != "")
       {
         _botSettings.toStore.registeredChannelIDs[r] = 1;
@@ -748,13 +750,45 @@ void LoadChannelIDs()
 void SaveSettings()
 {
   INFO("Save Settings...");
-  //EEPROM.put(0, _settings);
-  //EEPROM.put(sizeof(_settings), _botSettings.toStore);
+  File configFile = SPIFFS.open("/config.bin", "w");
+  if (configFile) 
+  {
+    INFO("Write config.bin file");
+    configFile.write((byte *)&_settings, sizeof(_settings));
+    configFile.close();
+    return;
+  }
+  INFO("failed to open config.bin file for writing");
 }
 
 void LoadSettings()
 {
   INFO("Load Settings...");
-  //EEPROM.get(0, _settings);    
-  //EEPROM.get(sizeof(_settings), _botSettings.toStore);  
+  if (SPIFFS.begin()) {
+        TRACE("mounted file system");
+        if (SPIFFS.exists("/config.bin")) {
+        File configFile = SPIFFS.open("/config.bin", "r");
+        if (configFile) 
+        {
+          INFO("Read config.bin file");    
+          configFile.read((byte *)&_settings, sizeof(_settings));
+          configFile.close();
+        }
+        else
+          INFO("failed to open config.bin file for reading");
+    }
+    else
+          INFO("File config.bin does not exist");
+  }
+
+  INFO("BR: ", _settings.Brightness);  
+  INFO("resetFlag: ", _settings.resetFlag);
+  INFO("reserved: ", _settings.reserved);
+  if(_settings.reserved != 0)
+  {
+    INFO("Reset Settings...");
+    _settings.reset();
+  }
+  INFO("BR: ", _settings.Brightness);  
+  INFO("resetFlag: ", _settings.resetFlag);
 }
