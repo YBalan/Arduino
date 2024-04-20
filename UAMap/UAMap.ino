@@ -23,6 +23,9 @@
 #define ENABLE_INFO_MAIN
 //#define ENABLE_TRACE_MAIN
 
+#define ENABLE_INFO_SETTINGS
+//#define ENABLE_TRACE_SETTINGS
+
 //#define ENABLE_INFO_BOT
 //#define ENABLE_TRACE_BOT
 
@@ -64,8 +67,6 @@ std::map<int, NetworkStatInfo> networkStat;
 #define LED_COUNT 25
 #define BRIGHTNESS_STEP 10
 
-UAMap::Settings _settings;
-
 std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 CRGBArray<LED_COUNT> leds;
 
@@ -80,6 +81,7 @@ void SetLedState(const UARegion &region, LedState &state)
   for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
   {
     state.Idx = idx;
+    state.IsAlarmed = ledsState[idx].IsAlarmed;
     ledsState[idx] = state;
   }
 }
@@ -126,8 +128,8 @@ void setup() {
   #ifdef USE_BOT
   //bot.setChatID(CHAT_ID);
   LoadChannelIDs();
-  bot->setToken(wifiOps.GetParameterValueById("telegramToken"));
-  _botSettings.botName = wifiOps.GetParameterValueById("telegramName");
+  bot->setToken(wifiOps.GetParameterValueById("telegramToken"));  
+  _botSettings.SetBotName(wifiOps.GetParameterValueById("telegramName"));  
   _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_MARKDOWN); 
@@ -135,6 +137,7 @@ void setup() {
   // String call1 = F("/alarms, /br 255, /br 2, /schema 0, /schema 1, /strobe, /rainbow");
   // bot->inlineMenuCallback("Menu", menu1, call1);
   // menuID = bot->lastBotMsg();
+  bot->skipUpdates();
   #endif
 }
 
@@ -153,7 +156,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   String value;
   bool answerCurrentAlarms = false;
 
-  bool hasData = msg.data.length() > 0 && filtered == BOT_MENU_NAME;
+  bool hasData = msg.data.length() > 0 && filtered == _botSettings.botNameForMenu;
   BOT_TRACE("Filtered: ", filtered);
   filtered = hasData ? msg.data : filtered;
   BOT_TRACE("Filtered: ", filtered);
@@ -162,7 +165,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   {    
     String menu1 = F("Alarms \n Max Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow");
     String call1 = F("/alarms, /br 255, /br 2, /schema 0, /schema 1, /strobe, /rainbow"); 
-    bot->inlineMenuCallback(BOT_MENU_NAME, menu1, call1, msg.chatID);
+    bot->inlineMenuCallback(_botSettings.botNameForMenu, menu1, call1, msg.chatID);
     menuID = bot->lastBotMsg();
   } else
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
@@ -212,6 +215,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_TEST, filtered, value))
   {
     bot->sendTyping(msg.chatID);
+    bot->sendMessage("Working...", msg.chatID);
     int status;
     String statusMsg;
     auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_REGIONS);
@@ -231,8 +235,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     switch(schema)
     {
       case ColorSchema::Light:
-        _settings.AlarmedColor = CRGB::LightGreen;
-        _settings.NotAlarmedColor = CRGB::Green;
+        _settings.AlarmedColor = CRGB::Red;
+        _settings.NotAlarmedColor = CRGB::Yellow;
         value = "Light";
       break;
       case ColorSchema::Dark: 
@@ -250,7 +254,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     answerCurrentAlarms = false;
   }
 
-  if(value != "")
+  if(value != "" && !hasData)
       messages.push_back(value);
 
   if(answerCurrentAlarms)
@@ -282,42 +286,19 @@ void loop()
   static uint32_t currentTicks = millis();
   currentTicks = millis();
 
-  if(effectStrtTicks > 0 && currentTicks - effectStrtTicks >= EFFECT_TIMEOUT)
-  {
-    effectStrtTicks = 0;
-    _effect = Effect::Normal;
-  }
-
+  HandleEffects(currentTicks);
+ 
   if(_effect == Effect::Normal)
   {
-    if(CheckAndUpdateAlarms(currentTicks))
-    {
-      //FastLEDShow(true);
-    }
-
     if(CheckAndUpdateRealLeds(currentTicks))
     {
       //FastLEDShow(false);
     }
-  }else
-  if(_effect == Effect::Rainbow)
-  {    
-    //fill_rainbow(leds, LED_COUNT, 0, 1);
-    fill_rainbow_circular(leds, LED_COUNT, 0, 1);
-    effectStarted = true;
-  }else
-  if(_effect == Effect::Strobe)
-  {    
-    if(!effectStarted)
+    if(CheckAndUpdateAlarms(currentTicks))
     {
-      for(uint8_t i = 0; i < LED_COUNT; i++)
-      {
-        ledsState[i].StartBlink(70, 15000);
-      }
-      effectStarted = true;
-    }  
-    CheckAndUpdateRealLeds(currentTicks);  
-  }
+      //FastLEDShow(true);
+    }    
+  }  
   
   FastLEDShow(false); 
 
@@ -417,16 +398,16 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
             alarmedLedIdx.clear();
             for(const auto &rId : alarmedRegions)
             {
-              auto ledIdx = api->getLedIndexByRegionId(rId.first);
-              INFO("regionId:", rId.first, "\tled index: ", ledIdx);
-              alarmedLedIdx[ledIdx] = std::move(rId.second);
+              // auto ledIdx = api->getLedIndexByRegionId(rId.first);
+              // INFO("regionId:", rId.first, "\tled index: ", ledIdx);
+              // alarmedLedIdx[ledIdx] = std::move(rId.second);
 
-              // auto ledRange = AlarmsApi::getLedIndexesByRegionId(rId.first);
-              // for(const auto &ledIdx : ledRange)
-              // {
-              //   INFO("regionId:", rId.first, "\tled index: ", ledIdx);
-              //   alarmedLedIdx[ledIdx] = std::move(rId.second);
-              // }
+              auto ledRange = AlarmsApi::getLedIndexesByRegionId(rId.first);
+              for(const auto &ledIdx : ledRange)
+              {
+                INFO("regionId:", rId.first, "\tled index: ", ledIdx);
+                alarmedLedIdx[ledIdx] = std::move(rId.second);
+              }
             }
 
             SetAlarmedLED(alarmedLedIdx);        
@@ -539,20 +520,24 @@ const bool SetStatusLED(const int &status, const String &msg)
     switch(status)
     {
       case AlarmsApiStatus::JSON_ERROR:
-        TRACE("STATUS JSON ERROR START BLINK");
+        INFO("STATUS JSON ERROR START BLINK");
         ledsState[LED_STATUS_IDX].Color = led.Color;
         ledsState[LED_STATUS_IDX].StartBlink(200, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
       default:
-        TRACE("STATUS NOT OK START BLINK");
+        INFO("STATUS NOT OK START BLINK");
         ledsState[LED_STATUS_IDX].Color = _settings.NoConnectionColor;
         ledsState[LED_STATUS_IDX].StartBlink(LED_STATUS_NO_CONNECTION_PERIOD, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
     }
+    #ifdef USE_BOT
+    //SendMessageToAllRegisteredChannels(BOT_CONNECTION_ISSUES_MSG);
+    #endif
+    //FastLEDShow(1000);
   }
   else
   {
-    TRACE("STATUS OK STOP BLINK");    
+    INFO("STATUS OK STOP BLINK");    
     led.Color = led.IsAlarmed ? _settings.AlarmedColor : _settings.NotAlarmedColor;
     RecalculateBrightness(led, false);
     led.StopBlink();   
@@ -577,9 +562,9 @@ void PrintNetworkStatToSerial()
   Serial.print("Network Statistic: ");
   if(networkStat.count(AlarmsApiStatus::API_OK) > 0)
     PrintNetworkStatInfoToSerial(networkStat[AlarmsApiStatus::API_OK]);
-  for(auto de : networkStat)
+  for(const auto &de : networkStat)
   {
-    auto &info = std::get<1>(de);
+    auto &info = de.second;
     if(info.code != AlarmsApiStatus::API_OK)
       PrintNetworkStatInfoToSerial(info);
   }
@@ -587,6 +572,33 @@ void PrintNetworkStatToSerial()
   #endif
 }
 
+void HandleEffects(const unsigned long &currentTicks)
+{
+   if(effectStrtTicks > 0 && currentTicks - effectStrtTicks >= EFFECT_TIMEOUT)
+  {
+    effectStrtTicks = 0;
+    _effect = Effect::Normal;
+  }
+
+  if(_effect == Effect::Rainbow)
+  {    
+    //fill_rainbow(leds, LED_COUNT, 0, 1);
+    fill_rainbow_circular(leds, LED_COUNT, 0, 1);
+    effectStarted = true;
+  }else
+  if(_effect == Effect::Strobe)
+  {    
+    if(!effectStarted)
+    {
+      for(uint8_t i = 0; i < LED_COUNT; i++)
+      {
+        ledsState[i].StartBlink(70, 15000);
+      }
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks);  
+  }
+}
 
 #ifdef NETWORK_STATISTIC  
 void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
@@ -617,10 +629,16 @@ void HandleDebugSerialCommands()
     PrintNetworkStatToSerial();
   }
 
-  if(debugButtonFromSerial > 2 && debugButtonFromSerial < LED_COUNT) // Blink Test
+  if(debugButtonFromSerial > 2 && debugButtonFromSerial <= 127) // Blink Test
   {
-    ledsState[debugButtonFromSerial].Color = CRGB::Yellow;
-    ledsState[debugButtonFromSerial].StartBlink(50, 20000);
+    // ledsState[debugButtonFromSerial].Color = CRGB::Yellow;
+    // ledsState[debugButtonFromSerial].StartBlink(50, 20000);
+    LedState state;
+    state.Color = CRGB::Yellow;    
+    state.BlinkPeriod = 50;
+    state.BlinkTotalTime = 20000;
+    state.IsAlarmed = false;
+    SetLedState((UARegion)debugButtonFromSerial, state);
   }  
 
   if(debugButtonFromSerial == 101)
@@ -694,117 +712,11 @@ void FastLEDShow(const bool &showTrace)
   FastLED.show();  
 }
 
-void SaveChannelIDs()
+void FastLEDShow(const int &retryCount)
 {
-  INFO("SaveChannelIDs");
-  File configFile = SPIFFS.open("/channelIDs.json", "w");
-  if (configFile) 
+  for(int i = 0; i < retryCount; i++)
   {
-    TRACE("Write channelIDs file");
-
-    String store;
-    for(const auto &v : _botSettings.toStore.registeredChannelIDs)
-      store += v.first + ',';
-
-    configFile.write(store.c_str());
-    configFile.close();
-        //end save
+    FastLED.show();   
+    delay(2);
   }
-  else
-  {
-    TRACE("failed to open channelIDs file for writing");    
-  }
-}
-
-std::vector<String> split(const String &s, char delimiter) {
-    std::vector<String> tokens;
-    int startIndex = 0; // Index where the current token starts
-
-    // Loop through each character in the string
-    for (int i = 0; i < s.length(); i++) {
-        // If the current character is the delimiter or it's the last character in the string
-        if (s.charAt(i) == delimiter || i == s.length() - 1) {
-            // Extract the substring from startIndex to the current position
-            String token = s.substring(startIndex, i);
-            token.trim();
-            tokens.push_back(token);
-            startIndex = i + 1; // Update startIndex for the next token
-        }
-    }
-    return tokens;
-}
-
-void LoadChannelIDs()
-{
-  INFO("LoadChannelIDs");
-  File configFile = SPIFFS.open("/channelIDs.json", "r");
-  if (configFile) 
-  {
-    TRACE("Read channelIDs file");    
-
-    auto read = configFile.readString();
-
-    TRACE("ChannelIDs in file: ", read);
-
-    for(const auto &r : split(read, ','))
-    {
-      INFO("\tChannelID: ", r);
-      if(r != "")
-      {
-        _botSettings.toStore.registeredChannelIDs[r] = 1;
-      }      
-    }
-
-    configFile.close();
-  }
-  else
-  {
-    TRACE("failed to open channelIDs file for reading");    
-  }
-}
-
-void SaveSettings()
-{
-  INFO("Save Settings...");
-  File configFile = SPIFFS.open("/config.bin", "w");
-  if (configFile) 
-  {
-    INFO("Write config.bin file");
-    configFile.write((byte *)&_settings, sizeof(_settings));
-    configFile.close();
-    return;
-  }
-  INFO("failed to open config.bin file for writing");
-}
-
-void LoadSettings()
-{
-  INFO("Load Settings...");
-  if (SPIFFS.begin()) {
-        TRACE("mounted file system");
-        if (SPIFFS.exists("/config.bin")) {
-        File configFile = SPIFFS.open("/config.bin", "r");
-        if (configFile) 
-        {
-          INFO("Read config.bin file");    
-          configFile.read((byte *)&_settings, sizeof(_settings));
-          configFile.close();
-        }
-        else
-          INFO("failed to open config.bin file for reading");
-    }
-    else
-          INFO("File config.bin does not exist");
-  }
-
-  INFO("BR: ", _settings.Brightness);  
-  INFO("resetFlag: ", _settings.resetFlag);
-  INFO("reserved: ", _settings.reserved);
-  if(_settings.reserved != 0)
-  {
-    INFO("Reset Settings...");
-    _settings.reset();
-  }
-  INFO("BR: ", _settings.Brightness);  
-  INFO("resetFlag: ", _settings.resetFlag);
 }

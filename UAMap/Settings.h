@@ -2,6 +2,20 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include "DEBUGHelper.h"
+
+#ifdef ENABLE_INFO_SETTINGS
+#define SETTINGS_INFO(...) SS_TRACE(__VA_ARGS__)
+#else
+#define SETTINGS_INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_SETTINGS
+#define SETTINGS_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define SETTINGS_TRACE(...) {}
+#endif
+
 #define ALARMS_UPDATE_TIMEOUT 25000
 #define ALARMS_CHECK_WITHOUT_STATUS false
 
@@ -72,6 +86,54 @@ namespace UAMap
     }
   };
 };
+
+UAMap::Settings _settings;
+
+void SaveSettings()
+{
+  SETTINGS_INFO("Save Settings...");
+  File configFile = SPIFFS.open("/config.bin", "w");
+  if (configFile) 
+  {
+    SETTINGS_INFO("Write config.bin file");
+    configFile.write((byte *)&_settings, sizeof(_settings));
+    configFile.close();
+    return;
+  }
+  SETTINGS_INFO("failed to open config.bin file for writing");
+}
+
+void LoadSettings()
+{
+  SETTINGS_INFO("Load Settings...");
+  if (SPIFFS.begin()) {
+        SETTINGS_TRACE("mounted file system");
+        if (SPIFFS.exists("/config.bin")) {
+        File configFile = SPIFFS.open("/config.bin", "r");
+        if (configFile) 
+        {
+          SETTINGS_INFO("Read config.bin file");    
+          configFile.read((byte *)&_settings, sizeof(_settings));
+          configFile.close();
+        }
+        else
+          SETTINGS_INFO("failed to open config.bin file for reading");
+    }
+    else
+          SETTINGS_INFO("File config.bin does not exist");
+  }
+
+  SETTINGS_INFO("BR: ", _settings.Brightness);  
+  SETTINGS_INFO("resetFlag: ", _settings.resetFlag);
+  SETTINGS_INFO("reserved: ", _settings.reserved);
+  if(_settings.reserved != 0)
+  {
+    SETTINGS_INFO("Reset Settings...");
+    _settings.reset();
+  }
+  SETTINGS_INFO("BR: ", _settings.Brightness);  
+  SETTINGS_INFO("resetFlag: ", _settings.resetFlag);
+}
 
 
 #endif //SETTINGS_H

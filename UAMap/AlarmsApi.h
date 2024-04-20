@@ -75,6 +75,7 @@ enum class UARegion : uint8_t
   Chernivetska = 26,
   Lvivska = 27,
   Donetska = 28,
+  Kyiv = 31,
   Krym = 127
 };
 
@@ -100,6 +101,7 @@ AlarmsLedIndexesMap alarmsLedIndexesMap =
   { UARegion::Chernihivska,         {14} },
   { UARegion::Cherkaska,            {15} },
   { UARegion::Kyivska,              {16} },
+  { UARegion::Kyiv,                 {16} },
   { UARegion::Zhytomyrska,          {17} },
   { UARegion::Khmelnitska,          {18} },
   { UARegion::Chernivetska,         {19} },
@@ -236,8 +238,8 @@ class AlarmsApi
       //HTTPClient https2;
       //BearSSL::WiFiClientSecure client2;      
 
-      https2->setTimeout(3000);
-      client->setTimeout(3000);
+      //https2->setTimeout(3000);
+      //client->setTimeout(3000);
       //client2.setInsecure();
       client->setInsecure();
       https2->useHTTP10(true);
@@ -394,7 +396,7 @@ class AlarmsApi
       client->setInsecure();
       
       //HTTPClient https;
-      https2->setTimeout(3000);      
+      //https2->setTimeout(3000);      
       //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
       ALARMS_TRACE("[HTTPS] begin: ", resource);   

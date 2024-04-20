@@ -20,7 +20,8 @@
 
 #define USER_CHAT_ID_LENGTH 9
 #define REGISTER_RETRY_COUNT 5
-#define BOT_MENU_NAME "UAMapMenu"
+#define BOT_MENU_NAME "Menu"
+#define BOT_CONNECTION_ISSUES_MSG F(" faced with connection issues")
 #include <FastBot.h>
 
 #ifdef USE_BOT
@@ -33,9 +34,21 @@ std::unique_ptr<FastBot> bot;
 //bot.showMenu("Menu1 \t Menu2 \t Menu3 \n Close", CHAT_ID);  
 struct BotSettings
 {
-  String botToken;
+  String botNameForMenu;
   String botName;
   String botSecure;
+
+  void SetBotName(const String &value)
+  {
+    botName = value;
+    botNameForMenu = value;
+    botNameForMenu.replace("@", "");
+    botNameForMenu.replace("_Bot", "");
+    botNameForMenu.replace("_bot", "");
+    botNameForMenu.replace("_", "");
+    botNameForMenu += BOT_MENU_NAME;
+  }
+
   struct ToStore
   {
     std::map<String, uint8_t> registeredChannelIDs;
@@ -80,7 +93,7 @@ void HangleBotMessages(FB_msg& msg)
   if(!msg.chatID.startsWith("-") //In private chat
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || msg.replyText.indexOf(REGISTRATION_MSG) >= 0 //In registration
-    || (msg.text == BOT_MENU_NAME && msg.data.length() > 0) //From BOT menu
+    || (msg.data.length() > 0 && msg.text == _botSettings.botNameForMenu) //From BOT menu
     )
   {
     botNameIdx = botNameIdx == -1 ? 0 : (botNameIdx + _botSettings.botName.length());
@@ -156,6 +169,83 @@ void HangleBotMessages(FB_msg& msg)
         }
       }
     }    
+  }
+}
+
+void SendMessageToAllRegisteredChannels(const String &msg, const bool &useBotName = true)
+{
+  for(const auto &channelID : _botSettings.toStore.registeredChannelIDs)
+  {
+    bot->sendMessage( useBotName ? _botSettings.botNameForMenu + msg : msg, channelID.first);
+  }
+}
+
+void SaveChannelIDs()
+{
+  BOT_INFO("SaveChannelIDs");
+  File configFile = SPIFFS.open("/channelIDs.json", "w");
+  if (configFile) 
+  {
+    BOT_TRACE("Write channelIDs file");
+
+    String store;
+    for(const auto &v : _botSettings.toStore.registeredChannelIDs)
+      store += v.first + ',';
+
+    configFile.write(store.c_str());
+    configFile.close();
+        //end save
+  }
+  else
+  {
+    BOT_TRACE("failed to open channelIDs file for writing");    
+  }
+}
+
+std::vector<String> split(const String &s, char delimiter) {
+    std::vector<String> tokens;
+    int startIndex = 0; // Index where the current token starts
+
+    // Loop through each character in the string
+    for (int i = 0; i < s.length(); i++) {
+        // If the current character is the delimiter or it's the last character in the string
+        if (s.charAt(i) == delimiter || i == s.length() - 1) {
+            // Extract the substring from startIndex to the current position
+            String token = s.substring(startIndex, i);
+            token.trim();
+            tokens.push_back(token);
+            startIndex = i + 1; // Update startIndex for the next token
+        }
+    }
+    return tokens;
+}
+
+void LoadChannelIDs()
+{
+  BOT_INFO("LoadChannelIDs");
+  File configFile = SPIFFS.open("/channelIDs.json", "r");
+  if (configFile) 
+  {
+    BOT_TRACE("Read channelIDs file");    
+
+    auto read = configFile.readString();
+
+    BOT_TRACE("ChannelIDs in file: ", read);
+
+    for(const auto &r : split(read, ','))
+    {
+      BOT_INFO("\tChannelID: ", r);
+      if(r != "")
+      {
+        _botSettings.toStore.registeredChannelIDs[r] = 1;
+      }      
+    }
+
+    configFile.close();
+  }
+  else
+  {
+    BOT_TRACE("failed to open channelIDs file for reading");    
   }
 }
 
