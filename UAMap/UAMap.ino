@@ -64,7 +64,7 @@ std::map<int, NetworkStatInfo> networkStat;
 
 #define PIN_RESET_BTN D5
 #define PIN_LED_STRIP D6
-#define LED_COUNT 25
+#define LED_COUNT 26
 #define BRIGHTNESS_STEP 10
 
 std::unique_ptr<AlarmsApi> api(new AlarmsApi());
@@ -636,7 +636,7 @@ void HandleDebugSerialCommands()
     LedState state;
     state.Color = CRGB::Yellow;    
     state.BlinkPeriod = 50;
-    state.BlinkTotalTime = 20000;
+    state.BlinkTotalTime = 5000;
     state.IsAlarmed = false;
     SetLedState((UARegion)debugButtonFromSerial, state);
   }  
