@@ -12,6 +12,8 @@
 //#define FASTLED_ESP8266_D1_PIN_ORDER
 #include <FastLED.h>
 
+#include <ezButton.h>
+
 #define VER 1.2
 //#define RELEASE
 #define DEBUG
@@ -62,10 +64,18 @@ struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 
+#define RELAY_OFF HIGH
+#define RELAY_ON  LOW
+
+#define PIN_RELAY1    D1
+#define PIN_RELAY2    D2
 #define PIN_RESET_BTN D5
 #define PIN_LED_STRIP D6
 #define LED_COUNT 26
 #define BRIGHTNESS_STEP 10
+
+//DebounceTime
+#define DebounceTime 50
 
 std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 CRGBArray<LED_COUNT> leds;
@@ -75,6 +85,8 @@ std::map<uint8_t, LedState> ledsState;
 
 int32_t menuID = 0;
 byte depth = 0;
+
+ezButton resetBtn(PIN_RESET_BTN);
 
 void SetLedState(const UARegion &region, LedState &state)
 {
@@ -90,6 +102,16 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   while (!Serial);   
+
+  pinMode(PIN_RELAY1, INPUT_PULLUP);
+  pinMode(PIN_RELAY1, OUTPUT);
+  pinMode(PIN_RELAY2, INPUT_PULLUP);
+  pinMode(PIN_RELAY2, OUTPUT);
+
+  digitalWrite(PIN_RELAY1, RELAY_OFF);
+  digitalWrite(PIN_RELAY2, RELAY_OFF);
+
+  resetBtn.setDebounceTime(DebounceTime);
 
   WiFiOps::WiFiOps<3> wifiOps("UAMap WiFi Manager", "UAMapAP", "password");
 
@@ -109,8 +131,11 @@ void setup() {
   ;  
 
   LoadSettings();
+  //_settings.reset();
 
-  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985);
+  auto resetButtonState = resetBtn.getState();
+  INFO("ResetBtn: ", resetButtonState);
+  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
   _settings.resetFlag = 200;
   api->setApiKey(wifiOps.GetParameterValueById("apiToken"));  
 
@@ -150,6 +175,8 @@ void setup() {
 #define BOT_COMMAND_TEST "/test"
 #define BOT_COMMAND_ALARMS "/alarms"
 #define BOT_COMMAND_MENU "/menu"
+#define BOT_COMMAND_RELAY1 "/relay1"
+#define BOT_COMMAND_RELAY2 "/relay2"
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 {   
   std::vector<String> messages;
@@ -163,8 +190,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   {    
-    String menu1 = F("Alarms \n Max Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow");
-    String call1 = F("/alarms, /br 255, /br 2, /schema 0, /schema 1, /strobe, /rainbow"); 
+    String menu1 = F("Alarms \n Brightness Max \t Brightness Mid \t Brightness Min \n Dark \t Light \n Strobe \t Rainbow");
+    String call1 = F("/alarms, /br 255, /br 120, /br 2, /schema 0, /schema 1, /strobe, /rainbow"); 
     bot->inlineMenuCallback(_botSettings.botNameForMenu, menu1, call1, msg.chatID);
     menuID = bot->lastBotMsg();
   } else
@@ -189,10 +216,31 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     INFO(" HEAP: ", ESP.getFreeHeap());
     INFO("STACK: ", ESP.getFreeContStack());
 
+    _settings.reset();
     _settings.alarmsCheckWithoutStatus = true;    
 
     value = String("Reseted: Heap: ") + String(ESP.getFreeHeap()) + " Stack: " + String(ESP.getFreeContStack());
     answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
+  {
+    auto regionId = value.toInt();
+    if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+    {
+      _settings.Relay1Region = regionId;
+    }
+    value = "Relay1: " + String(_settings.Relay1Region);
+    SaveSettings();
+  }else
+  if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
+  {
+    auto regionId = value.toInt();
+    if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+    {
+      _settings.Relay2Region = regionId;
+    }
+    value = "Relay2: " + String(_settings.Relay2Region);
+    SaveSettings();
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
@@ -286,18 +334,31 @@ void loop()
   static uint32_t currentTicks = millis();
   currentTicks = millis();
 
+  resetBtn.loop();
+
+  if(resetBtn.isPressed())
+  {
+    INFO(BUTTON_IS_PRESSED_MSG, " BR: ", _settings.Brightness);
+  }
+  if(resetBtn.isReleased())
+  {    
+    _settings.Brightness -= BRIGHTNESS_STEP;
+    INFO(BUTTON_IS_RELEASED_MSG, " BR: ", _settings.Brightness);
+    SetBrightness();    
+  }
+
   HandleEffects(currentTicks);
  
   if(_effect == Effect::Normal)
-  {
-    if(CheckAndUpdateRealLeds(currentTicks))
-    {
-      //FastLEDShow(false);
-    }
+  {    
     if(CheckAndUpdateAlarms(currentTicks))
     {
       //FastLEDShow(true);
     }    
+    if(CheckAndUpdateRealLeds(currentTicks))
+    {
+      //FastLEDShow(false);
+    }
   }  
   
   FastLEDShow(false); 
@@ -410,7 +471,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
               }
             }
 
-            SetAlarmedLED(alarmedLedIdx);        
+            SetAlarmedLED(alarmedLedIdx);            
             changed = true;
           } 
 
@@ -420,7 +481,9 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
             ESP.resetHeap();
             ESP.resetFreeContStack();
           }         
-        }       
+        } 
+
+        SetRelayStatus(alarmedLedIdx);           
       }                       
     }   
     
@@ -463,6 +526,39 @@ void SetAlarmedLED(const std::map<uint16_t, RegionInfo> &alarmedLedIdx)
   }  
 }
 
+void SetRelayStatus(const std::map<uint16_t, RegionInfo> &alarmedLedIdx)
+{
+  INFO("SetRelayStatus: Relay1: ", _settings.Relay1Region, " Relay2: ", _settings.Relay2Region);  
+  for(const auto &idx : alarmedLedIdx)
+  {
+    INFO(idx.first, ": ", idx.second.Id);
+  
+    if(idx.second.Id == _settings.Relay1Region)
+    {
+      digitalWrite(PIN_RELAY1, RELAY_ON);
+      INFO("Relay 1: ", "ON", " Region: ", _settings.Relay1Region);
+    }
+    else
+    {
+      if(digitalRead(PIN_RELAY1) == RELAY_ON)
+        INFO("Relay 1: ", "OFF", " Region: ", _settings.Relay1Region);
+      digitalWrite(PIN_RELAY1, RELAY_OFF);
+    }
+
+    if(idx.second.Id == _settings.Relay2Region)
+    {
+      digitalWrite(PIN_RELAY2, RELAY_ON);
+      INFO("Relay 2: ", "ON", " Region: ", _settings.Relay1Region);
+    }
+    else
+    {
+      if(digitalRead(PIN_RELAY2) == RELAY_ON)
+        INFO("Relay 2: ", "OFF", " Region: ", _settings.Relay1Region);
+      digitalWrite(PIN_RELAY2, RELAY_OFF);
+    }
+  }
+}
+
 const uint8_t GetScaledBrightness(const uint8_t& brScale, const bool& scaleDown)
 {
   auto scale = (uint8_t)(float(_settings.Brightness / 100.0) * (float)brScale);
@@ -474,25 +570,31 @@ const uint8_t GetScaledBrightness(const uint8_t& brScale, const bool& scaleDown)
 void RecalculateBrightness(LedState &led, const bool &showTrace)
 {
   if(_settings.alarmedScale > 0)
+  {
+    if(led.IsAlarmed && led.FixedBrightnessIfAlarmed)
     {
-      if(_settings.alarmScaleDown)
-      {
-        if(!led.IsAlarmed || led.FixedBrightnessIfAlarmed)
-        {
-          auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
-          if(showTrace)
-            TRACE("Led: ", led.Idx, " Br: ", br);
-        }
-      }
-      else
-      {
-        if(led.IsAlarmed && !led.FixedBrightnessIfAlarmed)
-        {
-          auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
-          if(showTrace)
-            TRACE("Led: ", led.Idx, " Br: ", br);
-        } 
-      }
+      auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
+      if(showTrace)
+         INFO("Led: ", led.Idx, " Br: ", br);
+    }
+      // if(_settings.alarmScaleDown)
+      // {
+      //   if(!led.IsAlarmed || led.FixedBrightnessIfAlarmed)
+      //   {
+      //     auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
+      //     if(showTrace)
+      //       TRACE("Led: ", led.Idx, " Br: ", br);
+      //   }
+      // }
+      // else
+      // {
+      //   if(led.IsAlarmed && !led.FixedBrightnessIfAlarmed)
+      //   {
+      //     auto br = led.setBrightness(GetScaledBrightness(_settings.alarmedScale, _settings.alarmScaleDown));
+      //     if(showTrace)
+      //       TRACE("Led: ", led.Idx, " Br: ", br);
+      //   } 
+      // }
     }
 }
 
@@ -592,7 +694,9 @@ void HandleEffects(const unsigned long &currentTicks)
     {
       for(uint8_t i = 0; i < LED_COUNT; i++)
       {
-        ledsState[i].StartBlink(70, 15000);
+        auto &led = ledsState[i];
+        led.StartBlink(70, 15000);
+        led.Color = led.IsAlarmed ? _settings.AlarmedColor : _settings.NotAlarmedColor;
       }
       effectStarted = true;
     }  
@@ -660,6 +764,18 @@ void HandleDebugSerialCommands()
 
     INFO(" HEAP: ", ESP.getFreeHeap());
     INFO("STACK: ", ESP.getFreeContStack());
+  }
+
+  if(debugButtonFromSerial == 103)
+  {
+    digitalWrite(PIN_RELAY1, !digitalRead(PIN_RELAY1));
+    INFO("Realy 1: ", digitalRead(PIN_RELAY1));
+  }
+
+  if(debugButtonFromSerial == 104)
+  {
+    digitalWrite(PIN_RELAY2, !digitalRead(PIN_RELAY2));
+    INFO("Realy 2: ", digitalRead(PIN_RELAY2));
   }
 
   debugButtonFromSerial = 0;

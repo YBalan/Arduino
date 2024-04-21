@@ -29,7 +29,7 @@
 #define LED_NOT_ALARMED_COLOR CRGB::Blue
 
 #define LED_NEW_ALARMED_PERIOD 500
-#define LED_NEW_ALARMED_TOTALTIME 5500
+#define LED_NEW_ALARMED_TOTALTIME 15000
 
 #define LED_ALARMED_SCALE_FACTOR 0//50% 
 
@@ -69,6 +69,9 @@ namespace UAMap
     int16_t resetFlag = 200;
     int reserved = 0;
 
+    int8_t Relay1Region = -1;
+    int8_t Relay2Region = -1;
+
     void reset()
     {
       PortalModeColor = LED_PORTAL_MODE_COLOR;
@@ -83,6 +86,9 @@ namespace UAMap
       alarmScaleDown = true;
       resetFlag = 200;
       reserved = 0;
+
+      Relay1Region = -1;
+      Relay2Region = -1;
     }
   };
 };
