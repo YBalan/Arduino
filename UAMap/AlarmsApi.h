@@ -35,7 +35,7 @@
 struct RegionInfo
 {
   String Name;
-  uint16_t Id;
+  uint8_t Id;
 };
 
 enum AlarmsApiStatus

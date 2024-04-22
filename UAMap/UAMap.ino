@@ -528,35 +528,54 @@ void SetAlarmedLED(const std::map<uint16_t, RegionInfo> &alarmedLedIdx)
 
 void SetRelayStatus(const std::map<uint16_t, RegionInfo> &alarmedLedIdx)
 {
-  INFO("SetRelayStatus: Relay1: ", _settings.Relay1Region, " Relay2: ", _settings.Relay2Region);  
+  INFO("SetRelayStatus: Relay1: ", _settings.Relay1Region, " Relay2: ", _settings.Relay2Region); 
+  
+  bool found1 = false;
+  bool found2 = false;
   for(const auto &idx : alarmedLedIdx)
   {
     INFO(idx.first, ": ", idx.second.Id);
   
-    if(idx.second.Id == _settings.Relay1Region)
+    if(!found1 && idx.second.Id == (uint8_t)_settings.Relay1Region)
     {
-      digitalWrite(PIN_RELAY1, RELAY_ON);
-      INFO("Relay 1: ", "ON", " Region: ", _settings.Relay1Region);
-    }
-    else
+      INFO("Found1: ", idx.second.Id);
+      found1 = true;        
+    }      
+    if(!found2 && idx.second.Id == (uint8_t)_settings.Relay2Region)
     {
-      if(digitalRead(PIN_RELAY1) == RELAY_ON)
-        INFO("Relay 1: ", "OFF", " Region: ", _settings.Relay1Region);
-      digitalWrite(PIN_RELAY1, RELAY_OFF);
-    }
-
-    if(idx.second.Id == _settings.Relay2Region)
-    {
-      digitalWrite(PIN_RELAY2, RELAY_ON);
-      INFO("Relay 2: ", "ON", " Region: ", _settings.Relay1Region);
-    }
-    else
-    {
-      if(digitalRead(PIN_RELAY2) == RELAY_ON)
-        INFO("Relay 2: ", "OFF", " Region: ", _settings.Relay1Region);
-      digitalWrite(PIN_RELAY2, RELAY_OFF);
+      INFO("Found2: ", idx.second.Id);
+      found2 = true;        
     }
   }
+
+  if(found1)
+  {
+    digitalWrite(PIN_RELAY1, RELAY_ON);
+    INFO("Relay 1: ", "ON", " Region: ", _settings.Relay1Region);      
+  }
+  else
+  {
+    if(digitalRead(PIN_RELAY1) == RELAY_ON)
+    {
+      INFO("Relay 1: ", "OFF", " Region: ", _settings.Relay1Region);
+      digitalWrite(PIN_RELAY1, RELAY_OFF);
+    }
+  }
+
+  if(found2)
+  {
+    digitalWrite(PIN_RELAY2, RELAY_ON);
+    INFO("Relay 2: ", "ON", " Region: ", _settings.Relay2Region);      
+  }
+  else
+  {
+    if(digitalRead(PIN_RELAY2) == RELAY_ON)
+    {
+      INFO("Relay 2: ", "OFF", " Region: ", _settings.Relay2Region);
+      digitalWrite(PIN_RELAY2, RELAY_OFF);
+    }
+  }    
+  
 }
 
 const uint8_t GetScaledBrightness(const uint8_t& brScale, const bool& scaleDown)
