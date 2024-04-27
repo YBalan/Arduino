@@ -86,6 +86,8 @@ namespace UAMap
       NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
       NotAlarmedColor = LED_NOT_ALARMED_COLOR;
       AlarmedColor = LED_ALARMED_COLOR;
+      PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
+
       Brightness = 2;
 
       alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;

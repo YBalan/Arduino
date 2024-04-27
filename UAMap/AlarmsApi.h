@@ -194,8 +194,7 @@ IotApiRegions iotApiRegions =
   {"Chernivetska",                UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
   {"Chernihivska",                UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
 };
-#endif
-
+#endif  
   private:
     //std::unique_ptr<BearSSL::WiFiClientSecure> client;    
     std::unique_ptr<HTTPClient> https2;

@@ -173,8 +173,11 @@ void setup() {
 
 #ifdef USE_BOT
 
-String menu1("Alarms \n Brightness Max \t Brightness Mid \t Brightness Min \n Dark \t Light \n Strobe \t Rainbow");
-String call1("/alarms, /br 255, /br 120, /br 2, /schema 0, /schema 1, /strobe, /rainbow"); 
+String BotMainMenu("Alarms \n Brightness Max \t Brightness Mid \t Brightness Min \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+String BotMainMenuCall("/alarms, /br 255, /br 120, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu"); 
+
+String BotRelayMenu1("Odeska \n Kharkivska \t Mykolaivska \t Vinnytska \t Kyivska \n Kirovohradska \t Poltavska \t Sumska \t Ternopilska");
+String BotRelayMenuCall1("{0} 18, {0} 22, {0} 17, {0} 4, {0} 14, {0} 15, {0} 19, {0} 20, {0} 21");
 
 #define BOT_COMMAND_BR "/br"
 #define BOT_COMMAND_RESET "/reset"
@@ -199,7 +202,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    bot->inlineMenuCallback(_botSettings.botNameForMenu, menu1, call1, msg.chatID);
+    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
     menuID = bot->lastBotMsg();
   } else
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
@@ -233,32 +236,19 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   {
     if(value == "menu")
     {
-      String menu;
-      String call;
+      INFO(" HEAP: ", ESP.getFreeHeap());
+      INFO("STACK: ", ESP.getFreeContStack()); 
 
-      uint8_t regionsCount = MAX_REGIONS_COUNT;
-      for(uint8_t i = 0; i < regionsCount; i++)
-      {
-        const auto &region = api->iotApiRegions[i];
-        menu += region.Name + (i < regionsCount - 1 ? ( i % 4 == 0 ? " \n " : " \t ") : "");
-        call += String("/relay1 ") + region.Id + (i < regionsCount - 1 ? ", " : "");  
+      ESP.resetHeap();
+      ESP.resetFreeContStack();
 
-        if(i % 8 == 0)      
-        {
-          menu += " \n Disable";
-          call += ", /relay1 -1";
+      INFO(" HEAP: ", ESP.getFreeHeap());
+      INFO("STACK: ", ESP.getFreeContStack());
 
-          INFO(menu);
-          INFO(call);      
+      SendInlineRelayMenu("Relay1", "/relay1", msg.chatID);   
 
-          bot->inlineMenuCallback(_botSettings.botNameForMenu+"Relay1", menu, call, msg.chatID);
-
-          menu = "";
-          call = "";
-
-        }
-      }      
       value = "";
+      answerCurrentAlarms = false;
     }
     else
     {
@@ -271,17 +261,35 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
       SaveSettings();
     }
 
-    answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
   {
-    auto regionId = value.toInt();
-    if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+    if(value == "menu")
     {
-      _settings.Relay2Region = regionId;
+      INFO(" HEAP: ", ESP.getFreeHeap());
+      INFO("STACK: ", ESP.getFreeContStack()); 
+
+      ESP.resetHeap();
+      ESP.resetFreeContStack();
+
+      INFO(" HEAP: ", ESP.getFreeHeap());
+      INFO("STACK: ", ESP.getFreeContStack());
+
+      SendInlineRelayMenu("Relay2", "/relay2", msg.chatID);   
+
+      value = "";
+      answerCurrentAlarms = false;
     }
-    value = "Relay2: " + String(_settings.Relay2Region);
-    SaveSettings();
+    else
+    {
+      auto regionId = value.toInt();
+      if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+      {
+        _settings.Relay2Region = regionId;
+      }
+      value = "Relay2: " + String(_settings.Relay2Region);
+      SaveSettings();
+    }
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
@@ -369,6 +377,39 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   }
 
   return std::move(messages);
+}
+
+void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID)
+{
+  String call1 = BotRelayMenuCall1;
+  call1.replace("{0}", relayCommand);
+  bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, BotRelayMenu1, call1, chatID);
+  /*String menu;
+  String call;
+
+  uint8_t regionsCount = MAX_REGIONS_COUNT;
+  for(uint8_t i = 0; i < regionsCount; i++)
+  {
+    const auto &region = api->iotApiRegions[i];
+    menu += region.Name + (i < regionsCount - 1 ? ( i % 4 == 0 ? " \n " : " \t ") : "");
+    call += relayCommand + " " + region.Id + (i < regionsCount - 1 ? ", " : "");  
+
+    if(i % 8 == 0)      
+    {
+      menu += String(" \n ") + "Disable";
+      call += String(", ") + relayCommand + " -1";
+
+      INFO(menu);
+      INFO(call);      
+
+      bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
+
+      delay(100);
+
+      menu = "";
+      call = "";
+    }
+  } */
 }
 #endif
 
