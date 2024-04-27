@@ -9,6 +9,7 @@ struct LedState
   int32_t BlinkTotalTime;
   bool FixedBrightnessIfAlarmed;
   bool IsAlarmed;
+  bool IsPartialAlarmed;
   CRGB Color;
   uint32_t PeriodTicks = 0;
   uint32_t TotalTimeTicks = 0;

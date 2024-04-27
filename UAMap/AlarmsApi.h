@@ -28,28 +28,14 @@
 #define ALARMS_TRACE(...) {}
 #endif
 
-#define ALARMS_API_BASE_URI "https://api.ukrainealarm.com/api/v3/"
-#define ALARMS_API_ALERTS "alerts"
-#define ALARMS_API_REGIONS "regions"
+#define ALARMS_API_OFFICIAL_BASE_URI "https://api.ukrainealarm.com/api/v3/"
+#define ALARMS_API_OFFICIAL_ALERTS "alerts"
+#define ALARMS_API_OFFICIAL_REGIONS "regions"
 
-struct RegionInfo
-{
-  String Name;
-  uint8_t Id;
-};
+#define ALARMS_API_IOT_BASE_URI "https://api.alerts.in.ua/"
+#define ALARMS_API_IOT_ALERTS "v1/iot/active_air_raid_alerts_by_oblast.json"
 
-enum AlarmsApiStatus
-{   
-  API_OK = 200,
-  WRONG_API_KEY = 401,  
-  NO_CONNECTION = 1000,
-  READ_TIMEOUT,
-  NO_WIFI,  
-  JSON_ERROR,
-  UNKNOWN,
-};
-
-enum class UARegion : uint8_t
+enum UARegion : uint8_t
 {
   Khmelnitska = 3,
   Vinnytska = 4,
@@ -75,9 +61,39 @@ enum class UARegion : uint8_t
   Chernivetska = 26,
   Lvivska = 27,
   Donetska = 28,
-  Kyiv = 31,
-  Krym = 127
+  Crimea = 29,
+  Sevastopol = 30,
+  Kyiv = 31,  
 };
+
+enum ApiAlarmStatus : uint8_t
+{
+  Alarmed,
+  NotAlarmed,
+  PartialAlarmed,
+};
+
+struct RegionInfo
+{
+  String Name;  
+  UARegion Id;
+  ApiAlarmStatus AlarmStatus;
+};
+
+enum ApiStatusCode
+{   
+  API_OK = 200,
+  WRONG_API_KEY = 401,  
+  NO_CONNECTION = 1000,
+  READ_TIMEOUT,
+  NO_WIFI,  
+  JSON_ERROR,
+  UNKNOWN,
+};
+
+#define MAX_REGIONS_COUNT 27
+typedef RegionInfo IotApiRegions[MAX_REGIONS_COUNT];
+//typedef std::array<RegionInfo, MAX_REGIONS_COUNT> IotApiRegions;
 
 
 #define MAX_LEDS_FOR_REGION 2
@@ -85,7 +101,7 @@ typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
 typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
 AlarmsLedIndexesMap alarmsLedIndexesMap =
 {
-  { UARegion::Krym,                 {0} },
+  { UARegion::Crimea,               {0} },
   { UARegion::Khersonska,           {1} },
   { UARegion::Zaporizka,            {2} },
   { UARegion::Donetska,             {3} },
@@ -99,7 +115,7 @@ AlarmsLedIndexesMap alarmsLedIndexesMap =
   { UARegion::Sumska,               {12} },
   { UARegion::Chernihivska,         {13} },  
   { UARegion::Kyivska,              {14} },  
-  { UARegion::Kyiv,                 {14} },
+  //{ UARegion::Kyiv,                 {14} },
   { UARegion::Cherkaska,            {15} },
   { UARegion::Vinnytska,            {16} },  
   { UARegion::Zhytomyrska,          {17} },
@@ -115,141 +131,150 @@ AlarmsLedIndexesMap alarmsLedIndexesMap =
 
 class AlarmsApi
 {  
-  private:
-    static const constexpr uint8_t ledsMapCount = 25;  
+public:  
+  #ifdef LANGUAGE_UA
+IotApiRegions iotApiRegions = 
+{
+  {"Автономна Республіка Крим",  UARegion::Crimea,            ApiAlarmStatus::NotAlarmed},          //0
+  {"Волинська область",          UARegion::Volynska,          ApiAlarmStatus::NotAlarmed},          //1
+  {"Вінницька область",          UARegion::Vinnytska,         ApiAlarmStatus::NotAlarmed},          //2
+  {"Дніпропетровська область",   UARegion::Dnipropetrovska,   ApiAlarmStatus::NotAlarmed},          //3
+  {"Донецька область",           UARegion::Donetska,          ApiAlarmStatus::NotAlarmed},          //4
+  {"Житомирська область",        UARegion::Zhytomyrska,       ApiAlarmStatus::NotAlarmed},          //5
+  {"Закарпатська область",       UARegion::Zakarpatska,       ApiAlarmStatus::NotAlarmed},          //6
+  {"Запорізька область",         UARegion::Zaporizka,         ApiAlarmStatus::NotAlarmed},          //7
+  {"Івано-Франківська область",  UARegion::Ivano_Frankivska,  ApiAlarmStatus::NotAlarmed},          //8
+  {"м. Київ",                    UARegion::Kyiv,              ApiAlarmStatus::NotAlarmed},          //9
+  {"Київська область",           UARegion::Kyivska,           ApiAlarmStatus::NotAlarmed},          //10
+  {"Кіровоградська область",     UARegion::Kirovohradska,     ApiAlarmStatus::NotAlarmed},          //11
+  {"Луганська область",          UARegion::Luhanska,          ApiAlarmStatus::NotAlarmed},          //12
+  {"Львівська область",          UARegion::Lvivska,           ApiAlarmStatus::NotAlarmed},          //13
+  {"Миколаївська область",       UARegion::Mykolaivska,       ApiAlarmStatus::NotAlarmed},          //14
+  {"Одеська область",            UARegion::Odeska,            ApiAlarmStatus::NotAlarmed},          //15
+  {"Полтавська область",         UARegion::Poltavska,         ApiAlarmStatus::NotAlarmed},          //16
+  {"Рівненська область",         UARegion::Rivnenska,         ApiAlarmStatus::NotAlarmed},          //17
+  {"м. Севастополь",             UARegion::Sevastopol,        ApiAlarmStatus::NotAlarmed},          //18
+  {"Сумська область",            UARegion::Sumska,            ApiAlarmStatus::NotAlarmed},          //19
+  {"Тернопільська область",      UARegion::Ternopilska,       ApiAlarmStatus::NotAlarmed},          //20
+  {"Харківська область",         UARegion::Kharkivska,        ApiAlarmStatus::NotAlarmed},          //21
+  {"Херсонська область",         UARegion::Khersonska,        ApiAlarmStatus::NotAlarmed},          //22
+  {"Хмельницька область",        UARegion::Khmelnitska,       ApiAlarmStatus::NotAlarmed},          //23
+  {"Черкаська область",          UARegion::Cherkaska,         ApiAlarmStatus::NotAlarmed},          //24
+  {"Чернівецька область",        UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
+  {"Чернігівська область",       UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
+};
+#else
+IotApiRegions iotApiRegions = 
+{
+  {"Crimea",                      UARegion::Crimea,            ApiAlarmStatus::NotAlarmed},          //0
+  {"Volynska",                    UARegion::Volynska,          ApiAlarmStatus::NotAlarmed},          //1
+  {"Vinnytska",                   UARegion::Vinnytska,         ApiAlarmStatus::NotAlarmed},          //2
+  {"Dnipropetrovska",             UARegion::Dnipropetrovska,   ApiAlarmStatus::NotAlarmed},          //3
+  {"Donetska",                    UARegion::Donetska,          ApiAlarmStatus::NotAlarmed},          //4
+  {"Zhytomyrska",                 UARegion::Zhytomyrska,       ApiAlarmStatus::NotAlarmed},          //5
+  {"Zakarpatska",                 UARegion::Zakarpatska,       ApiAlarmStatus::NotAlarmed},          //6
+  {"Zaporizka",                   UARegion::Zaporizka,         ApiAlarmStatus::NotAlarmed},          //7
+  {"Ivano-Frankivska",            UARegion::Ivano_Frankivska,  ApiAlarmStatus::NotAlarmed},          //8
+  {"Kyiv",                        UARegion::Kyiv,              ApiAlarmStatus::NotAlarmed},          //9
+  {"Kyivska",                     UARegion::Kyivska,           ApiAlarmStatus::NotAlarmed},          //10
+  {"Kirovohradska",               UARegion::Kirovohradska,     ApiAlarmStatus::NotAlarmed},          //11
+  {"Luhanska",                    UARegion::Luhanska,          ApiAlarmStatus::NotAlarmed},          //12
+  {"Lvivska",                     UARegion::Lvivska,           ApiAlarmStatus::NotAlarmed},          //13
+  {"Mykolaivska",                 UARegion::Mykolaivska,       ApiAlarmStatus::NotAlarmed},          //14
+  {"Odeska",                      UARegion::Odeska,            ApiAlarmStatus::NotAlarmed},          //15
+  {"Poltavska",                   UARegion::Poltavska,         ApiAlarmStatus::NotAlarmed},          //16
+  {"Rivnenska",                   UARegion::Rivnenska,         ApiAlarmStatus::NotAlarmed},          //17
+  {"Sevastopol",                  UARegion::Sevastopol,        ApiAlarmStatus::NotAlarmed},          //18
+  {"Sumska",                      UARegion::Sumska,            ApiAlarmStatus::NotAlarmed},          //19
+  {"Ternopilska",                 UARegion::Ternopilska,       ApiAlarmStatus::NotAlarmed},          //20
+  {"Kharkivska",                  UARegion::Kharkivska,        ApiAlarmStatus::NotAlarmed},          //21
+  {"Khersonska",                  UARegion::Khersonska,        ApiAlarmStatus::NotAlarmed},          //22
+  {"Khmelnitska",                 UARegion::Khmelnitska,       ApiAlarmStatus::NotAlarmed},          //23
+  {"Cherkaska",                   UARegion::Cherkaska,         ApiAlarmStatus::NotAlarmed},          //24
+  {"Chernivetska",                UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
+  {"Chernihivska",                UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
+};
+#endif
 
-    static const constexpr uint8_t alarmsLedsMap[] = 
-    {
-      127,  //Idx: 0 - "Crimea" //9999
-      23,   //Idx: 1 - "Kherson"
-      12,   //Idx: 2 - "Zap"
-      28,   //Idx: 3 - "Don"
-      16,   //Idx: 4 - "Luh"
-      22,   //Idx: 5 - "Khar"
-       9,   //Idx: 6 - "Dnipro"
-      17,   //Idx: 7 - "Mykol"
-      18,   //Idx: 8 - "Odesa"
-       4,   //Idx: 9 - "Vinn"
-      15,   //Idx: 10 - "Kirovograd"
-      19,   //Idx: 11 - "Poltava"
-      20,   //Idx: 12 - "Summ"
-      25,   //Idx: 13 - "Chernihiv"
-      24,   //Idx: 14 - "Cherkas"
-      14,   //Idx: 15 - "Kyivska"
-      10,   //Idx: 16 - "Gitom"
-       3,   //Idx: 17 - "Khmel"
-      26,   //Idx: 18 - "Chernivetska"
-      21,   //Idx: 19 - "Ternopil"
-       5,   //Idx: 20 - "Rivne"
-       8,   //Idx: 21 - "Volin"
-      27,   //Idx: 22 - "Lviv" 
-      13,   //Idx: 23 - "Ivano-Frank"
-      11,   //Idx: 24 - "Zakarpat"      
-      //....
-      31,   //Idx: 25 - "Kyiv"
-    };
-
   private:
-    std::unique_ptr<BearSSL::WiFiClientSecure> client;    
+    //std::unique_ptr<BearSSL::WiFiClientSecure> client;    
     std::unique_ptr<HTTPClient> https2;
     //create an HTTPClient instance
     //HTTPClient https;
     String lastActionIndex;
     String _apiKey;
+    String _uriBase;
+    bool _isOfficialApi = false;
 
   public:
-    AlarmsApi() : client(new BearSSL::WiFiClientSecure), https2(new HTTPClient){}
-    AlarmsApi(const char* apiKey) : client(new BearSSL::WiFiClientSecure), https2(new HTTPClient), _apiKey(apiKey) {}
+    AlarmsApi() : /*client(new BearSSL::WiFiClientSecure),*/ https2(new HTTPClient){}
+    AlarmsApi(const char* apiKey) : /*client(new BearSSL::WiFiClientSecure),*/ https2(new HTTPClient), _apiKey(apiKey) {}
 
     void setApiKey(const char *const apiKey) { _apiKey = apiKey; }
     void setApiKey(const String &apiKey) { _apiKey = apiKey; }
+
+    void setBaseUri(const char *const uriBase) { _uriBase = uriBase; CheckApi(); }
+    void setBaseUri(const String &uriBase) { _uriBase = uriBase; CheckApi(); }
+
+    void CheckApi()
+    {
+      _uriBase.toLowerCase();
+      _isOfficialApi = _uriBase == ALARMS_API_OFFICIAL_BASE_URI;
+    }
     
     const bool IsStatusChanged(int &status, String &statusMsg)
-    {      
-      auto httpRes = sendRequest("alerts/status", _apiKey, status, /*closeHttp:*/false);
-      if(status == AlarmsApiStatus::API_OK)
-      {
-        auto newActionIndex = ParseJsonLasActionIndex(httpRes);
-        bool isStatusChanged = lastActionIndex < newActionIndex;
-        ALARMS_TRACE("LAST: ", lastActionIndex);
-        ALARMS_TRACE(" NEW: ", newActionIndex);
-        lastActionIndex = newActionIndex;
-        return isStatusChanged;
-      }
-     
-      statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
-      https2->end();
-      return true;
-    }
-
-    const std::vector<uint16_t> getAlarmedRegions(int &status, String &statusMsg)
-    {
-      std::vector<uint16_t> res;
-      auto httpRes = sendRequest("alerts", _apiKey, status, /*closeHttp:*/false);
-      if(status == AlarmsApiStatus::API_OK)
-      {
-        DynamicJsonDocument doc(httpRes.length());
-        auto deserializeError = deserializeJson(doc, httpRes);
-        //serializeJson(doc, Serial);
-        if (!deserializeError) 
+    {     
+      if(_isOfficialApi)
+      { 
+        auto httpRes = sendRequest("alerts/status", _apiKey, status, statusMsg, /*closeHttp:*/false);
+        if(status == ApiStatusCode::API_OK)
         {
-          JsonArray arr = doc.as<JsonArray>();
+          String newActionIndex;
+          DynamicJsonDocument json(38);
+          auto deserializeError = deserializeJson(json, httpRes);
+          //serializeJson(json, Serial);
+          if (!deserializeError) 
+          {
+            newActionIndex = json["lastActionIndex"].as<const char *>();          
 
-          for (JsonVariant value : arr) {
-            
-            if(String(value["regionType"]) == "State")
-            {
-              ALARMS_TRACE(String(value));
-              res.push_back(String(value["regionId"]).toInt());
-            }
-          }
-        }
-        else
-        {          
-          ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
-        }
+            bool isStatusChanged = lastActionIndex < newActionIndex;
+            ALARMS_TRACE("LAST: ", lastActionIndex);
+            ALARMS_TRACE(" NEW: ", newActionIndex);
+            lastActionIndex = newActionIndex;
+            return isStatusChanged;
+          } 
+          ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());        
+        }     
+        
+        https2->end();
       }
-      statusMsg = status != AlarmsApiStatus::API_OK ? httpRes : "";
-      https2->end();
-      return std::move(res);
+      status = ApiStatusCode::API_OK;
+      return true;
     }    
 
-    public:
-    const String ParseJsonLasActionIndex(const String &httpRes)
-    {      
-        DynamicJsonDocument json(38);
-        auto deserializeError = deserializeJson(json, httpRes);
-        //serializeJson(json, Serial);
-        if (!deserializeError) 
-        {
-          String last(json["lastActionIndex"]);
-          //ALARMS_TRACE("LAST: ", last);
-          return std::move(last);
-          //return atoi(json["lastActionIndex"]);
-        }        
-        ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
-        return "";
-    }
-
-    const std::map<uint16_t, RegionInfo> getAlarmedRegions2(int &status, String &statusMsg, const String &resource = ALARMS_API_ALERTS)
+    public:    
+    const std::vector<RegionInfo *> getAlarmedRegions2(int &status, String &statusMsg, const String &resource = ALARMS_API_IOT_ALERTS)
     {
-      std::map<uint16_t, RegionInfo> res;
-      status = AlarmsApiStatus::UNKNOWN;
+      std::vector<RegionInfo *> res;
+      status = ApiStatusCode::UNKNOWN;
       //HTTPClient https2;
-      //BearSSL::WiFiClientSecure client2;      
+      //BearSSL::WiFiClientSecure client2;    
+      BearSSL::WiFiClientSecure client;  
 
       //https2->setTimeout(3000);
       //client->setTimeout(3000);
       //client2.setInsecure();
-      client->setInsecure();
-      https2->useHTTP10(true);
-      https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      client.setInsecure();
+      // https2->useHTTP10(true);
+      // https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
-      ALARMS_TRACE("[HTTPS2] begin: ", resource);   
+      const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;      
+
+      ALARMS_TRACE("[HTTPS2] begin: ", uri);   
       ALARMS_TRACE("[HTTPS2] apiKey: ", _apiKey); 
-      if (https2->begin(*client, ALARMS_API_BASE_URI + resource)) 
+      if (https2->begin(client, uri)) 
       { // HTTPS        
-        https2->addHeader("Authorization", _apiKey);        
+        https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
 
         ALARMS_TRACE("[HTTPS2] REQ GET: ", resource);
@@ -261,116 +286,123 @@ class AlarmsApi
           // HTTP header has been send and Server response header has been handled
           ALARMS_TRACE("[HTTPS2] RES GET: ", resource, "... code: ", httpCode);
           // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
-          {
-           // const String &p = https2->getString();
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
+          { 
+            status = ApiStatusCode::API_OK;          
             ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
             ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
-            ALARMS_TRACE("[HTTPS2] content-length: ", https2->getSize());
-            status = AlarmsApiStatus::API_OK;
-            DynamicJsonDocument doc(2048);
-            
-            ALARMS_TRACE("[HTTPS2] Full Json content: "); //https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/
-            ReadLoggingStream loggingStream(https2->getStream(), Serial);        
-            
-            DeserializationError deserializeError;
 
-            if(resource == ALARMS_API_ALERTS ? loggingStream.find("[") : loggingStream.find("\"states\":["))
+            if(resource.endsWith(".json"))
             {
-              Serial.println();
-              StaticJsonDocument<32> filter;
-              filter["regionType"] = true;
-              filter["regionId"] = true;
-              filter["regionName"] = true;
-              filter["regionEngName"] = true;
+              ALARMS_TRACE("[HTTPS2] IoT Dev API");
+              
+              ALARMS_TRACE("[HTTPS2] Start Parse String content"); 
+              ALARMS_TRACE("[HTTPS2] content-length: ", https2->getSize());
 
-              ALARMS_TRACE("[HTTPS2] Start Parse Json content");             
-              do
+              const String &payload = https2->getString();
+              
+              ALARMS_TRACE("[HTTPS2] Content: ", payload);                
+
+              for(uint8_t idx = 0; idx < MAX_REGIONS_COUNT; idx++)
               {
-                deserializeError = deserializeJson(doc, loggingStream, DeserializationOption::Filter(filter));
-                if(!deserializeError)
+                if(idx + 1 < payload.length())
                 {
-                  if(String(doc["regionType"]) == "State")
+                  const auto &ch = payload[idx + 1];
+                  RegionInfo *r = &iotApiRegions[idx];
+                  if(ch == 'N')
                   {
-                    ALARMS_TRACE(doc.as<const char*>());    
-
-                    const char *engNamePtr = doc["regionEngName"].as<const char*>();                
-
-                    RegionInfo rInfo;
-                    rInfo.Id = atoi(doc["regionId"].as<const char*>());                  
-                    rInfo.Name = engNamePtr != 0 && strlen(engNamePtr) > 0 ? engNamePtr : doc["regionName"].as<const char*>();
-
-                    res[rInfo.Id] = rInfo;
-                    ALARMS_TRACE("\tRegion: ID: ", rInfo.Id, " Name: ", rInfo.Name);
+                    r->AlarmStatus = ApiAlarmStatus::NotAlarmed;
+                  }
+                  else                 
+                  {                    
+                    r->AlarmStatus = ch == 'P' ? ApiAlarmStatus::PartialAlarmed : ApiAlarmStatus::Alarmed;
+                    res.push_back(r);
                   }
                 }
-                else
-                {
-                  ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
-                }
-              }while(loggingStream.findUntil(",","]"));
-            }
-            ALARMS_TRACE("[HTTPS2] End Parse Json content: ", deserializeError.c_str());
+              }  
 
-            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
-            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
-            /*auto deserializeError = deserializeJson(doc, *client);
-            //serializeJson(doc, Serial);
-            if (!deserializeError) 
-            {
-              JsonArray arr = resource == ALARMS_API_ALERTS ? doc.as<JsonArray>() : doc["states"].as<JsonArray>();  
-
-              ALARMS_TRACE("\tJson response size: ", arr.size());            
-              
-              for (const JsonVariant &value : arr) 
-              {                
-                if(String(value["regionType"]) == "State")
-                {
-                  //ALARMS_TRACE(value.as<const char*>());
-
-                  RegionInfo rInfo;
-                  rInfo.Id = atoi(value["regionId"].as<const char*>());                  
-                  rInfo.Name = value["regionName"].as<const char*>();
-
-                  res[rInfo.Id] = rInfo;
-                  ALARMS_TRACE("\tRegion: ID: ", rInfo.Id, " Name: ", rInfo.Name);
-                }
-              }                            
+              https2->end();
             }
             else
-            {          
-              ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
-              httpCode = AlarmsApiStatus::JSON_ERROR;
-              statusMsg = String("Json: ") + deserializeError.c_str();
-            }*/
+            {
+              // ALARMS_TRACE("[HTTPS2] Official API");
+
+              // ALARMS_TRACE("[HTTPS2] Full Json content: "); //https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/
+              // ReadLoggingStream loggingStream(https2->getStream(), Serial);        
+            
+              // DeserializationError deserializeError;
+
+              // if(resource == ALARMS_API_OFFICIAL_ALERTS ? loggingStream.find("[") : loggingStream.find("\"states\":["))
+              // {
+              //   DynamicJsonDocument doc(1024);
+              //   Serial.println();
+              //   StaticJsonDocument<32> filter;
+              //   filter["regionType"] = true;
+              //   filter["regionId"] = true;
+              //   filter["regionName"] = true;
+              //   filter["regionEngName"] = true;
+
+              //   ALARMS_TRACE("[HTTPS2] Start Parse Json content");             
+              //   do
+              //   {
+              //     deserializeError = deserializeJson(doc, loggingStream, DeserializationOption::Filter(filter));
+              //     if(!deserializeError)
+              //     {
+              //       if(String(doc["regionType"]) == "State")
+              //       {
+              //         ALARMS_TRACE(doc.as<const char*>());    
+
+              //         const char *engNamePtr = doc["regionEngName"].as<const char*>();                
+
+              //         RegionInfo rInfo;
+              //         int regionId = atoi(doc["regionId"].as<const char*>());                  
+              //         rInfo.Id = regionId == 9999 ? UARegion::Crimea : (UARegion)regionId;
+              //         rInfo.Name = engNamePtr != 0 && strlen(engNamePtr) > 0 ? engNamePtr : doc["regionName"].as<const char*>();
+
+              //         //res.push_back(rInfo);
+              //         ALARMS_TRACE("\tRegion: ID: ", (uint8_t)rInfo.Id, " Name: ", rInfo.Name);
+              //       }
+              //     }
+              //     else
+              //     {
+              //       ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+              //     }
+              //   }while(loggingStream.findUntil(",","]"));
+              // }
+              // ALARMS_TRACE("[HTTPS2] End Parse Json content: ", deserializeError.c_str());   
+              // https2->end();           
+            }                 
           }          
         }
+
+        ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
+        ALARMS_TRACE("STACK: ", ESP.getFreeContStack());     
 
         status = httpCode;
         switch(httpCode)
         {
-          case AlarmsApiStatus::API_OK:
-            ALARMS_TRACE("[HTTPS2] GET: OK");
-            statusMsg = "OK (200)";
+          case ApiStatusCode::API_OK:
+            //ALARMS_TRACE("[HTTPS2] GET: OK");
+            statusMsg = String("OK") + "(" + httpCode + ")";
             break;
           case HTTP_CODE_UNAUTHORIZED:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = AlarmsApiStatus::WRONG_API_KEY;
+            statusMsg = String("Unauthorized ") + "(" + httpCode + ")";
+            status = ApiStatusCode::WRONG_API_KEY;
             break;
           case HTTPC_ERROR_READ_TIMEOUT:
             statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = AlarmsApiStatus::READ_TIMEOUT;
+            status = ApiStatusCode::READ_TIMEOUT;
             break;       
           case HTTPC_ERROR_CONNECTION_FAILED:
             statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = AlarmsApiStatus::NO_CONNECTION;
+            status = ApiStatusCode::NO_CONNECTION;
             break;
-          case AlarmsApiStatus::JSON_ERROR:
-            status = AlarmsApiStatus::JSON_ERROR;
+          case ApiStatusCode::JSON_ERROR:
+            status = ApiStatusCode::JSON_ERROR;
             //statusMsg = "Json error";
             break;
           default:
-            
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
             break;
         }
 
@@ -380,31 +412,35 @@ class AlarmsApi
            
         return std::move(res);
         
-      } else 
+      }
+      else 
       {
-        status = AlarmsApiStatus::UNKNOWN;
+        status = ApiStatusCode::UNKNOWN;
         ALARMS_TRACE("[HTTPS] Unable to connect");
         statusMsg = "Unknown";
         return std::move(res);
       }      
     }
 
-    const String sendRequest(const String& resource, const String &apiKey, int &status, const bool &closeHttp)
+    const String sendRequest(const String& resource, const String &apiKey, int &status, String &statusMsg, const bool &closeHttp = true)
     {
-      status = AlarmsApiStatus::UNKNOWN;
+      status = ApiStatusCode::UNKNOWN;
+      BearSSL::WiFiClientSecure client;  
       // Ignore SSL certificate validation
-      client->setInsecure();
+      client.setInsecure();
       
       //HTTPClient https;
       //https2->setTimeout(3000);      
       //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
-      ALARMS_TRACE("[HTTPS] begin: ", resource);   
+      const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
+
+      ALARMS_TRACE("[HTTPS] begin: ", uri);   
       ALARMS_TRACE("[HTTPS] apiKey: ", apiKey); 
-      if (https2->begin(*client, ALARMS_API_BASE_URI + resource)) 
+      if (https2->begin(client, uri)) 
       {  // HTTPS
         String payload;
-        https2->addHeader("Authorization", apiKey);        
+        https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + apiKey);        
         https2->addHeader("Accept", "application/json");      
 
         ALARMS_TRACE("[HTTPS] REQ GET: ", resource);
@@ -414,13 +450,13 @@ class AlarmsApi
         if (httpCode > 0) 
         {
           // HTTP header has been send and Server response header has been handled
-          ALARMS_TRACE("[HTTPS] RES GET: ", resource, "... code: ", httpCode);
+          ALARMS_TRACE("[HTTPS] RES GET: ", uri, "... code: ", httpCode);
           // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) 
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
           {
             ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
             ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
-            status = AlarmsApiStatus::API_OK;
+            status = ApiStatusCode::API_OK;
             payload = https2->getString();  
 
             ALARMS_TRACE("[HTTPS] content-length: ", https2->getSize());          
@@ -433,62 +469,51 @@ class AlarmsApi
         status = httpCode;
         switch(httpCode)
         {
+          case ApiStatusCode::API_OK:
+            ALARMS_TRACE("[HTTPS2] GET: OK");
+            statusMsg = String("OK") + "(" + httpCode + ")";
+            break;
           case HTTP_CODE_UNAUTHORIZED:
-            status = AlarmsApiStatus::WRONG_API_KEY;
+            statusMsg = String("Unauthorized ") + "(" + httpCode + ")";
+            status = ApiStatusCode::WRONG_API_KEY;
             break;
           case HTTPC_ERROR_READ_TIMEOUT:
-            status = AlarmsApiStatus::READ_TIMEOUT;
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+            status = ApiStatusCode::READ_TIMEOUT;
             break;       
           case HTTPC_ERROR_CONNECTION_FAILED:
-            status = AlarmsApiStatus::NO_CONNECTION;
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
+            status = ApiStatusCode::NO_CONNECTION;
+            break;
+          case ApiStatusCode::JSON_ERROR:
+            status = ApiStatusCode::JSON_ERROR;
+            //statusMsg = "Json error";
+            break;
+          default:
+            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
             break;
         }
 
         if(closeHttp)
           https2->end();
 
-        String httpResultMsg = "OK (200)";
-        if(status == AlarmsApiStatus::API_OK)
-        {
-          ALARMS_TRACE("[HTTPS] GET: OK");
-          return std::move(payload);
-        }
-        else
-        {
-          httpResultMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-          ALARMS_TRACE("[HTTPS] GET: ", resource, "... failed, error: ", httpResultMsg);
-          return std::move(httpResultMsg);
-        }
+        ALARMS_TRACE("[HTTPS2] GET: ", resource, "... status message: ", statusMsg);
+
+        return std::move(payload);
+
       } else 
       {
-        status = AlarmsApiStatus::UNKNOWN;
+        status = ApiStatusCode::UNKNOWN;
         ALARMS_TRACE("[HTTPS] Unable to connect");
+        statusMsg = "Unknown";
         return std::move("[HTTPS] Unable to connect");
       }      
     }   
 
-    public:
-    const int8_t getLedIndexByRegionId(const uint16_t &regionId) const
-    {
-      int8_t res = -1;
-      const int alarmsLedsMapLength = sizeof(alarmsLedsMap) / sizeof(alarmsLedsMap[0]);
-      ALARMS_INFO("LED Map Count: ", alarmsLedsMapLength)
-      for(uint8_t idx = 0; idx < alarmsLedsMapLength; idx++)
-      {
-        auto mapValue = alarmsLedsMap[idx];
-        if(mapValue == (regionId == 9999 ? 127 : regionId))
-        {
-          res = idx;
-          break;
-        }
-      }
-      ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", res);
-      return res;
-    } 
-
+    public:    
     static const std::vector<uint8_t> getLedIndexesByRegionId(const uint16_t &regionId)
     {       
-      auto region = (UARegion)(regionId == 9999 ? 127 : regionId);
+      auto region = (UARegion)(regionId == 9999 ? (uint16_t)UARegion::Crimea : regionId);
 
       return getLedIndexesByRegion(region);
     }   
@@ -506,7 +531,7 @@ class AlarmsApi
           if(i == 0 || ledRange[i] > 0)
           {
             res.push_back(ledRange[i]);
-            ALARMS_INFO("regionId: ", regionId, " mapped to idx: ", ledRange[i]);      
+            ALARMS_INFO("regionId: ", (uint8_t)region, " mapped to idx: ", ledRange[i]);      
           }
         }        
       }

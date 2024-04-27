@@ -19,19 +19,22 @@
 #define ALARMS_UPDATE_TIMEOUT 25000
 #define ALARMS_CHECK_WITHOUT_STATUS false
 
-#define LED_STATUS_IDX 15 //Kyivska
-#define LED_STATUS_NO_CONNECTION_COLOR CRGB::Orange
+#define LED_STATUS_IDX 14 //Kyivska
+#define LED_STATUS_NO_CONNECTION_COLOR CRGB::White
 #define LED_STATUS_NO_CONNECTION_PERIOD 1000
 #define LED_STATUS_NO_CONNECTION_TOTALTIME -1
 
 #define LED_PORTAL_MODE_COLOR CRGB::Green
 #define LED_ALARMED_COLOR CRGB::Red
 #define LED_NOT_ALARMED_COLOR CRGB::Blue
+#define LED_PARTIAL_ALARMED_COLOR CRGB::Yellow
 
 #define LED_NEW_ALARMED_PERIOD 500
 #define LED_NEW_ALARMED_TOTALTIME 15000
 
 #define LED_ALARMED_SCALE_FACTOR 0//50% 
+
+#define MAX_BASE_URI_LENGTH 50
 
 #define EFFECT_TIMEOUT 15000
 uint32_t effectStrtTicks = 0;
@@ -58,6 +61,7 @@ namespace UAMap
     CRGB PortalModeColor = LED_PORTAL_MODE_COLOR;
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
     CRGB NotAlarmedColor = LED_NOT_ALARMED_COLOR;
+    CRGB PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
     CRGB AlarmedColor = LED_ALARMED_COLOR;
     uint8_t Brightness = 2;
 
@@ -71,6 +75,10 @@ namespace UAMap
 
     int8_t Relay1Region = -1;
     int8_t Relay2Region = -1;
+
+    int16_t BuzzTime = -1;
+
+    char BaseUri[MAX_BASE_URI_LENGTH]; // = ALARMS_API_IOT_BASE_URI;
 
     void reset()
     {
@@ -89,6 +97,8 @@ namespace UAMap
 
       Relay1Region = -1;
       Relay2Region = -1;
+
+      strcpy(BaseUri, ALARMS_API_IOT_BASE_URI);
     }
   };
 };

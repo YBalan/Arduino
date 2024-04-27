@@ -32,6 +32,7 @@ std::unique_ptr<FastBot> bot;
 
 // показать юзер меню (\t - горизонтальное разделение кнопок, \n - вертикальное
 //bot.showMenu("Menu1 \t Menu2 \t Menu3 \n Close", CHAT_ID);  
+//https://stackoverflow.com/questions/72594564/how-can-i-add-menu-button-in-telegram-bot
 struct BotSettings
 {
   String botNameForMenu;
