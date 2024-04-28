@@ -242,7 +242,7 @@ IotApiRegions iotApiRegions =
             lastActionIndex = newActionIndex;
             return isStatusChanged;
           } 
-          ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());        
+          ALARMS_TRACE(F("[JSON] Deserialization error: "), deserializeError.c_str());        
         }     
         
         https2->end();
@@ -269,38 +269,38 @@ IotApiRegions iotApiRegions =
       
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;      
 
-      ALARMS_TRACE("[HTTPS2] begin: ", uri);   
-      ALARMS_TRACE("[HTTPS2] apiKey: ", _apiKey); 
+      ALARMS_TRACE(F("[HTTPS2] begin: "), uri);   
+      ALARMS_TRACE(F("[HTTPS2] apiKey: "), _apiKey); 
       if (https2->begin(client, uri)) 
       { // HTTPS        
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
 
-        ALARMS_TRACE("[HTTPS2] REQ GET: ", resource);
+        ALARMS_TRACE(F("[HTTPS2] REQ GET: "), resource);
         // start connection and send HTTP header
         int httpCode = https2->GET();
         // httpCode will be negative on error
         if (httpCode > 0) 
         {
           // HTTP header has been send and Server response header has been handled
-          ALARMS_TRACE("[HTTPS2] RES GET: ", resource, "... code: ", httpCode);
+          ALARMS_TRACE(F("[HTTPS2] RES GET: "), resource, F("... code: "), httpCode);
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
           { 
             status = ApiStatusCode::API_OK;          
-            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
-            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
+            ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
+            ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());
 
             if(resource.endsWith(".json"))
             {
-              ALARMS_TRACE("[HTTPS2] IoT Dev API");
+              ALARMS_TRACE(F("[HTTPS2] IoT Dev API"));
               
-              ALARMS_TRACE("[HTTPS2] Start Parse String content"); 
-              ALARMS_TRACE("[HTTPS2] content-length: ", https2->getSize());
+              ALARMS_TRACE(F("[HTTPS2] Start Parse String content")); 
+              ALARMS_TRACE(F("[HTTPS2] content-length: "), https2->getSize());
 
               const String &payload = https2->getString();
               
-              ALARMS_TRACE("[HTTPS2] Content: ", payload);                
+              ALARMS_TRACE(F("[HTTPS2] Content: "), payload);                
 
               for(uint8_t idx = 0; idx < MAX_REGIONS_COUNT; idx++)
               {
@@ -341,7 +341,7 @@ IotApiRegions iotApiRegions =
               //   filter["regionName"] = true;
               //   filter["regionEngName"] = true;
 
-              //   ALARMS_TRACE("[HTTPS2] Start Parse Json content");             
+              //   ALARMS_TRACE(F("[HTTPS2] Start Parse Json content"));             
               //   do
               //   {
               //     deserializeError = deserializeJson(doc, loggingStream, DeserializationOption::Filter(filter));
@@ -359,33 +359,33 @@ IotApiRegions iotApiRegions =
               //         rInfo.Name = engNamePtr != 0 && strlen(engNamePtr) > 0 ? engNamePtr : doc["regionName"].as<const char*>();
 
               //         //res.push_back(rInfo);
-              //         ALARMS_TRACE("\tRegion: ID: ", (uint8_t)rInfo.Id, " Name: ", rInfo.Name);
+              //         ALARMS_TRACE(F("\tRegion: ID: "), (uint8_t)rInfo.Id, F(" Name: "), rInfo.Name);
               //       }
               //     }
               //     else
               //     {
-              //       ALARMS_TRACE("[JSON] Deserialization error: ", deserializeError.c_str());
+              //       ALARMS_TRACE(F("[JSON] Deserialization error: "), deserializeError.c_str());
               //     }
               //   }while(loggingStream.findUntil(",","]"));
               // }
-              // ALARMS_TRACE("[HTTPS2] End Parse Json content: ", deserializeError.c_str());   
+              // ALARMS_TRACE(F("[HTTPS2] End Parse Json content: "), deserializeError.c_str());   
               // https2->end();           
             }                 
           }          
         }
 
-        ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
-        ALARMS_TRACE("STACK: ", ESP.getFreeContStack());     
+        ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
+        ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());     
 
         status = httpCode;
         switch(httpCode)
         {
           case ApiStatusCode::API_OK:
             //ALARMS_TRACE("[HTTPS2] GET: OK");
-            statusMsg = String("OK") + "(" + httpCode + ")";
+            statusMsg = String(F("OK")) + "(" + httpCode + ")";
             break;
           case HTTP_CODE_UNAUTHORIZED:
-            statusMsg = String("Unauthorized ") + "(" + httpCode + ")";
+            statusMsg = String(F("Unauthorized ")) + "(" + httpCode + ")";
             status = ApiStatusCode::WRONG_API_KEY;
             break;
           case HTTPC_ERROR_READ_TIMEOUT:
@@ -405,7 +405,7 @@ IotApiRegions iotApiRegions =
             break;
         }
 
-        ALARMS_TRACE("[HTTPS2] GET: ", resource, "... status message: ", statusMsg);
+        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
         
         https2->end();
            
@@ -415,8 +415,8 @@ IotApiRegions iotApiRegions =
       else 
       {
         status = ApiStatusCode::UNKNOWN;
-        ALARMS_TRACE("[HTTPS] Unable to connect");
-        statusMsg = "Unknown";
+        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
+        statusMsg = F("Unknown");
         return std::move(res);
       }      
     }
@@ -434,8 +434,8 @@ IotApiRegions iotApiRegions =
 
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
 
-      ALARMS_TRACE("[HTTPS] begin: ", uri);   
-      ALARMS_TRACE("[HTTPS] apiKey: ", apiKey); 
+      ALARMS_TRACE(F("[HTTPS] begin: "), uri);   
+      ALARMS_TRACE(F("[HTTPS] apiKey: "), apiKey); 
       if (https2->begin(client, uri)) 
       {  // HTTPS
         String payload;
@@ -449,17 +449,17 @@ IotApiRegions iotApiRegions =
         if (httpCode > 0) 
         {
           // HTTP header has been send and Server response header has been handled
-          ALARMS_TRACE("[HTTPS] RES GET: ", uri, "... code: ", httpCode);
+          ALARMS_TRACE(F("[HTTPS] RES GET: "), uri, "... code: ", httpCode);
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
           {
-            ALARMS_TRACE(" HEAP: ", ESP.getFreeHeap());
-            ALARMS_TRACE("STACK: ", ESP.getFreeContStack());
+            ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
+            ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());
             status = ApiStatusCode::API_OK;
             payload = https2->getString();  
 
-            ALARMS_TRACE("[HTTPS] content-length: ", https2->getSize());          
-            //ALARMS_TRACE("[HTTPS] content: ", payload);
+            ALARMS_TRACE(F("[HTTPS] content-length: "), https2->getSize());          
+            //ALARMS_TRACE(F("[HTTPS] content: "), payload);
            
             //return "Ok";
           }          
@@ -469,11 +469,11 @@ IotApiRegions iotApiRegions =
         switch(httpCode)
         {
           case ApiStatusCode::API_OK:
-            ALARMS_TRACE("[HTTPS2] GET: OK");
-            statusMsg = String("OK") + "(" + httpCode + ")";
+            //ALARMS_TRACE(F("[HTTPS2] GET: OK"));
+            statusMsg = String(F("OK")) + "(" + httpCode + ")";
             break;
           case HTTP_CODE_UNAUTHORIZED:
-            statusMsg = String("Unauthorized ") + "(" + httpCode + ")";
+            statusMsg = String(F("Unauthorized ")) + "(" + httpCode + ")";
             status = ApiStatusCode::WRONG_API_KEY;
             break;
           case HTTPC_ERROR_READ_TIMEOUT:
@@ -496,16 +496,16 @@ IotApiRegions iotApiRegions =
         if(closeHttp)
           https2->end();
 
-        ALARMS_TRACE("[HTTPS2] GET: ", resource, "... status message: ", statusMsg);
+        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
 
         return std::move(payload);
 
       } else 
       {
         status = ApiStatusCode::UNKNOWN;
-        ALARMS_TRACE("[HTTPS] Unable to connect");
+        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
         statusMsg = "Unknown";
-        return std::move("[HTTPS] Unable to connect");
+        return std::move(F("[HTTPS] Unable to connect"));
       }      
     }   
 
@@ -520,7 +520,7 @@ IotApiRegions iotApiRegions =
     static const std::vector<uint8_t> getLedIndexesByRegion(const UARegion &region) 
     {
       std::vector<uint8_t> res;
-      ALARMS_INFO("LED Map Count: ", alarmsLedIndexesMap.size());
+      ALARMS_INFO(F("LED Map Count: "), alarmsLedIndexesMap.size());
 
       if(alarmsLedIndexesMap.count(region) > 0)
       {
@@ -530,7 +530,7 @@ IotApiRegions iotApiRegions =
           if(i == 0 || ledRange[i] > 0)
           {
             res.push_back(ledRange[i]);
-            ALARMS_INFO("regionId: ", (uint8_t)region, " mapped to idx: ", ledRange[i]);      
+            ALARMS_INFO(F(" Region: "), (uint8_t)region, F(" mapped to idx: "), ledRange[i]);      
           }
         }        
       }
