@@ -50,6 +50,7 @@
 #include "Settings.h"
 #include "WiFiOps.h"
 #include "TelegramBot.h"
+#include "BuzzHelper.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -191,6 +192,7 @@ void setup() {
 #define BOT_COMMAND_RELAY1 F("/relay1")
 #define BOT_COMMAND_RELAY2 F("/relay2")
 #define BOT_COMMAND_UPDATE F("/update")
+#define BOT_COMMAND_BUZZTIME F("/buzztime")
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 {   
   std::vector<String> messages;
@@ -221,6 +223,19 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
       }
     }
     value = String(F("Update Timeout: ")) + String(_settings.alarmsUpdateTimeout) + F("ms...");
+  } else
+  if(GetCommandValue(BOT_COMMAND_BUZZTIME, filtered, value))
+  { 
+    if(value.length() > 0)
+    {
+      auto update = value.toInt();
+      if(update == -1 || (update >= 2000 && update <= 120000))
+      {
+        _settings.BuzzTime = update;
+        SaveSettings();
+      }
+    }
+    value = String(F("Buzz Time: ")) + String(_settings.BuzzTime) + F("ms...");
   } else
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
   {
@@ -665,15 +680,22 @@ void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
 
   if(found1)
   {
-    digitalWrite(PIN_RELAY1, RELAY_ON);
+    if(digitalRead(PIN_RELAY1) == RELAY_OFF)
+    {
+      DoStrobe();
+      Buzz::AlarmStart(PIN_BUZZ, _settings.BuzzTime);      
+    }
+
+    digitalWrite(PIN_RELAY1, RELAY_ON);    
     TRACE(F(" Relay 1: "), F("ON"), F(" Region: "), _settings.Relay1Region);      
   }
   else
   {
     if(digitalRead(PIN_RELAY1) == RELAY_ON)
-    {
-      TRACE(F(" Relay 1: "), F("OFF"), F(" Region: "), _settings.Relay1Region);
+    { 
       digitalWrite(PIN_RELAY1, RELAY_OFF);
+      Buzz::AlarmEnd(PIN_BUZZ, _settings.BuzzTime);
+      TRACE(F(" Relay 1: "), F("OFF"), F(" Region: "), _settings.Relay1Region);
     }
   }
 
@@ -685,9 +707,9 @@ void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
   else
   {
     if(digitalRead(PIN_RELAY2) == RELAY_ON)
-    {
-      TRACE(F(" Relay 2: "), F("OFF"), F(" Region: "), _settings.Relay2Region);
+    {      
       digitalWrite(PIN_RELAY2, RELAY_OFF);
+      TRACE(F(" Relay 2: "), F("OFF"), F(" Region: "), _settings.Relay2Region);
     }
   }    
   
@@ -808,6 +830,16 @@ void PrintNetworkStatToSerial()
   #endif
 }
 
+void DoStrobe()
+{
+  for(uint8_t i = 0; i < LED_COUNT; i++)
+  {
+    auto &led = ledsState[i];
+    led.StartBlink(70, 15000);
+    led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor; ;
+  }
+}
+
 void HandleEffects(const unsigned long &currentTicks)
 {
    if(effectStrtTicks > 0 && currentTicks - effectStrtTicks >= EFFECT_TIMEOUT)
@@ -826,12 +858,7 @@ void HandleEffects(const unsigned long &currentTicks)
   {    
     if(!effectStarted)
     {
-      for(uint8_t i = 0; i < LED_COUNT; i++)
-      {
-        auto &led = ledsState[i];
-        led.StartBlink(70, 15000);
-        led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor; ;
-      }
+      DoStrobe();
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks);  
@@ -928,14 +955,25 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 104)
   {
     //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));
+    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
 
-    delay(1000);
-    tone(PIN_BUZZ, 1000, 5000);
-    tone(PIN_BUZZ, 800, 5000);
-    tone(PIN_BUZZ, 1000, 5000);
-    
-    //noTone(PIN_BUZZ);
+    Buzz::AlarmStart(PIN_BUZZ, 5000);
+  }
+
+  if(debugButtonFromSerial == 105)
+  {
+    //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
+    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
+
+    Buzz::AlarmEnd(PIN_BUZZ, 5000);
+  }
+
+  if(debugButtonFromSerial == 106)
+  {
+    //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
+    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
+
+    Buzz::Siren(PIN_BUZZ, 5000);
   }
 
   debugButtonFromSerial = 0;
