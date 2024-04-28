@@ -21,11 +21,12 @@
 //#define LANGUAGE_UA
 #define LANGUAGE_EN
 
-#ifdef DEBUG
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
 
 #define ENABLE_INFO_MAIN
+#ifdef DEBUG
+
 #define ENABLE_TRACE_MAIN
 
 #define ENABLE_INFO_SETTINGS
@@ -206,7 +207,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    static const String BotMainMenu = F("Alarms \n Brightness Max \t Brightness Mid \t Brightness Min \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+    static const String BotMainMenu = F("Alarms \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
     static const String BotMainMenuCall = F("/alarms, /br 255, /br 120, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
     //menuID = bot->lastBotMsg();
