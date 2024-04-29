@@ -199,6 +199,8 @@ unregisterall - Unregister all chat(s)
 update - Current period of update in milliseconds
 update10000 - Set period of update to 10secs
 baseuri - Current alerts.api uri
+token - Current Alerts.Api token
+nstat - Network Statistic
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
 
@@ -238,6 +240,9 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_RELAY2 F("/relay2")
 #define BOT_COMMAND_UPDATE F("/update")
 #define BOT_COMMAND_BUZZTIME F("/buzztime")
+#define BOT_COMMAND_TOKEN F("/token")
+#define BOT_COMMAND_NSTAT F("/nstat")
+
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 {   
   std::vector<String> messages;
@@ -288,6 +293,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
       }
     }
     value = String(F("Buzz Time: ")) + String(_settings.BuzzTime) + F("ms...");
+    noAnswerIfFromMenu = false;
   } else
   if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
   {
@@ -326,6 +332,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
   {
     noAnswerIfFromMenu = !HandleRelay(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
+  }else
+  if(GetCommandValue(BOT_COMMAND_TOKEN, filtered, value))
+  {
+    value = String(F("Token: ")) + api->GetApiKey();
+  }else
+  if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
+  {
+    PrintNetworkStatistic(value);
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
@@ -771,7 +785,7 @@ void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
     }
 
     digitalWrite(PIN_RELAY1, RELAY_ON);    
-    TRACE(F(" Relay 1: "), F("ON"), F(" Region: "), _settings.Relay1Region);      
+    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), _settings.Relay1Region);      
   }
   else
   {
@@ -779,21 +793,21 @@ void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
     { 
       digitalWrite(PIN_RELAY1, RELAY_OFF);
       Buzz::AlarmEnd(PIN_BUZZ, _settings.BuzzTime);
-      TRACE(F(" Relay 1: "), F("OFF"), F(" Region: "), _settings.Relay1Region);
+      TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), _settings.Relay1Region);
     }
   }
 
   if(found2)
   {
     digitalWrite(PIN_RELAY2, RELAY_ON);
-    TRACE(F(" Relay 2: "), F("ON"), F(" Region: "), _settings.Relay2Region);      
+    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), _settings.Relay2Region);      
   }
   else
   {
     if(digitalRead(PIN_RELAY2) == RELAY_ON)
     {      
       digitalWrite(PIN_RELAY2, RELAY_OFF);
-      TRACE(F(" Relay 2: "), F("OFF"), F(" Region: "), _settings.Relay2Region);
+      TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), _settings.Relay2Region);
     }
   }    
   
@@ -898,6 +912,13 @@ void FillNetworkStat(const int& code, const String &desc)
   #endif
 }
 
+#ifdef NETWORK_STATISTIC  
+void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
+{  
+  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
+}
+#endif
+
 void PrintNetworkStatToSerial()
 {
   #ifdef NETWORK_STATISTIC
@@ -906,11 +927,35 @@ void PrintNetworkStatToSerial()
     PrintNetworkStatInfoToSerial(networkStat[ApiStatusCode::API_OK]);
   for(const auto &de : networkStat)
   {
-    auto &info = de.second;
+    const auto &info = de.second;
     if(info.code != ApiStatusCode::API_OK)
       PrintNetworkStatInfoToSerial(info);
   }
   Serial.println();
+  #endif
+}
+
+void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
+{  
+  str += F("\[") + info.description + F(": ") + String(info.count) + F("\]") + F(" - ");   
+}
+
+void PrintNetworkStatistic(String &str)
+{
+  str = F("Network Statistic: ");
+  #ifdef NETWORK_STATISTIC  
+  if(networkStat.count(ApiStatusCode::API_OK) > 0)
+    PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
+  for(const auto &de : networkStat)
+  {
+    const auto &info = de.second;
+    if(info.code != ApiStatusCode::API_OK)
+      PrintNetworkStatInfo(info, str);
+  }
+  str.replace("(", "");
+  str.replace(")", "");
+  #else
+  str += F("Off");
   #endif
 }
 
@@ -948,13 +993,6 @@ void HandleEffects(const unsigned long &currentTicks)
     CheckAndUpdateRealLeds(currentTicks);  
   }
 }
-
-#ifdef NETWORK_STATISTIC  
-void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
-{  
-  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
-}
-#endif
 
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
@@ -1025,19 +1063,19 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 102)
   {
     digitalWrite(PIN_RELAY1, !digitalRead(PIN_RELAY1));
-    INFO(F(" Realy 1: "), digitalRead(PIN_RELAY1));
+    INFO(F("Realy1"), F(": "), digitalRead(PIN_RELAY1));
   }
 
   if(debugButtonFromSerial == 103)
   {
     digitalWrite(PIN_RELAY2, !digitalRead(PIN_RELAY2));
-    INFO(F(" Realy 2: "), digitalRead(PIN_RELAY2));
+    INFO(F("Realy2"), F(": "), digitalRead(PIN_RELAY2));
   }
 
   if(debugButtonFromSerial == 104)
   {
     //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
+    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
 
     Buzz::AlarmStart(PIN_BUZZ, 5000);
   }
@@ -1045,7 +1083,7 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 105)
   {
     //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
+    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
 
     Buzz::AlarmEnd(PIN_BUZZ, 5000);
   }
@@ -1053,7 +1091,7 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 106)
   {
     //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F(" BUZZ: "), digitalRead(PIN_BUZZ));    
+    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
 
     Buzz::Siren(PIN_BUZZ, 5000);
   }

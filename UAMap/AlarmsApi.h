@@ -235,6 +235,8 @@ IotApiRegions iotApiRegions =
     void setBaseUri(const char *const uriBase) { _uriBase = uriBase; CheckApi(); }
     void setBaseUri(const String &uriBase) { _uriBase = uriBase; CheckApi(); }
 
+    const String& GetApiKey() const { return _apiKey; }
+
     void CheckApi()
     {
       _uriBase.toLowerCase();
