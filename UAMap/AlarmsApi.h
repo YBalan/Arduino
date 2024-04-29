@@ -282,9 +282,9 @@ IotApiRegions iotApiRegions =
       //BearSSL::WiFiClientSecure client2;    
       BearSSL::WiFiClientSecure client;  
 
-      //https2->setTimeout(3000);
-      //client->setTimeout(3000);
-      //client2.setInsecure();
+      https2->setTimeout(500);
+      client.setTimeout(500);
+      
       client.setInsecure();
       // https2->useHTTP10(true);
       // https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
@@ -459,7 +459,7 @@ IotApiRegions iotApiRegions =
       client.setInsecure();
       
       //HTTPClient https;
-      //https2->setTimeout(3000);      
+      https2->setTimeout(500);
       //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;

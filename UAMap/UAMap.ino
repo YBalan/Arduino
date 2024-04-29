@@ -179,7 +179,7 @@ void setup() {
   _botSettings.SetBotName(wifiOps.GetParameterValueById("telegramName"));  
   _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
   bot->attach(HangleBotMessages);
-  bot->setTextMode(FB_MARKDOWN); 
+  bot->setTextMode(FB_TEXT); 
   
   bot->setLimit(1);
   bot->skipUpdates();
@@ -201,6 +201,7 @@ update10000 - Set period of update to 10secs
 baseuri - Current alerts.api uri
 token - Current Alerts.Api token
 nstat - Network Statistic
+rssi - WiFi Quality rssi db
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
 
@@ -242,6 +243,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_BUZZTIME F("/buzztime")
 #define BOT_COMMAND_TOKEN F("/token")
 #define BOT_COMMAND_NSTAT F("/nstat")
+#define BOT_COMMAND_RSSI F("/rssi")
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 {   
@@ -340,6 +342,13 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
   {
     PrintNetworkStatistic(value);
+  }else
+  if(GetCommandValue(BOT_COMMAND_RSSI, filtered, value))
+  {
+    value = F("SSID: ") + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
+          + F("RSSI: ") + String(WiFi.RSSI()) + F("db") + F(" ")
+          + F("IP: ") + WiFi.localIP().toString() + F(" ")
+          + F("MAC: ") + WiFi.macAddress();
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
@@ -937,7 +946,7 @@ void PrintNetworkStatToSerial()
 
 void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
 {  
-  str += F("\[") + info.description + F(": ") + String(info.count) + F("\]") + F(" - ");   
+  str += F("[\"") + info.description + F("\": ") + String(info.count) + F("]; ");
 }
 
 void PrintNetworkStatistic(String &str)
@@ -952,8 +961,8 @@ void PrintNetworkStatistic(String &str)
     if(info.code != ApiStatusCode::API_OK)
       PrintNetworkStatInfo(info, str);
   }
-  str.replace("(", "");
-  str.replace(")", "");
+  //str.replace("(", "");
+  //str.replace(")", "");
   #else
   str += F("Off");
   #endif

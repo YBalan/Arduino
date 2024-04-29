@@ -138,6 +138,8 @@ class WiFiOps
       //set config save notify callback
       wifiManager.setSaveConfigCallback(SaveCallback::saveConfigCallback);
 
+      wifiManager.setWiFiAutoReconnect(true);
+
       //set static ip
       //wifiManager.setSTAStaticIPConfig(IPAddress(172, 16, 1, 99), IPAddress(172, 16, 1, 1), IPAddress(255, 255, 255, 0));
 
@@ -145,8 +147,7 @@ class WiFiOps
 
       WIFI_TRACE(F("Adding parameters to WiFiManager..."));
       //add all your parameters here
-      //wifiManager.addParameter(&custom_api_token);
-      
+           
       for(uint8_t pIdx = 0; pIdx < _parameters.Count(); pIdx++)
       {
         auto &parameter = _parameters.GetAt(pIdx);
@@ -178,6 +179,9 @@ class WiFiOps
       //if it does not connect it starts an access point with the specified name
       //here  "AutoConnectAP"
       //and goes into a blocking loop awaiting configuration
+      /*WiFi.enableInsecureWEP();
+      WiFi.encryptionType(int networkItem);*/
+
       if (!wifiManager.autoConnect((_APName + (_addMacToAPName ? "_" + mac : "")).c_str(), _APPass.c_str())) {
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
@@ -189,11 +193,6 @@ class WiFiOps
       //if you get here you have connected to the WiFi
       WIFI_INFO(F("connected...yeey :)"));
 
-      //read updated parameters
-      //strcpy(api_token, custom_api_token.getValue());
-      //WIFI_TRACE("The values in the file are: ");
-      //WIFI_TRACE("\tapi_token : ", String(api_token));      
-
       SaveFSSettings(_parameters);
 
       WIFI_TRACE(F("The values in the file are: "));
@@ -202,9 +201,9 @@ class WiFiOps
         WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
       }
 
-      WIFI_INFO(F("local ip"));
+      WIFI_INFO(F("IP: "));
       WIFI_INFO(WiFi.localIP());
-      WIFI_INFO(F("MAC:"));
+      WIFI_INFO(F("MAC: "));
       WIFI_INFO(WiFi.macAddress());
 
       return _parameters;
