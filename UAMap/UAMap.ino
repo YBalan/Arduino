@@ -277,6 +277,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   } else
   if(GetCommandValue(BOT_COMMAND_BUZZTIME, filtered, value))
   { 
+    bot->sendTyping(msg.chatID);
     if(value.length() > 0)
     {
       auto update = value.toInt();
@@ -292,12 +293,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   {
     bot->sendTyping(msg.chatID);
     auto br = value.toInt();
-    br = br <= 0 ? 1 : (br > 255 ? 255 : br);
-    //if(br > 0 && br <= 255)
-       _settings.Brightness = br;
+    if(value.length() > 0)
+    {
+      br = br <= 0 ? 1 : (br > 255 ? 255 : br);
+      //if(br > 0 && br <= 255)
+      _settings.Brightness = br;
 
-    SetBrightness();      
-    value = String(F("Brightness changed to: ")) + String(br);
+      SetBrightness();      
+    }
+    value = String(F("Brightness: ")) + String(_settings.Brightness);
     answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
@@ -370,6 +374,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
   {    
     bot->sendTyping(msg.chatID);
+    
     uint8_t schema = value.toInt();
     switch(schema)
     {
@@ -391,11 +396,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     SetAlarmedLED(alarmedLedIdx);
     SetBrightness();
 
-    value = String(F("Color Chema changed to: ")) + value;
+    value = String(F("Color Schema: ")) + value;
     answerCurrentAlarms = false;
   }
 
-  if(value != "" && !noAnswerIfFromMenu)
+  if(value.length() > 0 && !noAnswerIfFromMenu)
       messages.push_back(value);
 
   if(answerCurrentAlarms || answerAll)
