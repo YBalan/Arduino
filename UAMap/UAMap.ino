@@ -122,27 +122,38 @@ void setup() {
 
   digitalWrite(PIN_BUZZ, LOW);
 
-  resetBtn.setDebounceTime(DebounceTime);
-
-  WiFiOps::WiFiOps<3> wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
+  resetBtn.setDebounceTime(DebounceTime);  
 
   Serial.println();
   Serial.println(F("!!!! Start UA Map !!!!"));
   Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
-  Serial.print(F("STACK: ")); Serial.println(ESP.getFreeContStack());  
-
-  ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, false, _settings.PortalModeColor};
-
-  wifiOps
-  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 47)  
-  .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
-  .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
-  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
-  ;  
+  Serial.print(F("STACK: ")); Serial.println(ESP.getFreeContStack());    
 
   LoadSettings();
   //_settings.reset();
+
+  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
+  FastLED.clear();  
+  SetBrightness(); 
+
+  //delay(5000);
+
+  ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, false, _settings.PortalModeColor};
+  SetBrightness();
+
+  //delay(5000);
+
+  WiFiOps::WiFiOps<3> wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
+
+  wifiOps
+  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 47)  
+  #ifdef USE_BOT
+  .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
+  .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
+  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
+  #endif
+  ;    
 
   auto resetButtonState = resetBtn.getState();
   INFO(F("ResetBtn: "), resetButtonState);
@@ -150,10 +161,7 @@ void setup() {
   _settings.resetFlag = 200;
   api->setApiKey(wifiOps.GetParameterValueById("apiToken")); 
   api->setBaseUri(_settings.BaseUri); 
-  INFO(F("Base Uri: "), _settings.BaseUri);
-
-  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
-  FastLED.clear();  
+  INFO(F("Base Uri: "), _settings.BaseUri);  
 
   ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 1000, -1, false, false, false, _settings.NoConnectionColor};
   ledsState[0] = {0 /*Crymea*/, 0, 0, true, false, false, _settings.AlarmedColor};
@@ -182,13 +190,48 @@ void setup() {
 // int32_t menuID = 0;
 // byte depth = 0;
 
+/*
+!!!!!!!!!!!!!!!! - Bot Additional Commands for Admin
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
+
+!!!!!!!!!!!!!!!! - Bot Commands for Users
+menu - Simple menu
+br - Current brightness
+br255 - Max brightness
+br2 - Min brightness
+br1 - Min brightness only alarmed visible
+alarmed - List of currently alarmed regions
+all - List of All regions
+relay1 - Region Id set for Relay1
+relay10 - Switch Off Relay1
+relay2 - Region Id set for Relay2
+relay20 - Switch Off Relay2
+buzztime - Current buzzer time in milliseconds
+buzztime3000 - Set buzzer time to 3secs
+buzztime0 - Switch off buzzer
+schema - Current Color schema
+schema0 - Set Color schema to Dark
+schema1 - Set Color schema to Light
+strobe - Stroboscope with current Br & Schema
+rainbow - Rainbow with current Br
+
+*/
+
 #define BOT_COMMAND_BR F("/br")
 #define BOT_COMMAND_RESET F("/reset")
 #define BOT_COMMAND_RAINBOW F("/rainbow")
 #define BOT_COMMAND_STROBE F("/strobe")
 #define BOT_COMMAND_SCHEMA F("/schema")
 #define BOT_COMMAND_BASEURI F("/baseuri")
-#define BOT_COMMAND_ALARMS F("/alarms")
+#define BOT_COMMAND_ALARMED F("/alarmed")
+#define BOT_COMMAND_ALL F("/all")
 #define BOT_COMMAND_MENU F("/menu")
 #define BOT_COMMAND_RELAY1 F("/relay1")
 #define BOT_COMMAND_RELAY2 F("/relay2")
@@ -199,6 +242,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   std::vector<String> messages;
   String value;
   bool answerCurrentAlarms = false;
+  bool answerAll = false;
 
   bool hasData = msg.data.length() > 0 && filtered.startsWith(_botSettings.botNameForMenu);
   BOT_TRACE(F("Filtered: "), filtered);
@@ -207,8 +251,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    static const String BotMainMenu = F("Alarms \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-    static const String BotMainMenuCall = F("/alarms, /br 255, /br 120, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
+    static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+    static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
     //menuID = bot->lastBotMsg();
   } else
@@ -230,7 +274,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     if(value.length() > 0)
     {
       auto update = value.toInt();
-      if(update == -1 || (update >= 2000 && update <= 120000))
+      if(update == 0 || (update >= 2000 && update <= 120000))
       {
         _settings.BuzzTime = update;
         SaveSettings();
@@ -259,7 +303,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     INFO(" HEAP: ", ESP.getFreeHeap());
     INFO("STACK: ", ESP.getFreeContStack());
 
-    _settings.reset();
+    //_settings.reset();
     _settings.alarmsCheckWithoutStatus = true;    
 
     value = String(F("Reseted: Heap: ")) + String(ESP.getFreeHeap()) + F(" Stack: ") + String(ESP.getFreeContStack());
@@ -286,11 +330,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     else
     {
       auto regionId = value.toInt();    
-      if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+      if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
       {
         _settings.Relay1Region = regionId;
       }
       value = "Relay1: " + String(_settings.Relay1Region);
+      hasData = false;
       SaveSettings();
     }
 
@@ -316,11 +361,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     else
     {
       auto regionId = value.toInt();
-      if(regionId == -1 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+      if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
       {
         _settings.Relay2Region = regionId;
       }
       value = "Relay2: " + String(_settings.Relay2Region);
+      hasData = false;
       SaveSettings();
     }
   }else
@@ -354,10 +400,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     value = _settings.BaseUri;
     answerCurrentAlarms = false;
   }else
-  if(GetCommandValue(BOT_COMMAND_ALARMS, filtered, value))
+  if(GetCommandValue(BOT_COMMAND_ALARMED, filtered, value))
   {
     bot->sendTyping(msg.chatID);
     answerCurrentAlarms = true;
+    answerAll = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_ALL, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    answerCurrentAlarms = true;
+    answerAll = true;
   }else
   if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
   {    
@@ -390,17 +443,27 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(value != "" && !hasData)
       messages.push_back(value);
 
-  if(answerCurrentAlarms)
+  if(answerCurrentAlarms || answerAll)
   {
-    String answer = String(F("Alarmed regions count: ")) + String(alarmedLedIdx.size());
-     
-    messages.push_back(answer);   
-    
-    for(const auto &regionKvp : alarmedLedIdx)
+    if(answerCurrentAlarms)
     {
-      const auto &region = regionKvp.second;
-      String regionMsg = region->Name + ": [" + String((uint8_t)region->Id) + "]";
-      messages.push_back(regionMsg);
+      String answerAlarmed = String(F("Alarmed regions count: ")) + String(alarmedLedIdx.size());     
+      messages.push_back(answerAlarmed);
+    }
+
+    if(answerAll)  
+    {  
+      String answerAllMsg = String(F("All regions count: ")) + String(MAX_REGIONS_COUNT);
+      messages.push_back(answerAllMsg);
+    }
+    
+    for(const auto &region : api->iotApiRegions)
+    {      
+      if(region.AlarmStatus == ApiAlarmStatus::Alarmed || answerAll)
+      {
+        String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + "]";
+        messages.push_back(regionMsg);
+      }
     } 
   }
 
@@ -423,17 +486,30 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
   String menu;
   String call;
 
-  uint8_t regionsCount = MAX_REGIONS_COUNT;
-  for(uint8_t i = 0; i < regionsCount; i++)
-  {
-    const auto &region = api->iotApiRegions[i];
-    menu += region.Name + (i < regionsCount - 1 ? ( i % 4 == 0 ? " \n " : " \t ") : "");
-    call += relayCommand + " " + region.Id + (i < regionsCount - 1 ? ", " : "");  
+  bool sendWholeMenu = false;
+  static const uint8_t RegionsInLine = 3;
+  static const uint8_t RegionsInGroup = 10;
 
-    if(i % 8 == 0)      
+  uint8_t regionsCount = MAX_REGIONS_COUNT;
+  uint8_t regionPlace = 0;
+  bool isEndOfGoup = false;
+  for(uint8_t regionIdx = 0; regionIdx < regionsCount; regionIdx++)
+  {
+    const auto &region = api->iotApiRegions[regionIdx];
+    if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
+
+    menu += region.Name + (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));
+    call += relayCommand + region.Id + F(", ");//(isEndOfGoup ? F("") : F(", "));  
+
+    regionPlace++;
+    isEndOfGoup = (regionPlace == RegionsInGroup - 1 || regionIdx == regionsCount - 1);
+
+    if(!sendWholeMenu && isEndOfGoup)      
     {
-      menu += String(" \n ") + "Disable";
-      call += String(", ") + relayCommand + " -1";
+      menu += String(F(" \n ")) + F("Disable");
+      call += String(F(", ")) + relayCommand + F(" 0");
+
+      regionPlace = 0;
 
       INFO(menu);
       INFO(call);      
@@ -442,9 +518,20 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
 
       delay(100);
 
-      menu = "";
-      call = "";
+      menu.clear();
+      call.clear();
     }
+  }
+
+  if(sendWholeMenu)
+  {
+    menu += String(F(" \n ")) + F("Disable");
+    call += String(F(", ")) + relayCommand + F(" 0");
+
+    INFO(menu);
+    INFO(call);   
+
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
   }
 }
 #endif
@@ -492,6 +579,7 @@ void loop()
   {
     BOT_INFO(F("Bot overloaded!"));
     bot->skipUpdates();
+    bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
   }
   #endif
 
@@ -582,7 +670,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
         if(statusChanged || _settings.alarmsCheckWithoutStatus || ALARMS_CHECK_WITHOUT_STATUS)
         {              
           auto alarmedRegions = api->getAlarmedRegions2(status, statusMsg);    
-          TRACE(F("HTTP "), F("Alarmed regions: "), alarmedRegions.size());
+          TRACE(F("HTTP "), F("Alarmed regions count: "), alarmedRegions.size());
           if(status == ApiStatusCode::API_OK)
           { 
             _settings.alarmsCheckWithoutStatus = false;           
@@ -618,7 +706,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
     changed = (changed || statusChanged);
 
     INFO(F(""));
-    INFO(F("Alarmed regions: "), alarmedLedIdx.size());
+    INFO(F("Alarmed regions count: "), alarmedLedIdx.size());
     INFO(F("Waiting "), _settings.alarmsUpdateTimeout, F("ms..."));
     PrintNetworkStatToSerial();
   }
@@ -658,7 +746,7 @@ void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
 void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
 {
   INFO(F("SetRelayStatus: "), F(" Relay1: "), _settings.Relay1Region, F(" Relay2: "), _settings.Relay2Region); 
-  if(_settings.Relay1Region == -1 && _settings.Relay2Region == -1) return;
+  if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
   
   bool found1 = false;
   bool found2 = false;  
@@ -884,9 +972,7 @@ void HandleDebugSerialCommands()
   }
 
   if(debugButtonFromSerial == 1) // Reset WiFi
-  {
-    ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, false, _settings.PortalModeColor};
-    FastLEDShow(true);
+  {    
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();
@@ -1032,6 +1118,6 @@ void FastLEDShow(const int &retryCount)
   for(int i = 0; i < retryCount; i++)
   {
     FastLED.show();   
-    delay(2);
+    //delay(2);
   }
 }

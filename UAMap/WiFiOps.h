@@ -24,10 +24,6 @@
 #define WIFI_TRACE(...) {}
 #endif
 
-//#define API_TOKEN_LENGTH 42
-//define your default values here, if there are different values in config.json, they are overwritten.
-//char api_token[API_TOKEN_LENGTH] = "YOUR_API_TOKEN";
-
 namespace WiFiOps
 {
 

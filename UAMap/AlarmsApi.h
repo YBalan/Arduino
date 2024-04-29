@@ -377,33 +377,7 @@ IotApiRegions iotApiRegions =
         ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
         ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());     
 
-        status = httpCode;
-        switch(httpCode)
-        {
-          case ApiStatusCode::API_OK:
-            //ALARMS_TRACE("[HTTPS2] GET: OK");
-            statusMsg = String(F("OK")) + "(" + httpCode + ")";
-            break;
-          case HTTP_CODE_UNAUTHORIZED:
-            statusMsg = String(F("Unauthorized ")) + "(" + httpCode + ")";
-            status = ApiStatusCode::WRONG_API_KEY;
-            break;
-          case HTTPC_ERROR_READ_TIMEOUT:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = ApiStatusCode::READ_TIMEOUT;
-            break;       
-          case HTTPC_ERROR_CONNECTION_FAILED:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = ApiStatusCode::NO_CONNECTION;
-            break;
-          case ApiStatusCode::JSON_ERROR:
-            status = ApiStatusCode::JSON_ERROR;
-            //statusMsg = "Json error";
-            break;
-          default:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            break;
-        }
+        HandleErrors(httpCode, status, statusMsg);
 
         ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
         
@@ -419,6 +393,40 @@ IotApiRegions iotApiRegions =
         statusMsg = F("Unknown");
         return std::move(res);
       }      
+    }
+
+    void HandleErrors(const int& httpCode, int& status, String &statusMsg)
+    {
+      status = httpCode;
+      switch(httpCode)
+      {
+        case ApiStatusCode::API_OK:
+          //ALARMS_TRACE("[HTTPS2] GET: OK");
+          statusMsg = String(F("OK")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_UNAUTHORIZED:
+          statusMsg = String(F("Unauthorized ")) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::WRONG_API_KEY;
+          break;
+        case HTTPC_ERROR_READ_TIMEOUT:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::READ_TIMEOUT;
+          break;       
+        case HTTPC_ERROR_CONNECTION_FAILED:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::NO_CONNECTION;
+          break;
+        case ApiStatusCode::JSON_ERROR:
+          status = ApiStatusCode::JSON_ERROR;
+          //statusMsg = "Json error";            
+          break;
+        case HTTP_CODE_TOO_MANY_REQUESTS:
+          statusMsg = String(F("To Many Requests")) + F("(") + httpCode + F(")");
+          break;
+        default:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          break;
+      }
     }
 
     const String sendRequest(const String& resource, const String &apiKey, int &status, String &statusMsg, const bool &closeHttp = true)
@@ -465,33 +473,7 @@ IotApiRegions iotApiRegions =
           }          
         }
 
-        status = httpCode;
-        switch(httpCode)
-        {
-          case ApiStatusCode::API_OK:
-            //ALARMS_TRACE(F("[HTTPS2] GET: OK"));
-            statusMsg = String(F("OK")) + "(" + httpCode + ")";
-            break;
-          case HTTP_CODE_UNAUTHORIZED:
-            statusMsg = String(F("Unauthorized ")) + "(" + httpCode + ")";
-            status = ApiStatusCode::WRONG_API_KEY;
-            break;
-          case HTTPC_ERROR_READ_TIMEOUT:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = ApiStatusCode::READ_TIMEOUT;
-            break;       
-          case HTTPC_ERROR_CONNECTION_FAILED:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            status = ApiStatusCode::NO_CONNECTION;
-            break;
-          case ApiStatusCode::JSON_ERROR:
-            status = ApiStatusCode::JSON_ERROR;
-            //statusMsg = "Json error";
-            break;
-          default:
-            statusMsg = String(https2->errorToString(httpCode)) + "(" + httpCode + ")";
-            break;
-        }
+        HandleErrors(httpCode, status, statusMsg);
 
         if(closeHttp)
           https2->end();

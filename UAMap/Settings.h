@@ -73,10 +73,10 @@ namespace UAMap
     int16_t resetFlag = 200;
     int reserved = 0;
 
-    int8_t Relay1Region = -1;
-    int8_t Relay2Region = -1;
+    uint8_t Relay1Region = 0;
+    uint8_t Relay2Region = 0;
 
-    int16_t BuzzTime = -1;
+    uint16_t BuzzTime = 0;
 
     char BaseUri[MAX_BASE_URI_LENGTH]; // = ALARMS_API_IOT_BASE_URI;
 
@@ -97,8 +97,10 @@ namespace UAMap
       resetFlag = 200;
       reserved = 0;
 
-      Relay1Region = -1;
-      Relay2Region = -1;
+      Relay1Region = 0;
+      Relay2Region = 0;
+
+      BuzzTime = 0;
 
       strcpy(BaseUri, ALARMS_API_IOT_BASE_URI);
     }
