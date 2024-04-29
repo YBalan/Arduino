@@ -14,17 +14,21 @@
 
 #include <ezButton.h>
 
-#define VER 1.2
+#define VER 1.3
 //#define RELEASE
 #define DEBUG
+
+#define USE_BOT
+#define USE_BUZZER
+#define BOT_MAX_INCOME_MSG_SIZE 2000
 
 //#define LANGUAGE_UA
 #define LANGUAGE_EN
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
-
 #define ENABLE_INFO_MAIN
+
 #ifdef DEBUG
 
 #define ENABLE_TRACE_MAIN
@@ -41,9 +45,6 @@
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 #endif
-
-#define USE_BOT
-#define BOT_MAX_INCOME_MSG_SIZE 2000
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -244,15 +245,20 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   bool answerCurrentAlarms = false;
   bool answerAll = false;
 
-  bool hasData = msg.data.length() > 0 && filtered.startsWith(_botSettings.botNameForMenu);
+  bool noAnswerIfFromMenu = msg.data.length() > 0 && filtered.startsWith(_botSettings.botNameForMenu);
   BOT_TRACE(F("Filtered: "), filtered);
-  filtered = hasData ? msg.data : filtered;
+  filtered = noAnswerIfFromMenu ? msg.data : filtered;
   BOT_TRACE(F("Filtered: "), filtered);
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
+    #ifdef USE_BUZZER
+    static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+    static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu, /buzztime 0, /buzztime 3000");
+    #else
     static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
     static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
+    #endif
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
     //menuID = bot->lastBotMsg();
   } else
@@ -311,69 +317,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
-    if(value == "menu")
-    {
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack()); 
-
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
-
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
-
-      SendInlineRelayMenu("Relay1", "/relay1", msg.chatID);   
-
-      value = "";
-      answerCurrentAlarms = false;
-    }
-    else
-    {
-      auto regionId = value.toInt();    
-      if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
-      {
-        _settings.Relay1Region = regionId;
-      }
-      value = "Relay1: " + String(_settings.Relay1Region);
-      hasData = false;
-      SaveSettings();
-    }
-
+    noAnswerIfFromMenu = !HandleRelay(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
   {
-    if(value == "menu")
-    {
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack()); 
-
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
-
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
-
-      SendInlineRelayMenu("Relay2", "/relay2", msg.chatID);   
-
-      value = "";
-      answerCurrentAlarms = false;
-    }
-    else
-    {
-      auto regionId = value.toInt();
-      if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
-      {
-        _settings.Relay2Region = regionId;
-      }
-      value = "Relay2: " + String(_settings.Relay2Region);
-      hasData = false;
-      SaveSettings();
-    }
+    noAnswerIfFromMenu = !HandleRelay(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
     bot->sendTyping(msg.chatID);
-    value = F("Rainbow started...");
+    //value = F("Rainbow started...");
+    value.clear();
     _effect = Effect::Rainbow;   
     effectStrtTicks = millis();
     effectStarted = false;
@@ -382,7 +336,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_STROBE, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
-    value = F("Strobe started...");
+    //value = F("Strobe started...");
+    value.clear();
     _effect = Effect::Strobe;   
     effectStrtTicks = millis();
     effectStarted = false;
@@ -422,14 +377,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
         _settings.AlarmedColor = CRGB::Red;
         _settings.NotAlarmedColor = CRGB::White;
         _settings.PartialAlarmedColor = CRGB::Yellow;
-        value = "Light";
+        value = String(F("Light"));
       break;
       case ColorSchema::Dark: 
       default:
         _settings.AlarmedColor = LED_ALARMED_COLOR;
         _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
         _settings.PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
-        value = "Dark";
+        value = String(F("Dark"));
       break;
     }
 
@@ -440,7 +395,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     answerCurrentAlarms = false;
   }
 
-  if(value != "" && !hasData)
+  if(value != "" && !noAnswerIfFromMenu)
       messages.push_back(value);
 
   if(answerCurrentAlarms || answerAll)
@@ -461,7 +416,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     {      
       if(region.AlarmStatus == ApiAlarmStatus::Alarmed || answerAll)
       {
-        String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + "]";
+        String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
         messages.push_back(regionMsg);
       }
     } 
@@ -473,6 +428,41 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   }
 
   return std::move(messages);
+}
+
+const bool HandleRelay(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID)
+{
+  if(value == F("menu"))
+    {
+      INFO(F(" HEAP: "), ESP.getFreeHeap());
+      INFO(F("STACK: "), ESP.getFreeContStack()); 
+
+      ESP.resetHeap();
+      ESP.resetFreeContStack();
+
+      INFO(F(" HEAP: "), ESP.getFreeHeap());
+      INFO(F("STACK: "), ESP.getFreeContStack());
+
+      SendInlineRelayMenu(relayName, relayCommand, chatID);   
+
+      value.clear();   
+      return false;   
+    }
+    else
+    {
+      if(value.length() > 0)
+      {
+        auto regionId = value.toInt();    
+        if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
+        {
+          relaySetting = regionId;
+          SaveSettings();
+        }
+      }
+      value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting));
+      BOT_TRACE(F("Bot answer: "), value);
+      return true;
+    }
 }
 
 /*String BotRelayMenu1("Odeska \n Kharkivska \t Mykolaivska \t Vinnytska \t Kyivska \n Kirovohradska \t Poltavska \t Sumska \t Ternopilska");
@@ -745,7 +735,7 @@ void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
 
 void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
 {
-  INFO(F("SetRelayStatus: "), F(" Relay1: "), _settings.Relay1Region, F(" Relay2: "), _settings.Relay2Region); 
+  INFO(F("SetRelayStatus: "), F("Relay1"), F(": "), _settings.Relay1Region, F(" "), F("Relay2"), F(": "), _settings.Relay2Region); 
   if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
   
   bool found1 = false;

@@ -194,7 +194,27 @@ IotApiRegions iotApiRegions =
   {"Chernivetska",                UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
   {"Chernihivska",                UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
 };
-#endif  
+#endif 
+  public: 
+  // Iterator to the beginning of the custom vector
+    const auto &begin() const {
+        return std::begin(iotApiRegions);
+    }
+
+    // Iterator to the end of the custom vector
+    const auto &end() const {
+        return std::end(iotApiRegions);
+    }
+
+    const String GetRegionNameById(const UARegion &id)
+    {
+      for(const auto &r : iotApiRegions)
+      {
+        if(r.Id == id)
+          return std::move(r.Name);
+      }
+      return F("");
+    }
   private:
     //std::unique_ptr<BearSSL::WiFiClientSecure> client;    
     std::unique_ptr<HTTPClient> https2;
