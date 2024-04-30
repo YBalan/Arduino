@@ -207,6 +207,7 @@ nstat - Network Statistic
 rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
+changeconfig - change configuration WiFi, tokens...
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
 
@@ -237,6 +238,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_RESET F("/reset")
 #define BOT_COMMAND_TEST F("/test")
 #define BOT_COMMAND_VER F("/ver")
+#define BOT_COMMAND_CHANGE_CONFIG F("/changeconfig")
 #define BOT_COMMAND_RAINBOW F("/rainbow")
 #define BOT_COMMAND_STROBE F("/strobe")
 #define BOT_COMMAND_SCHEMA F("/schema")
@@ -322,6 +324,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
   {
     bot->sendTyping(msg.chatID);
+    bot->sendMessage(F("Wait for restart..."), msg.chatID);
+    ESP.restart();
+  }else
+  if(GetCommandValue(BOT_COMMAND_CHANGE_CONFIG, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    bot->sendMessage(F("Wait for restart..."), msg.chatID);
     ESP.restart();
   }else
   if(GetCommandValue(BOT_COMMAND_TEST, filtered, value))
@@ -376,6 +387,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   {
     value = F("SSID: ") + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
           + F("RSSI: ") + String(WiFi.RSSI()) + F("db") + F(" ")
+          + F("Channel: ") + WiFi.channel() + F(" ")
           + F("IP: ") + WiFi.localIP().toString() + F(" ")
           + F("GatewayIP: ") + WiFi.gatewayIP().toString() + F(" ")
           + F("MAC: ") + WiFi.macAddress()          
@@ -701,11 +713,12 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
 
     // wait for WiFi connection
     int status = ApiStatusCode::NO_WIFI;
-    String statusMsg;
+    String statusMsg = F("No WiFi");
    
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
       status = ApiStatusCode::UNKNOWN;
+      statusMsg.clear();
       //INFO("WiFi - CONNECTED");
       //ESP.resetHeap();
       //ESP.resetFreeContStack();
@@ -903,14 +916,13 @@ void RecalculateBrightness()
   }
 }
 
-//int prevStatus = AlarmsApiStatus::UNKNOWN;
 const bool SetStatusLED(const int &status, const String &msg)
 {
   static int prevStatus = ApiStatusCode::UNKNOWN;
   bool changed = prevStatus != status;
   prevStatus = status;
 
-  FillNetworkStat(status, status != ApiStatusCode::API_OK ? msg : F("OK (200)"));
+  FillNetworkStat(status, msg);
   auto &led = ledsState[LED_STATUS_IDX];
   if(status != ApiStatusCode::API_OK)
   {
