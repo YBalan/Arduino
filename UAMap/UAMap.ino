@@ -548,32 +548,38 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
   String call;
 
   bool sendWholeMenu = false;
-  static const uint8_t RegionsInLine = 3;
-  static const uint8_t RegionsInGroup = 10;
+  static const uint8_t RegionsInLine = 2;
+  static const uint8_t RegionsInGroup = 6;
 
   uint8_t regionsCount = MAX_REGIONS_COUNT;
-  uint8_t regionPlace = 0;
+  uint8_t regionPlace = 1;
   bool isEndOfGoup = false;
   for(uint8_t regionIdx = 0; regionIdx < regionsCount; regionIdx++)
   {
     const auto &region = api->iotApiRegions[regionIdx];
     if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
 
-    menu += region.Name + (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));
+    menu += region.Name + (regionPlace != 0 && regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));
     call += relayCommand + region.Id + F(", ");//(isEndOfGoup ? F("") : F(", "));  
 
     regionPlace++;
-    isEndOfGoup = (regionPlace == RegionsInGroup - 1 || regionIdx == regionsCount - 1);
+    isEndOfGoup = (regionPlace == RegionsInGroup || regionIdx == regionsCount - 1);
 
     if(!sendWholeMenu && isEndOfGoup)      
     {
-      menu += String(F(" \n ")) + F("Disable");
+      menu += String(F(" \n ")) + relayName + F(" ") + F("Off");
       call += String(F(", ")) + relayCommand + F(" 0");
 
-      regionPlace = 0;
+      regionPlace = 1;      
+
+      ESP.resetHeap();
+      ESP.resetFreeContStack();
+
+      INFO(F(" HEAP: "), ESP.getFreeHeap());
+      INFO(F("STACK: "), ESP.getFreeContStack());  
 
       INFO(menu);
-      INFO(call);      
+      INFO(call);    
 
       bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
 
