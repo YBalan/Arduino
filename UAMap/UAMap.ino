@@ -268,6 +268,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
+    bot->sendTyping(msg.chatID);
+    INFO(F("Main Menu"));
     #ifdef USE_BUZZER
     static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
     static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu, /buzztime 0, /buzztime 3000");
@@ -275,11 +277,18 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
     static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
     #endif
+
+    ESP.resetHeap();
+    ESP.resetFreeContStack();
+
+    INFO(F(" HEAP: "), ESP.getFreeHeap());
+    INFO(F("STACK: "), ESP.getFreeContStack());
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
     //menuID = bot->lastBotMsg();
   } else
   if(GetCommandValue(BOT_COMMAND_UPDATE, filtered, value))
   { 
+    bot->sendTyping(msg.chatID);
     if(value.length() > 0)
     {
       auto update = value.toInt();
@@ -365,6 +374,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   }else
   if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
   {
+    bot->sendTyping(msg.chatID);
     value = F("Flash Date: ") + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
