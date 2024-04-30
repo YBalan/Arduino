@@ -190,6 +190,9 @@ class WiFiOps
         delay(5000);
       }
 
+      WiFi.setAutoReconnect(true);
+      WiFi.setAutoConnect(true); 
+
       //if you get here you have connected to the WiFi
       WIFI_INFO(F("connected...yeey :)"));
 

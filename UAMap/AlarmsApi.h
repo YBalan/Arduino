@@ -215,6 +215,15 @@ IotApiRegions iotApiRegions =
       }
       return F("");
     }
+    RegionInfo* const GetRegionById(const UARegion &id)
+    {
+      for(auto &r : iotApiRegions)
+      {
+        if(r.Id == id)
+          return &r;
+      }
+      return nullptr;
+    }
   private:
     //std::unique_ptr<BearSSL::WiFiClientSecure> client;    
     std::unique_ptr<HTTPClient> https2;
@@ -287,7 +296,7 @@ IotApiRegions iotApiRegions =
       
       client.setInsecure();
       // https2->useHTTP10(true);
-      // https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;      
 
@@ -426,10 +435,24 @@ IotApiRegions iotApiRegions =
           //ALARMS_TRACE("[HTTPS2] GET: OK");
           statusMsg = String(F("OK")) + F("(") + httpCode + F(")");
           break;
-        case HTTP_CODE_UNAUTHORIZED:
-          statusMsg = String(F("Unauthorized ")) + F("(") + httpCode + F(")");
+        // ------------------- CODES
+        case HTTP_CODE_UNAUTHORIZED: //401
+          statusMsg = String(F("Unauthorized")) + F("(") + httpCode + F(")");
           status = ApiStatusCode::WRONG_API_KEY;
           break;
+        case HTTP_CODE_TOO_MANY_REQUESTS: //429
+          statusMsg = String(F("To Many Requests")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_NOT_MODIFIED: //304
+          statusMsg = String(F("Not Modified")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_FORBIDDEN: //403
+          statusMsg = String(F("Forbidden. Possible token blocked")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_METHOD_NOT_ALLOWED: //405
+          statusMsg = String(F("Method not allowed")) + F("(") + httpCode + F(")");
+          break;
+        // ------------------- ERRORS
         case HTTPC_ERROR_READ_TIMEOUT:
           statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
           status = ApiStatusCode::READ_TIMEOUT;
@@ -438,13 +461,11 @@ IotApiRegions iotApiRegions =
           statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
           status = ApiStatusCode::NO_CONNECTION;
           break;
+        // ------------------- CUSTOM ERRORS
         case ApiStatusCode::JSON_ERROR:
           status = ApiStatusCode::JSON_ERROR;
           //statusMsg = "Json error";            
-          break;
-        case HTTP_CODE_TOO_MANY_REQUESTS:
-          statusMsg = String(F("To Many Requests")) + F("(") + httpCode + F(")");
-          break;
+          break;        
         default:
           statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
           break;

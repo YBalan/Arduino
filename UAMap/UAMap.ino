@@ -14,7 +14,7 @@
 
 #include <ezButton.h>
 
-#define VER 1.3
+#define VER 1.4
 //#define RELEASE
 #define DEBUG
 
@@ -99,8 +99,8 @@ void SetLedState(const UARegion &region, LedState &state)
   for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
   {
     state.Idx = idx;
-    state.IsAlarmed = ledsState[idx].IsAlarmed;
-    state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
+    // state.IsAlarmed = ledsState[idx].IsAlarmed;
+    // state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
     ledsState[idx] = state;
   }
 }
@@ -202,6 +202,7 @@ baseuri - Current alerts.api uri
 token - Current Alerts.Api token
 nstat - Network Statistic
 rssi - WiFi Quality rssi db
+test - test by regionId
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
 
@@ -230,6 +231,7 @@ rainbow - Rainbow with current Br
 
 #define BOT_COMMAND_BR F("/br")
 #define BOT_COMMAND_RESET F("/reset")
+#define BOT_COMMAND_TEST F("/test")
 #define BOT_COMMAND_RAINBOW F("/rainbow")
 #define BOT_COMMAND_STROBE F("/strobe")
 #define BOT_COMMAND_SCHEMA F("/schema")
@@ -315,17 +317,36 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
   if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    ESP.resetHeap();
-    ESP.resetFreeContStack();
+    ESP.restart();
+  }else
+  if(GetCommandValue(BOT_COMMAND_TEST, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);    
 
-    INFO(" HEAP: ", ESP.getFreeHeap());
-    INFO("STACK: ", ESP.getFreeContStack());
+    auto regionId = value.toInt();
+    String answer = F(" Region: ") + String(regionId);
+    if(value.length() > 0 && regionId > 2 && regionId < 31)
+    {      
+      LedState state;
+      state.Color = CRGB::Yellow;    
+      state.BlinkPeriod = 50;
+      state.BlinkTotalTime = 5000;
+      state.IsAlarmed = true;
+      state.IsPartialAlarmed = false;
+      SetLedState((UARegion)regionId, state);
 
-    //_settings.reset();
-    _settings.alarmsCheckWithoutStatus = true;    
+      RegionInfo *const regionPtr = api->GetRegionById((UARegion)regionId);
+      if(regionPtr != nullptr)
+      {
+        regionPtr->AlarmStatus = ApiAlarmStatus::Alarmed;
+        alarmedLedIdx[(UARegion)regionId] = regionPtr;
+        answer += F(" Test started...");
+        SetRelayStatus(alarmedLedIdx);
+      }      
+    }  
 
-    value = String(F("Reseted: Heap: ")) + String(ESP.getFreeHeap()) + F(" Stack: ") + String(ESP.getFreeContStack());
-    answerCurrentAlarms = false;
+    value = answer; 
+
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
@@ -348,7 +369,9 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     value = F("SSID: ") + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
           + F("RSSI: ") + String(WiFi.RSSI()) + F("db") + F(" ")
           + F("IP: ") + WiFi.localIP().toString() + F(" ")
-          + F("MAC: ") + WiFi.macAddress();
+          + F("GatewayIP: ") + WiFi.gatewayIP().toString() + F(" ")
+          + F("MAC: ") + WiFi.macAddress()          
+    ;
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
@@ -1043,7 +1066,7 @@ void HandleDebugSerialCommands()
     state.Color = CRGB::Yellow;    
     state.BlinkPeriod = 50;
     state.BlinkTotalTime = 5000;
-    state.IsAlarmed = false;
+    state.IsAlarmed = true;
     state.IsPartialAlarmed = false;
     SetLedState((UARegion)debugButtonFromSerial, state);
   }  
@@ -1052,22 +1075,7 @@ void HandleDebugSerialCommands()
   {    
     _settings.alarmsCheckWithoutStatus = !_settings.alarmsCheckWithoutStatus;
     INFO(F("alarmsCheckWithoutStatus: "), _settings.alarmsCheckWithoutStatus);
-  }
-
-  // if(debugButtonFromSerial == 102)
-  // {
-  //   INFO(F(" HEAP: "), ESP.getFreeHeap());
-  //   INFO(F("STACK: "), ESP.getFreeContStack());
-
-  //   int status;
-  //   String statusMsg;
-  //   auto regions = api->getAlarmedRegions2(status, statusMsg, ALARMS_API_OFFICIAL_REGIONS);
-  //   Serial.println();
-  //   INFO(F("HTTP response regions count: "), regions.size(), F(" status: "), status, F(" msg: "), statusMsg);
-
-  //   INFO(F(" HEAP: "), ESP.getFreeHeap());
-  //   INFO(F("STACK: "), ESP.getFreeContStack());
-  // }
+  } 
 
   if(debugButtonFromSerial == 102)
   {
