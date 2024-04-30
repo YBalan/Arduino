@@ -44,6 +44,9 @@
 
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
+
+#define ENABLE_INFO_BUZZ
+#define ENABLE_TRACE_BUZZ
 #endif
 
 #include "DEBUGHelper.h"
@@ -343,8 +346,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
         answer += F(" Test started...");
         SetRelayStatus(alarmedLedIdx);
       }      
-    }  
-
+    } 
     value = answer; 
 
   }else
@@ -651,7 +653,7 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
       led.TotalTimeTicks = 0;    
       led.BlinkPeriod = 0;
       led.BlinkTotalTime = 0;
-      TRACE(F("Led idx: "), led.Idx, F(" Total timeout: "), led.BlinkTotalTime, F(" FINISHED"));
+      //TRACE(F("Led idx: "), led.Idx, F(" Total timeout: "), led.BlinkTotalTime, F(" FINISHED"));
     }   
 
     if(led.BlinkPeriod != 0 && (led.PeriodTicks > 0 && currentTicks - led.PeriodTicks >= abs(led.BlinkPeriod)))
@@ -660,14 +662,16 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
       led.BlinkPeriod *= -1;
       led.PeriodTicks = currentTicks;
       changed = true;
-      TRACE(F("Led idx: "), led.Idx, F(" BLINK! : period: "), led.BlinkPeriod, F(" Total time: "), led.BlinkTotalTime);
+      //TRACE(F("Led idx: "), led.Idx, F(" BLINK! : period: "), led.BlinkPeriod, F(" Total time: "), led.BlinkTotalTime);
     }   
 
     if(led.BlinkTotalTime == 0)
     {
       bool colorChanges = leds[led.Idx] == led.Color;
       if(!colorChanges)
-        TRACE(F("Led idx: "), led.Idx, F(" Color Changed"));
+      {
+        //TRACE(F("Led idx: "), led.Idx, F(" Color Changed"));
+      }
       changed = (changed || !colorChanges);
 
       led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor;       

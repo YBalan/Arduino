@@ -2,6 +2,19 @@
 #ifndef BUZZ_HELPER_H
 #define BUZZ_HELPER_H
 
+#include "DEBUGHelper.h"
+#ifdef ENABLE_INFO_BUZZ
+#define BUZZ_INFO(...) SS_TRACE("[BUZZ INFO] ", __VA_ARGS__)
+#else
+#define BUZZ_INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_BUZZ
+#define BUZZ_TRACE(...) SS_TRACE("[BUZZ TRACE] ", __VA_ARGS__)
+#else
+#define BUZZ_TRACE(...) {}
+#endif
+
 #define DEFAULT_SIREN_PERIOD_DURATION_MS 325
 #define DEFAULT_SIREN_UP_FRQ 800
 #define DEFAULT_SIREN_DOWN_FRQ 500
@@ -32,14 +45,22 @@ namespace Buzz
 
   void AlarmStart(const uint8_t &pin, const int16_t &totalTime = 3000)
   {
+    BUZZ_INFO(F("AlarmStart"));
     if(totalTime > 0)
+    {      
+      BUZZ_INFO(F("Time: "), totalTime);
       Siren(pin, totalTime, /*up:*/500, /*down:*/500, /*pause:*/500, /*period:*/1000);
+    }
   }
 
   void AlarmEnd(const uint8_t &pin, const int16_t &totalTime = 3000)
-  {
+  {    
+    BUZZ_INFO(F("AlarmEnd"));
     if(totalTime > 0)
+    {
+      BUZZ_INFO(F("Time: "), totalTime);
       Siren(pin, totalTime, /*up:*/800, /*down:*/800, /*pause:*/500, /*period:*/1000);
+    }
   }
 };
 

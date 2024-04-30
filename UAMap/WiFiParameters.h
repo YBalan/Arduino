@@ -4,6 +4,7 @@
 
 #include <vector>
 
+#include "DEBUGHelper.h"
 #ifdef ENABLE_INFO_WIFI
 #define WIFIP_INFO(...) SS_TRACE(F("[WiFi PARAMS INFO] "), __VA_ARGS__)
 #else
