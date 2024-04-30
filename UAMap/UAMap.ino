@@ -14,7 +14,7 @@
 
 #include <ezButton.h>
 
-#define VER 1.4
+#define VER F("1.4")
 //#define RELEASE
 #define DEBUG
 
@@ -130,7 +130,7 @@ void setup() {
 
   Serial.println();
   Serial.println(F("!!!! Start UA Map !!!!"));
-  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
+  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESP.getFreeContStack());    
 
@@ -206,6 +206,7 @@ token - Current Alerts.Api token
 nstat - Network Statistic
 rssi - WiFi Quality rssi db
 test - test by regionId
+ver - Version Info
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
 
@@ -235,6 +236,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_BR F("/br")
 #define BOT_COMMAND_RESET F("/reset")
 #define BOT_COMMAND_TEST F("/test")
+#define BOT_COMMAND_VER F("/ver")
 #define BOT_COMMAND_RAINBOW F("/rainbow")
 #define BOT_COMMAND_STROBE F("/strobe")
 #define BOT_COMMAND_SCHEMA F("/schema")
@@ -349,6 +351,10 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     } 
     value = answer; 
 
+  }else
+  if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
+  {
+    value = F("Flash Date: ") + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
