@@ -2,6 +2,8 @@
 #ifndef LED_STATE_H
 #define LED_STATE_H
 
+#include "Settings.h"
+
 struct LedState
 {
   int8_t Idx = -1;
@@ -38,6 +40,11 @@ struct LedState
 
     Color = _targetHSV;
     return _targetHSV.v;
+  }
+
+  void SetColors(const UAMap::Settings &settings)
+  {
+    Color = IsAlarmed ? (IsPartialAlarmed ? settings.PartialAlarmedColor : settings.AlarmedColor) : settings.NotAlarmedColor;
   }
 };
 

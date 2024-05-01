@@ -14,7 +14,7 @@
 
 #include <ezButton.h>
 
-#define VER F("1.4")
+#define VER F("1.5")
 //#define RELEASE
 #define DEBUG
 
@@ -138,15 +138,12 @@ void setup() {
   //_settings.reset();
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
-  FastLED.clear();  
-  SetBrightness(); 
+  FastLED.clear(); 
 
-  //delay(5000);
+  leds[LED_STATUS_IDX] = _settings.PortalModeColor;
 
-  ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 0, 0, false, false, false, _settings.PortalModeColor};
   SetBrightness();
-
-  //delay(5000);
+  FastLEDShow(1000);    
 
   WiFiOps::WiFiOps<3> wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
@@ -172,7 +169,7 @@ void setup() {
   ledsState[4] = {4 /*Luh*/, 0, 0, true, false, false, _settings.AlarmedColor};
 
   SetAlarmedLED(alarmedLedIdx);
-  CheckAndUpdateRealLeds(millis());
+  CheckAndUpdateRealLeds(millis(), /*effectStarted:*/false);
   SetBrightness(); 
 
   #ifdef USE_BOT
@@ -253,6 +250,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_TOKEN F("/token")
 #define BOT_COMMAND_NSTAT F("/nstat")
 #define BOT_COMMAND_RSSI F("/rssi")
+#define BOT_COMMAND_GAY F("/gay")
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
 {   
@@ -409,7 +407,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     //value = F("Rainbow started...");
     value.clear();
     _effect = Effect::Rainbow;   
-    effectStrtTicks = millis();
+    effectStartTicks = millis();
     effectStarted = false;
     answerCurrentAlarms = false;
   }else
@@ -419,7 +417,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
     //value = F("Strobe started...");
     value.clear();
     _effect = Effect::Strobe;   
-    effectStrtTicks = millis();
+    effectStartTicks = millis();
+    effectStarted = false;
+    answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_GAY, filtered, value))
+  {   
+    bot->sendTyping(msg.chatID);
+    //value = F("Strobe started...");
+    value.clear();
+    _effect = Effect::Gay;   
+    effectStartTicks = millis();
     effectStarted = false;
     answerCurrentAlarms = false;
   }else
@@ -640,7 +648,7 @@ void loop()
     {
       //FastLEDShow(true);
     }    
-    if(CheckAndUpdateRealLeds(currentTicks))
+    if(CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/false))
     {
       //FastLEDShow(false);
     }
@@ -663,7 +671,7 @@ void loop()
   firstRun = false;
 }
 
-const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
+const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks, const bool &effectStarted)
 {
   //INFO("CheckStatuses");
 
@@ -672,7 +680,7 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
   {
     auto &led = ledKvp.second;
 
-    if(led.Idx < 0 && led.Idx >= LED_COUNT) break;
+    if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
 
     //TRACE(F("Led idx: "), led.Idx, F(" Total timeout: "), led.BlinkTotalTime, F(" Period timeout: "), led.BlinkPeriod, F(" current: "), currentTicks);
 
@@ -691,9 +699,10 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
     }   
 
     if(led.BlinkPeriod != 0 && (led.PeriodTicks > 0 && currentTicks - led.PeriodTicks >= abs(led.BlinkPeriod)))
-    { 
-      leds[led.Idx] = led.BlinkPeriod > 0 ? 0 : led.Color;     
-      led.BlinkPeriod *= -1;
+    {       
+      leds[led.Idx] = led.BlinkPeriod > 0 ? CRGB::Black : led.Color;      
+      //led.BlinkPeriod *= -1;
+      led.BlinkPeriod = led.BlinkPeriod > 0 ? (0 - led.BlinkPeriod) : (abs(led.BlinkPeriod));
       led.PeriodTicks = currentTicks;
       changed = true;
       //TRACE(F("Led idx: "), led.Idx, F(" BLINK! : period: "), led.BlinkPeriod, F(" Total time: "), led.BlinkTotalTime);
@@ -708,7 +717,8 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks)
       }
       changed = (changed || !colorChanges);
 
-      led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor;       
+      if(!effectStarted)
+        led.SetColors(_settings);      
       RecalculateBrightness(led, false);
       leds[led.Idx] = led.Color;         
       //changed = true;      
@@ -796,6 +806,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
 void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
 {
   TRACE(F("SetAlarmedLED: "), alarmedLedIdx.size());
+  FastLED.setBrightness(_settings.Brightness);
   for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
   {   
     auto &led = ledsState[ledIdx];
@@ -851,7 +862,7 @@ void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
   {
     if(digitalRead(PIN_RELAY1) == RELAY_OFF)
     {
-      DoStrobe();
+      DoStrobe(/*alarmedColorSchema:*/true);
       Buzz::AlarmStart(PIN_BUZZ, _settings.BuzzTime);      
     }
 
@@ -964,7 +975,7 @@ const bool SetStatusLED(const int &status, const String &msg)
   else
   {
     TRACE(F("STATUS OK STOP BLINK"));    
-    led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor; ;
+    led.SetColors(_settings);
     RecalculateBrightness(led, false);
     led.StopBlink();   
   }
@@ -1029,21 +1040,22 @@ void PrintNetworkStatistic(String &str)
   #endif
 }
 
-void DoStrobe()
+void DoStrobe(const bool &alarmedColorSchema)
 {
   for(uint8_t i = 0; i < LED_COUNT; i++)
   {
     auto &led = ledsState[i];
     led.StartBlink(70, 15000);
-    led.Color = led.IsAlarmed ? (led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor) : _settings.NotAlarmedColor; ;
+    if(alarmedColorSchema)
+      led.SetColors(_settings);
   }
 }
 
 void HandleEffects(const unsigned long &currentTicks)
 {
-   if(effectStrtTicks > 0 && currentTicks - effectStrtTicks >= EFFECT_TIMEOUT)
+   if(effectStartTicks > 0 && currentTicks - effectStartTicks >= EFFECT_TIMEOUT)
   {
-    effectStrtTicks = 0;
+    effectStartTicks = 0;
     _effect = Effect::Normal;
   }
 
@@ -1057,10 +1069,29 @@ void HandleEffects(const unsigned long &currentTicks)
   {    
     if(!effectStarted)
     {
-      DoStrobe();
+      DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
     }  
-    CheckAndUpdateRealLeds(currentTicks);  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }  else
+  if(_effect == Effect::Gay)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_rainbow_circular(leds, LED_COUNT, 0, 1);
+      for(auto &ledKvp : ledsState)
+      {
+        auto &led = ledKvp.second;
+        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+
+        led.Color = leds[led.Idx];
+      }
+
+      DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
   }
 }
 
@@ -1206,6 +1237,6 @@ void FastLEDShow(const int &retryCount)
   for(int i = 0; i < retryCount; i++)
   {
     FastLED.show();   
-    //delay(2);
+    yield(); // watchdog
   }
 }

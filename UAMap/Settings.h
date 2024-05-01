@@ -37,13 +37,14 @@
 #define MAX_BASE_URI_LENGTH 50
 
 #define EFFECT_TIMEOUT 15000
-uint32_t effectStrtTicks = 0;
+uint32_t effectStartTicks = 0;
 bool effectStarted = false;
 enum Effect : uint8_t
 {
   Normal,
   Rainbow,
   Strobe,
+  Gay,
 
 } _effect;
 
