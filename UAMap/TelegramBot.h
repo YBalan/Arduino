@@ -56,7 +56,7 @@ struct BotSettings
   } toStore;
 } _botSettings;
 
-extern const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered);
+extern const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup);
 extern void SaveChannelIDs();
 
 const bool GetCommandValue(const String &command, const String &filteredMsg, String &value)
@@ -91,9 +91,12 @@ void HangleBotMessages(FB_msg& msg)
   BOT_INFO(F("MESSAGE: "), msg.text);
 
   auto botNameIdx = -1;
-  if(!msg.chatID.startsWith("-") //In private chat
+  bool isGroup = msg.chatID.startsWith("-");
+  if(
+    (!isGroup) //In private chat
+    || (msg.text == F("/nstat") || msg.text == F("/rssi") || msg.text == F("/ver")) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
-    || msg.replyText.indexOf(REGISTRATION_MSG) >= 0 //In registration
+    || (msg.replyText.indexOf(REGISTRATION_MSG) >= 0) //In registration
     || (msg.data.length() > 0 && msg.text.startsWith(_botSettings.botNameForMenu)) //From BOT menu
     )
   {
@@ -123,7 +126,7 @@ void HangleBotMessages(FB_msg& msg)
       {
         //MENU
         auto filtered = msg.text.substring(botNameIdx, msg.text.length());
-        auto result = HandleBotMenu(msg, filtered);
+        auto result = HandleBotMenu(msg, filtered, isGroup);
         if(result.size() > 0)
         {
           if(result.size() == 1)

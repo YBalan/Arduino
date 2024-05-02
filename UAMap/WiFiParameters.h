@@ -123,7 +123,6 @@ class WiFiNullParameter : public WiFiParameter
   virtual bool IsNull() {return true;}
 };
 
-template <int PARAMS_COUNT>
 class WiFiParameters
 {
   std::vector<WiFiParameter> _parameters;  
@@ -131,8 +130,7 @@ public:
   inline static WiFiNullParameter NullParam;
 public:
 
-  WiFiParameters() 
-  //: _parameters(PARAMS_COUNT)
+  WiFiParameters()  
   {}
 
   void AddParameter(const WiFiParameter &param)

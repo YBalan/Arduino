@@ -42,19 +42,20 @@ namespace WiFiOps
 //   setPreSaveConfigCallback( std::function<void()> func );
 //  called just before doing OTA update
 //   setPreOtaUpdateCallback( std::function<void()> func );
-namespace SaveCallback
+namespace WiFiManagerCallBacks
 {
   //flag for saving data
   static bool _shouldSaveConfig = false;
 
   //callback notifying us of the need to save config
   void saveConfigCallback () {
-    WIFI_INFO("Should save config");
+    WIFI_INFO(F("Should save config"));
     _shouldSaveConfig = true;
-  }
+  }    
+
+  extern void whenAPStarted(WiFiManager *manager);
 }
 
-template <int PARAMS_COUNT = 0>
 class WiFiOps
 {
   private:
@@ -62,7 +63,7 @@ class WiFiOps
     String _APName;
     String _APPass;
     bool _addMacToAPName;
-    WiFiParameters<PARAMS_COUNT> _parameters;
+    WiFiParameters _parameters;
     uint8_t _lastPlace;
   public:
     
@@ -117,7 +118,7 @@ class WiFiOps
       return _parameters.Count();
     }
 
-    const WiFiParameters<PARAMS_COUNT> &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
+    const WiFiParameters &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
     {
       WIFI_TRACE(F("TryToConnectOrOpenConfigPortal..."));
 
@@ -136,7 +137,10 @@ class WiFiOps
       wifiManager.setTitle(_title);
 
       //set config save notify callback
-      wifiManager.setSaveConfigCallback(SaveCallback::saveConfigCallback);
+      wifiManager.setSaveConfigCallback(WiFiManagerCallBacks::saveConfigCallback);
+
+      //when AP started
+      wifiManager.setAPCallback(WiFiManagerCallBacks::whenAPStarted);
 
       wifiManager.setWiFiAutoReconnect(true);
 
@@ -213,10 +217,10 @@ class WiFiOps
     }
 
     //save the custom parameters to FS
-    void SaveFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToSave)
+    void SaveFSSettings(WiFiParameters &parametersToSave)
     {  
       WIFI_TRACE(F("Save Settings..."));
-      if (SaveCallback::_shouldSaveConfig) {
+      if (WiFiManagerCallBacks::_shouldSaveConfig) {
         WIFI_TRACE(F("saving config"));
     #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
         DynamicJsonDocument json(1024);
@@ -252,7 +256,7 @@ class WiFiOps
     }
 
     //read configuration from FS json
-    void LoadFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToLoad)
+    void LoadFSSettings(WiFiParameters &parametersToLoad)
     { 
       WIFI_TRACE(F("Load Settings..."));
       WIFI_TRACE(F("mounting FS..."));

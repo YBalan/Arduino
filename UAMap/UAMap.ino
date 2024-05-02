@@ -14,13 +14,13 @@
 
 #include <ezButton.h>
 
-#define VER F("1.5")
+#define VER F("1.6")
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
-#define BOT_MAX_INCOME_MSG_SIZE 2000
+#define BOT_MAX_INCOME_MSG_SIZE 1000
 
 //#define LANGUAGE_UA
 #define LANGUAGE_EN
@@ -83,7 +83,7 @@ std::map<int, NetworkStatInfo> networkStat;
 #define PIN_RESET_BTN D5
 #define PIN_LED_STRIP D6
 #define LED_COUNT 26
-#define BRIGHTNESS_STEP 10
+#define BRIGHTNESS_STEP 25
 
 //DebounceTime
 #define DebounceTime 50
@@ -118,13 +118,12 @@ void setup() {
   pinMode(PIN_RELAY2, INPUT_PULLUP);
   pinMode(PIN_RELAY2, OUTPUT);
 
-  pinMode(PIN_BUZZ, INPUT_PULLUP);
+  //pinMode(PIN_BUZZ, INPUT_PULLUP);
   pinMode(PIN_BUZZ, OUTPUT);
+  digitalWrite(PIN_BUZZ, LOW);
 
   digitalWrite(PIN_RELAY1, RELAY_OFF);
-  digitalWrite(PIN_RELAY2, RELAY_OFF);
-
-  digitalWrite(PIN_BUZZ, LOW);
+  digitalWrite(PIN_RELAY2, RELAY_OFF);  
 
   resetBtn.setDebounceTime(DebounceTime);  
 
@@ -140,12 +139,12 @@ void setup() {
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
   FastLED.clear(); 
 
-  leds[LED_STATUS_IDX] = _settings.PortalModeColor;
+  leds[LED_STATUS_IDX] = LED_LOAD_MODE_COLOR;
 
   SetBrightness();
   FastLEDShow(1000);    
 
-  WiFiOps::WiFiOps<3> wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
+  WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
   wifiOps
   .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 47)  
@@ -184,6 +183,15 @@ void setup() {
   bot->setLimit(1);
   bot->skipUpdates();
   #endif
+}
+
+void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
+{
+  INFO(F("AP Started Call Back"));
+  leds[LED_STATUS_IDX] = _settings.PortalModeColor;
+
+  SetBrightness();
+  FastLEDShow(1000);    
 }
 
 #ifdef USE_BOT
@@ -252,7 +260,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_RSSI F("/rssi")
 #define BOT_COMMAND_GAY F("/gay")
 
-const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered)
+const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {   
   std::vector<String> messages;
   String value;
@@ -635,7 +643,21 @@ void loop()
   }
   if(resetBtn.isReleased())
   {    
-    _settings.Brightness -= BRIGHTNESS_STEP;
+    static bool brBtnChangeDirectionUp = false;
+    auto nextBr = _settings.Brightness + (brBtnChangeDirectionUp ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP);
+    if(nextBr < 0)
+    {
+      nextBr = 1;
+      brBtnChangeDirectionUp = true;
+    }else
+    if(nextBr > 255)
+    {
+      nextBr = 255;
+      brBtnChangeDirectionUp = false;
+    }
+
+    _settings.Brightness = nextBr;
+
     INFO(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
     SetBrightness();    
   }
@@ -1100,7 +1122,7 @@ void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 2) // Reset Settings
   {
-    _settings.reset();
+    _settings.init();
     SaveSettings();
     api->setBaseUri(_settings.BaseUri);
   }

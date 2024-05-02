@@ -140,7 +140,7 @@ namespace Buzz
     if(totalTime > 0)
     {      
       BUZZ_INFO(F("Time: "), totalTime);
-      Siren(pin, totalTime, /*up:*/500, /*down:*/500, /*pause:*/500, /*period:*/1000);
+      Siren(pin, totalTime, /*up:*/800, /*down:*/800, /*pause:*/500, /*period:*/1000);
     }
   }
 
@@ -150,7 +150,7 @@ namespace Buzz
     if(totalTime > 0)
     {
       BUZZ_INFO(F("Time: "), totalTime);
-      Siren(pin, totalTime, /*up:*/800, /*down:*/800, /*pause:*/500, /*period:*/1000);
+      Siren(pin, totalTime, /*up:*/500, /*down:*/500, /*pause:*/500, /*period:*/1000);
     }
   }
   

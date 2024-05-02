@@ -25,6 +25,7 @@
 #define LED_STATUS_NO_CONNECTION_TOTALTIME -1
 
 #define LED_PORTAL_MODE_COLOR CRGB::Green
+#define LED_LOAD_MODE_COLOR CRGB::White
 #define LED_ALARMED_COLOR CRGB::Red
 #define LED_NOT_ALARMED_COLOR CRGB::Blue
 #define LED_PARTIAL_ALARMED_COLOR CRGB::Yellow
@@ -59,6 +60,9 @@ namespace UAMap
   class Settings
   {
     public:
+
+    Settings(){ init(); }
+
     CRGB PortalModeColor = LED_PORTAL_MODE_COLOR;
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
     CRGB NotAlarmedColor = LED_NOT_ALARMED_COLOR;
@@ -81,7 +85,7 @@ namespace UAMap
 
     char BaseUri[MAX_BASE_URI_LENGTH]; // = ALARMS_API_IOT_BASE_URI;
 
-    void reset()
+    void init()
     {
       PortalModeColor = LED_PORTAL_MODE_COLOR;
       NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
@@ -150,7 +154,7 @@ void LoadSettings()
   if(_settings.reserved != 0)
   {
     SETTINGS_INFO("Reset Settings...");
-    _settings.reset();
+    _settings.init();
   }
   SETTINGS_INFO("BR: ", _settings.Brightness);  
   SETTINGS_INFO("resetFlag: ", _settings.resetFlag);
