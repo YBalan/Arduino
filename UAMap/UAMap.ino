@@ -14,9 +14,9 @@
 
 #include <ezButton.h>
 
-#define VER F("1.6")
+#define VER F("1.7")
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
@@ -140,6 +140,7 @@ void setup() {
   FastLED.clear(); 
 
   leds[LED_STATUS_IDX] = LED_LOAD_MODE_COLOR;
+  fill_ua_prapor(leds);
 
   SetBrightness();
   FastLEDShow(1000);    
@@ -259,6 +260,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_NSTAT F("/nstat")
 #define BOT_COMMAND_RSSI F("/rssi")
 #define BOT_COMMAND_GAY F("/gay")
+#define BOT_COMMAND_UA F("/ua")
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {   
@@ -432,9 +434,19 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_GAY, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
-    //value = F("Strobe started...");
+    //value = F("Gay started...");
     value.clear();
     _effect = Effect::Gay;   
+    effectStartTicks = millis();
+    effectStarted = false;
+    answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_UA, filtered, value))
+  {   
+    bot->sendTyping(msg.chatID);
+    //value = F("UA started...");
+    value.clear();
+    _effect = Effect::UA;   
     effectStartTicks = millis();
     effectStarted = false;
     answerCurrentAlarms = false;
@@ -1114,6 +1126,25 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::UA)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_ua_prapor(leds);
+      for(auto &ledKvp : ledsState)
+      {
+        auto &led = ledKvp.second;
+        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+
+        led.Color = leds[led.Idx];
+      }
+
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
   }
 }
 
@@ -1261,4 +1292,42 @@ void FastLEDShow(const int &retryCount)
     FastLED.show();   
     yield(); // watchdog
   }
+}
+
+void fill_ua_prapor(CRGBArray<LED_COUNT> &leds)
+{
+  leds[0] = CRGB::Yellow;
+  leds[1] = CRGB::Yellow;
+  leds[2] = CRGB::Yellow;  
+  leds[3] = CRGB::Yellow;
+
+  leds[4] = CRGB::Blue;
+  leds[5] = CRGB::Blue;
+
+  leds[6] = CRGB::Yellow;
+  leds[7] = CRGB::Yellow;
+  leds[8] = CRGB::Yellow;
+  leds[9] = CRGB::Yellow;
+  leds[10] = CRGB::Yellow;
+
+  leds[11] = CRGB::Blue;
+  leds[12] = CRGB::Blue;
+  leds[13] = CRGB::Blue;
+  leds[14] = CRGB::Blue;
+  leds[15] = CRGB::Blue;
+
+  leds[16] = CRGB::Yellow;
+
+  leds[17] = CRGB::Blue;
+  leds[18] = CRGB::Blue;
+
+  leds[19] = CRGB::Yellow;
+  leds[20] = CRGB::Yellow;
+  leds[21] = CRGB::Yellow;
+  leds[22] = CRGB::Yellow;
+
+  leds[23] = CRGB::Blue;
+
+  leds[24] = CRGB::Yellow;
+  leds[25] = CRGB::Yellow;
 }

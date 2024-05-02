@@ -46,6 +46,7 @@ enum Effect : uint8_t
   Rainbow,
   Strobe,
   Gay,
+  UA,
 
 } _effect;
 

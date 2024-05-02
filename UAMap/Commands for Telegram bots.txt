@@ -12,6 +12,7 @@ rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
 gay - trolololo
+ua - Ukrain Prapor
 changeconfig - change configuration WiFi, tokens...
 menu - Simple menu
 br - Current brightness
