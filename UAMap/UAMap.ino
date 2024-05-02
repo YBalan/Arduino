@@ -14,13 +14,17 @@
 
 #include <ezButton.h>
 
-#define VER F("1.7")
+#define VER F("1.8")
 //#define RELEASE
 #define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
-#define BOT_MAX_INCOME_MSG_SIZE 1000
+#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
+
+//#define USE_BUZZER_MELODIES 
+
+#define HTTP_TIMEOUT 500
 
 //#define LANGUAGE_UA
 #define LANGUAGE_EN
@@ -118,7 +122,7 @@ void setup() {
   pinMode(PIN_RELAY2, INPUT_PULLUP);
   pinMode(PIN_RELAY2, OUTPUT);
 
-  //pinMode(PIN_BUZZ, INPUT_PULLUP);
+  pinMode(PIN_BUZZ, INPUT_PULLUP);
   pinMode(PIN_BUZZ, OUTPUT);
   digitalWrite(PIN_BUZZ, LOW);
 
@@ -180,7 +184,7 @@ void setup() {
   _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_TEXT); 
-  
+  //bot->setPeriod(_settings.alarmsUpdateTimeout);
   bot->setLimit(1);
   bot->skipUpdates();
   #endif
@@ -279,8 +283,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     INFO(F("Main Menu"));
     #ifdef USE_BUZZER
-    static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-    static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu, /buzztime 0, /buzztime 3000");
+    static const String BotMainMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+    static const String BotMainMenuCall = F("/alarmed, /all, /br 2, /br 128, /br 255, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu, /buzztime 0, /buzztime 3000");
     #else
     static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
     static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
@@ -672,35 +676,41 @@ void loop()
 
     INFO(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
     SetBrightness();    
-  }
+  }  
 
   HandleEffects(currentTicks);
  
   if(_effect == Effect::Normal)
-  {    
+  { 
     if(CheckAndUpdateAlarms(currentTicks))
     {
       //FastLEDShow(true);
-    }    
+    }
+
     if(CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/false))
     {
       //FastLEDShow(false);
-    }
+    }        
   }  
   
   FastLEDShow(false); 
 
-  HandleDebugSerialCommands();    
+  HandleDebugSerialCommands();   
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();
+  if(botStatus == 0)
+  {
+    // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
+    // botStatus = bot->tickManual();
+  }
   if(botStatus == 2)
   {
     BOT_INFO(F("Bot overloaded!"));
     bot->skipUpdates();
-    bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
+    //bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
   }
-  #endif
+  #endif   
 
   firstRun = false;
 }
@@ -1213,27 +1223,59 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 104)
   {
-    //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
-
+    INFO(F("AlarmStart"));
     Buzz::AlarmStart(PIN_BUZZ, 5000);
   }
 
   if(debugButtonFromSerial == 105)
   {
-    //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
-
+    INFO(F("AlarmEnd"));
     Buzz::AlarmEnd(PIN_BUZZ, 5000);
   }
 
   if(debugButtonFromSerial == 106)
-  {
-    //digitalWrite(PIN_BUZZ, !digitalRead(PIN_BUZZ));
-    INFO(F("BUZZ: "), digitalRead(PIN_BUZZ));    
-
+  { 
+    INFO(F("Siren"));
     Buzz::Siren(PIN_BUZZ, 5000);
   }
+
+  #ifdef USE_BUZZER_MELODIES    
+  if(debugButtonFromSerial == 107)
+  { 
+    INFO(F("Pitches"));
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::pitchesMelody, ARRAY_SIZE(Buzz::pitchesMelody)); 
+  }
+
+  if(debugButtonFromSerial == 108)
+  {  
+    INFO(F("Nokia"));
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::nokiaMelody, ARRAY_SIZE(Buzz::nokiaMelody)); 
+  }
+
+  if(debugButtonFromSerial == 109)
+  {  
+    INFO(F("Pacman"));
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::pacmanMelody, ARRAY_SIZE(Buzz::pacmanMelody)); 
+  }
+
+  if(debugButtonFromSerial == 110)
+  {    
+    INFO(F("Happy Birthday"));
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::happyBirthdayMelody, ARRAY_SIZE(Buzz::happyBirthdayMelody)); 
+  }
+
+  if(debugButtonFromSerial == 111)
+  {     
+    INFO(F("Xmas"));
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::xmasMelody, ARRAY_SIZE(Buzz::xmasMelody)); 
+  }
+
+  if(debugButtonFromSerial == 112)
+  {  
+    INFO(F("Star War"));    
+    Buzz::PlayMelody(PIN_BUZZ, Buzz::starWarMelody, ARRAY_SIZE(Buzz::starWarMelody));
+  }
+  #endif
 
   debugButtonFromSerial = 0;
   if(Serial.available() > 0)

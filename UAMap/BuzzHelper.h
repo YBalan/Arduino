@@ -154,27 +154,94 @@ namespace Buzz
     }
   }
   
-  /*
+  
   //https://www.arduino.cc/en/Tutorial/Tone
   //https://projecthub.arduino.cc/tmekinyan/playing-popular-songs-with-arduino-and-a-buzzer-546f4a
   //https://www.build-electronic-circuits.com/arduino-buzzer/
+
+  #define NOTES_MINIMUM_DISTINGUISH_SET 1.20
+  #define ARRAY_SIZE(array) ((sizeof(array))/(sizeof(array[0])))
+
   struct NoteToPlay
   {
     int note = 0;
     int duration = 4;
   };
 
-  NoteToPlay someMelody[] = { {NOTE_C4, 4}, {NOTE_G3, 8}, {NOTE_G3, 8}, {NOTE_A3, 4}, {NOTE_G3, 4}, {NOTE_EMPTY, 4}, {NOTE_B3, 4}, {NOTE_C4, 4} };
+  #ifdef USE_BUZZER_MELODIES
+  static constexpr const NoteToPlay pitchesMelody[] = { {NOTE_C4, 4}, {NOTE_G3, 8}, {NOTE_G3, 8}, {NOTE_A3, 4}, {NOTE_G3, 4}, {NOTE_EMPTY, 4}, {NOTE_B3, 4}, {NOTE_C4, 4} };
 
   //Star Wars Main Theme
-  NoteToPlay starWarMelody[] = {
+  static constexpr const NoteToPlay starWarMelody[] = {
   {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 650}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 350}, {NOTE_F5, 150}, {NOTE_C5, 500}, {NOTE_GS4, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 650}, {NOTE_EMPTY, 500},
   };
 
-  void PlayMelody(const uint8_t &pin, const NoteToPlay* const melody)
+  static constexpr const NoteToPlay nokiaMelody[] = {
+    {NOTE_E5, 8}, {NOTE_D5, 8}, {NOTE_FS4, 4}, {NOTE_GS4, 4}, 
+    {NOTE_CS5, 8}, {NOTE_B4, 8}, {NOTE_D4, 4}, {NOTE_E4, 4}, 
+    {NOTE_B4, 8}, {NOTE_A4, 8}, {NOTE_CS4, 4}, {NOTE_E4, 4},
+    {NOTE_A4, 2}
+  };
+
+  static constexpr const NoteToPlay happyBirthdayMelody[] = {
+    {NOTE_C4, 4}, {NOTE_C4, 8}, 
+    {NOTE_D4, 4}, {NOTE_C4, 4}, {NOTE_F4, 4},
+    {NOTE_E4, 2}, {NOTE_C4, 4}, {NOTE_C4, 8}, 
+    {NOTE_D4, 4}, {NOTE_C4, 4}, {NOTE_G4, 4},
+    {NOTE_F4, 2}, {NOTE_C4, 4}, {NOTE_C4, 8},
+    
+    {NOTE_C5, 4}, {NOTE_A4, 4}, {NOTE_F4, 4}, 
+    {NOTE_E4, 4}, {NOTE_D4, 4}, {NOTE_AS4, 4}, {NOTE_AS4, 8},
+    {NOTE_A4, 4}, {NOTE_F4, 4}, {NOTE_G4, 4},
+    {NOTE_F4, 2},
+  };
+
+   static constexpr const NoteToPlay pacmanMelody[] = {
+    {NOTE_B4, 16}, {NOTE_B5, 16}, {NOTE_FS5, 16}, {NOTE_DS5, 16},
+    {NOTE_B5, 32}, {NOTE_FS5, 16}, {NOTE_DS5, 8}, {NOTE_C5, 16},
+    {NOTE_C6, 16}, {NOTE_G6, 16}, {NOTE_E6, 16}, {NOTE_C6, 32}, {NOTE_G6, 16}, {NOTE_E6, 8},
+    
+    {NOTE_B4, 16}, {NOTE_B5, 16}, {NOTE_FS5, 16}, {NOTE_DS5, 16}, {NOTE_B5, 32},
+    {NOTE_FS5, 16}, {NOTE_DS5, 8}, {NOTE_DS5, 32}, {NOTE_E5, 32}, {NOTE_F5, 32},
+    {NOTE_F5, 32}, {NOTE_FS5, 32}, {NOTE_G5, 32}, {NOTE_G5, 32}, {NOTE_GS5, 32}, {NOTE_A5, 16}, {NOTE_B5, 8},
+  };
+
+  static constexpr const NoteToPlay xmasMelody[] = {
+    {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 4},
+    {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 4},
+    {NOTE_E5, 8}, {NOTE_G5, 8}, {NOTE_C5, 8}, {NOTE_D5, 8},
+    {NOTE_E5, 2},
+    {NOTE_F5, 8}, {NOTE_F5, 8}, {NOTE_F5, 8}, {NOTE_F5, 8},
+    {NOTE_F5, 8}, {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 16}, {NOTE_E5, 16},
+    {NOTE_E5, 8}, {NOTE_D5, 8}, {NOTE_D5, 8}, {NOTE_E5, 8},
+    {NOTE_D5, 4}, {NOTE_G5, 4},
+  };
+  #endif
+
+  int MelodyLengthMs(const NoteToPlay *const melody, const int& melodySize, const bool &showTrace = true)
   {
-    const int melodySize = sizeof(melody) / sizeof(NoteToPlay);
+    int res = 0;   
     // iterate over the notes of the melody:
+    
+    for (int thisNote = 0; thisNote < melodySize; thisNote++) 
+    {
+      int noteDuration = melody[thisNote].duration < 50 ? (1000 / melody[thisNote].duration) : melody[thisNote].duration;
+      int pauseBetweenNotes = noteDuration * NOTES_MINIMUM_DISTINGUISH_SET;
+
+      res += noteDuration + pauseBetweenNotes;
+    }    
+
+    if(showTrace)
+      BUZZ_INFO(F("MelodyLengthMs: "), res, F("ms..."));
+    return res;
+  }
+
+  void PlayMelody(const uint8_t &pin, const NoteToPlay *const melody, const int& melodySize)
+  { 
+    BUZZ_INFO(F("Play Melody"));    
+      // iterate over the notes of the melody:
+
+    BUZZ_INFO(F("\t"), F("Size: "), melodySize, F(" "), F("Length: "), MelodyLengthMs(melody, melodySize, /*showTrace:*/false), F("ms..."));
 
     for (int thisNote = 0; thisNote < melodySize; thisNote++) 
     {
@@ -182,23 +249,27 @@ namespace Buzz
 
       //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
 
-      int noteDuration = 1000 / melody[thisNote].duration;
+      int noteDuration = melody[thisNote].duration < 50 ? (1000 / melody[thisNote].duration) : melody[thisNote].duration;
+
+      BUZZ_TRACE(F("\tDuration"), noteDuration);
 
       tone(pin, melody[thisNote].note, noteDuration);
 
       // to distinguish the notes, set a minimum time between them.
 
-      // the note's duration + 30% seems to work well:
+      // the note's duration + NOTES_MINIMUM_DISTINGUISH_SET% seems to work well:
 
-      int pauseBetweenNotes = noteDuration * 1.30;
+      int pauseBetweenNotes = noteDuration * NOTES_MINIMUM_DISTINGUISH_SET;
+
+      BUZZ_TRACE(F("\tPause"), pauseBetweenNotes);
 
       delay(pauseBetweenNotes);
 
       // stop the tone playing:
 
       noTone(pin);
-    }
-  }  */
+    }    
+  }  
 };
 
 #endif //BUZZ_HELPER_H

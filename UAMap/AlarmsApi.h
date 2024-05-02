@@ -248,6 +248,7 @@ IotApiRegions iotApiRegions =
 
     void CheckApi()
     {
+      if(!_uriBase.endsWith("/")) _uriBase += '/';
       _uriBase.toLowerCase();
       _isOfficialApi = _uriBase == ALARMS_API_OFFICIAL_BASE_URI;
     }
@@ -291,19 +292,23 @@ IotApiRegions iotApiRegions =
       //BearSSL::WiFiClientSecure client2;    
       BearSSL::WiFiClientSecure client;  
 
-      https2->setTimeout(500);
-      client.setTimeout(500);
+      https2->setTimeout(HTTP_TIMEOUT);
+      client.setTimeout(HTTP_TIMEOUT);
+      //client.setConnectTimeout(HTTP_TIMEOUT);
       
       client.setInsecure();
       // https2->useHTTP10(true);
       https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
-      const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;      
+      const auto uri = _uriBase + resource;      
 
       ALARMS_TRACE(F("[HTTPS2] begin: "), uri);   
       ALARMS_TRACE(F("[HTTPS2] apiKey: "), _apiKey); 
       if (https2->begin(client, uri)) 
-      { // HTTPS        
+      { // HTTPS    
+
+        https2->setTimeout(HTTP_TIMEOUT);
+
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
 
@@ -480,7 +485,7 @@ IotApiRegions iotApiRegions =
       client.setInsecure();
       
       //HTTPClient https;
-      https2->setTimeout(500);
+      https2->setTimeout(HTTP_TIMEOUT);
       //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
@@ -489,6 +494,8 @@ IotApiRegions iotApiRegions =
       ALARMS_TRACE(F("[HTTPS] apiKey: "), apiKey); 
       if (https2->begin(client, uri)) 
       {  // HTTPS
+
+        https2->setTimeout(HTTP_TIMEOUT);
         String payload;
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + apiKey);        
         https2->addHeader("Accept", "application/json");      
