@@ -141,14 +141,13 @@ void setup() {
   //_settings.reset();
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
-  FastLED.clear(); 
 
-  leds[LED_STATUS_IDX] = LED_LOAD_MODE_COLOR;
+  FastLED.clear();   
   fill_ua_prapor(leds);
+  FastLED.setBrightness(_settings.Brightness > 1 ? _settings.Brightness : 2);
 
-  SetBrightness();
-  FastLEDShow(1000);    
-
+  FastLEDShow(1000);
+  
   WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
   wifiOps
@@ -193,9 +192,10 @@ void setup() {
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
   INFO(F("AP Started Call Back"));
+  FastLED.clear(); 
   leds[LED_STATUS_IDX] = _settings.PortalModeColor;
 
-  SetBrightness();
+  FastLED.setBrightness(_settings.Brightness > 1 ? _settings.Brightness : 2);  
   FastLEDShow(1000);    
 }
 
