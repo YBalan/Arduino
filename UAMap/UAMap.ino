@@ -14,7 +14,7 @@
 
 #include <ezButton.h>
 
-#define VER F("1.8")
+#define VER F("1.9")
 //#define RELEASE
 #define DEBUG
 
