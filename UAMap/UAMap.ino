@@ -1,3 +1,5 @@
+//Estimates: https://docs.google.com/spreadsheets/d/1mYA_Bc687Y8no1yJDxv83fimtd0WU4nvcGI80_jnJME/edit?usp=sharing
+
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 
@@ -14,7 +16,7 @@
 
 #include <ezButton.h>
 
-#define VER F("1.9")
+#define VER F("1.10")
 //#define RELEASE
 #define DEBUG
 
@@ -218,10 +220,13 @@ rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
 changeconfig - change configuration WiFi, tokens...
+chid - Registered ChannelIDs
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
+gay - trolololo
 
 !!!!!!!!!!!!!!!! - Bot Commands for Users
+ua - Ukrain Prapor
 menu - Simple menu
 br - Current brightness
 br255 - Max brightness
@@ -265,6 +270,7 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_RSSI F("/rssi")
 #define BOT_COMMAND_GAY F("/gay")
 #define BOT_COMMAND_UA F("/ua")
+#define BOT_COMMAND_CHID F("/chid")
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {   
@@ -296,7 +302,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     INFO(F(" HEAP: "), ESP.getFreeHeap());
     INFO(F("STACK: "), ESP.getFreeContStack());
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
-    //menuID = bot->lastBotMsg();
+    
+    delay(500);
   } else
   if(GetCommandValue(BOT_COMMAND_UPDATE, filtered, value))
   { 
@@ -414,6 +421,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
           + F("GatewayIP: ") + WiFi.gatewayIP().toString() + F(" ")
           + F("MAC: ") + WiFi.macAddress()          
     ;
+  }else
+  if(GetCommandValue(BOT_COMMAND_CHID, filtered, value))
+  {
+    INFO(F("BOT Channels:"));
+    value.clear();
+    value = String(F("BOT Channels:")) + F(" ") + String(_botSettings.toStore.registeredChannelIDs.size()) + F(" -> ");
+    for(const auto &channel : _botSettings.toStore.registeredChannelIDs)  
+    {
+      INFO(F("\t"), channel.first);
+      value += F("[") + channel.first + F("]") + F("; ");
+    }
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
   {    
