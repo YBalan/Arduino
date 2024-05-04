@@ -18,7 +18,7 @@
 
 #define VER F("1.10")
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
@@ -103,17 +103,6 @@ std::map<uint8_t, LedState> ledsState;
 
 ezButton resetBtn(PIN_RESET_BTN);
 
-void SetLedState(const UARegion &region, LedState &state)
-{
-  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
-  {
-    state.Idx = idx;
-    // state.IsAlarmed = ledsState[idx].IsAlarmed;
-    // state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
-    ledsState[idx] = state;
-  }
-}
-
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -145,7 +134,7 @@ void setup() {
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
 
   FastLED.clear();   
-  fill_ua_prapor(leds);
+  fill_ua_prapor2();
   FastLED.setBrightness(_settings.Brightness > 1 ? _settings.Brightness : 2);
 
   FastLEDShow(1000);
@@ -168,11 +157,11 @@ void setup() {
   api->setApiKey(wifiOps.GetParameterValueById("apiToken")); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
-
-  ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyiv*/, 1000, -1, false, false, false, _settings.NoConnectionColor};
-  ledsState[0] = {0 /*Crymea*/, 0, 0, true, false, false, _settings.AlarmedColor};
-  ledsState[4] = {4 /*Luh*/, 0, 0, true, false, false, _settings.AlarmedColor};
-
+ 
+  //ledsState[LED_STATUS_IDX] = {LED_STATUS_IDX /*Kyivska*/, 1000, -1, false, false, false, _settings.NoConnectionColor};
+  //ledsState[0] = {0 /*Crimea*/, 0, 0, true, false, false, _settings.AlarmedColor};
+  //ledsState[4] = {4 /*Luh*/, 0, 0, true, false, false, _settings.AlarmedColor};
+  
   SetAlarmedLED(alarmedLedIdx);
   CheckAndUpdateRealLeds(millis(), /*effectStarted:*/false);
   SetBrightness(); 
@@ -377,7 +366,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       state.BlinkTotalTime = 5000;
       state.IsAlarmed = true;
       state.IsPartialAlarmed = false;
-      SetLedState((UARegion)regionId, state);
+      SetRegionState((UARegion)regionId, state);
 
       RegionInfo *const regionPtr = api->GetRegionById((UARegion)regionId);
       if(regionPtr != nullptr)
@@ -1160,7 +1149,7 @@ void HandleEffects(const unsigned long &currentTicks)
     if(!effectStarted)
     {
       FastLED.setBrightness(255);
-      fill_ua_prapor(leds);
+      fill_ua_prapor2();
       for(auto &ledKvp : ledsState)
       {
         auto &led = ledKvp.second;
@@ -1218,7 +1207,7 @@ void HandleDebugSerialCommands()
     state.BlinkTotalTime = 5000;
     state.IsAlarmed = true;
     state.IsPartialAlarmed = false;
-    SetLedState((UARegion)debugButtonFromSerial, state);
+    SetRegionState((UARegion)debugButtonFromSerial, state);
   }  
 
   if(debugButtonFromSerial == 101)
@@ -1354,7 +1343,7 @@ void FastLEDShow(const int &retryCount)
   }
 }
 
-void fill_ua_prapor(CRGBArray<LED_COUNT> &leds)
+void fill_ua_prapor()
 {
   leds[0] = CRGB::Yellow;
   leds[1] = CRGB::Yellow;
@@ -1390,4 +1379,56 @@ void fill_ua_prapor(CRGBArray<LED_COUNT> &leds)
 
   leds[24] = CRGB::Yellow;
   leds[25] = CRGB::Yellow;
+}
+
+void fill_ua_prapor2()
+{ 
+  SetRegionColor(UARegion::Crimea,            CRGB::Yellow);
+  SetRegionColor(UARegion::Khersonska,        CRGB::Yellow);
+  SetRegionColor(UARegion::Zaporizka,         CRGB::Yellow);
+  SetRegionColor(UARegion::Donetska,          CRGB::Yellow);
+  SetRegionColor(UARegion::Dnipropetrovska,   CRGB::Yellow);
+  SetRegionColor(UARegion::Mykolaivska,       CRGB::Yellow);
+  SetRegionColor(UARegion::Odeska,            CRGB::Yellow);
+  SetRegionColor(UARegion::Kirovohradska,     CRGB::Yellow);
+  SetRegionColor(UARegion::Vinnytska,         CRGB::Yellow);
+  SetRegionColor(UARegion::Khmelnitska,       CRGB::Yellow);
+  SetRegionColor(UARegion::Chernivetska,      CRGB::Yellow);
+  SetRegionColor(UARegion::Ivano_Frankivska,  CRGB::Yellow);
+  SetRegionColor(UARegion::Ternopilska,       CRGB::Yellow);
+  SetRegionColor(UARegion::Lvivska,           CRGB::Yellow);
+  SetRegionColor(UARegion::Zakarpatska,       CRGB::Yellow);
+
+
+  SetRegionColor(UARegion::Luhanska,          CRGB::Blue);
+  SetRegionColor(UARegion::Kharkivska,        CRGB::Blue);
+  SetRegionColor(UARegion::Poltavska,         CRGB::Blue);
+  SetRegionColor(UARegion::Sumska,            CRGB::Blue);
+  SetRegionColor(UARegion::Chernihivska,      CRGB::Blue);
+  SetRegionColor(UARegion::Kyivska,           CRGB::Blue);
+  SetRegionColor(UARegion::Cherkaska,         CRGB::Blue);
+  SetRegionColor(UARegion::Zhytomyrska,       CRGB::Blue);
+  SetRegionColor(UARegion::Rivnenska,         CRGB::Blue);
+  SetRegionColor(UARegion::Volynska,          CRGB::Blue);
+
+}
+
+void SetRegionColor(const UARegion &region, const CRGB &color)
+{
+  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  {    
+    ledsState[idx].Color = color;
+    leds[idx] = color;
+  }
+}
+
+void SetRegionState(const UARegion &region, LedState &state)
+{
+  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  {
+    state.Idx = idx;
+    // state.IsAlarmed = ledsState[idx].IsAlarmed;
+    // state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
+    ledsState[idx] = state;
+  }
 }

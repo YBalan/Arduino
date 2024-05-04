@@ -2,6 +2,7 @@
 #ifndef LED_STATE_H
 #define LED_STATE_H
 
+#include "pixeltypes.h"
 #include "Settings.h"
 
 struct LedState
@@ -14,7 +15,10 @@ struct LedState
   bool IsPartialAlarmed;
   CRGB Color;
   uint32_t PeriodTicks = 0;
-  uint32_t TotalTimeTicks = 0;
+  uint32_t TotalTimeTicks = 0;  
+
+  LedState() { }
+  LedState(const CRGB &color) : Color(color) { }  
 
   void StopBlink()
   {
