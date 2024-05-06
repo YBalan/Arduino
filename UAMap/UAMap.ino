@@ -16,12 +16,13 @@
 
 #include <ezButton.h>
 
-#define VER F("1.10")
+#define VER F("1.11")
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
+#define USE_BOT_MAIN_MENU_INLINE
 #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
 
 //#define USE_BUZZER_MELODIES 
@@ -60,7 +61,7 @@
 #include "LedState.h"
 #include "Settings.h"
 #include "WiFiOps.h"
-#include "TelegramBot.h"
+#include "TelegramBotHelper.h"
 #include "BuzzHelper.h"
 
 #ifdef ENABLE_INFO_MAIN
@@ -260,10 +261,25 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_GAY F("/gay")
 #define BOT_COMMAND_UA F("/ua")
 #define BOT_COMMAND_CHID F("/chid")
+#define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
-{   
+{  
   std::vector<String> messages;
+
+  if(msg.OTA && msg.text == BOT_COMMAND_FRMW_UPDATE)
+  { 
+    INFO(F("Update check..."));
+    String fileName = msg.fileName;
+    fileName.replace(F(".bin"), F(""));    
+    if(fileName.length() > 0)
+    {
+      INFO(F("Update..."));
+      bot->update();
+    }
+    return std::move(messages);
+  }
+  
   String value;
   bool answerCurrentAlarms = false;
   bool answerAll = false;
@@ -279,10 +295,10 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     INFO(F("Main Menu"));
     #ifdef USE_BUZZER
     static const String BotMainMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-    static const String BotMainMenuCall = F("/alarmed, /all, /br 2, /br 128, /br 255, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu, /buzztime 0, /buzztime 3000");
+    static const String BotMainMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
     #else
-    static const String BotMainMenu = F("Alarmed \t All \n Max Br \t Mid Br \t Min Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-    static const String BotMainMenuCall = F("/alarmed, /all, /br 255, /br 128, /br 2, /schema 0, /schema 1, /strobe, /rainbow, /relay1 menu, /relay2 menu");
+    static const String BotMainMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+    static const String BotMainMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
     #endif
 
     ESP.resetHeap();
@@ -290,7 +306,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     INFO(F(" HEAP: "), ESP.getFreeHeap());
     INFO(F("STACK: "), ESP.getFreeContStack());
+
+    #ifdef USE_BOT_MAIN_MENU_INLINE
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
+    #else
+    //bot->showMenuText(BotMainMenu, BotMainMenuCall, msg.chatID, true);
+    #endif
     
     delay(500);
   } else
