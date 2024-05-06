@@ -16,13 +16,14 @@
 
 #include <ezButton.h>
 
-#define VER F("1.11")
+#define VER F("1.14")
 //#define RELEASE
 #define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
-#define USE_BOT_MAIN_MENU_INLINE
+#define USE_BOT_MAIN_MENU 
+#define USE_BOT_SIMPLE_ANSWER false
 #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
 
 //#define USE_BUZZER_MELODIES 
@@ -213,9 +214,9 @@ changeconfig - change configuration WiFi, tokens...
 chid - Registered ChannelIDs
 relay1menu - Relay1 Menu to choose region
 relay2menu - Relay2 Menu to choose region
-gay - trolololo
 
 !!!!!!!!!!!!!!!! - Bot Commands for Users
+gay - trolololo
 ua - Ukrain Prapor
 menu - Simple menu
 br - Current brightness
@@ -263,6 +264,15 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_CHID F("/chid")
 #define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
 
+//Main Menu Main
+#define BOT_MENU_UA_PRAPOR F("UA Prapor")
+#define BOT_MENU_ALARMED F("Alarmed")
+#define BOT_MENU_ALL F("All")
+#define BOT_MENU_MIN_BR F("Min Br")
+#define BOT_MENU_MID_BR F("Mid Br")
+#define BOT_MENU_MAX_BR F("Max Br")
+#define BOT_MENU_NIGHT_BR F("Night Br")
+
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
   std::vector<String> messages;
@@ -284,7 +294,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   bool answerCurrentAlarms = false;
   bool answerAll = false;
 
-  bool noAnswerIfFromMenu = msg.data.length() > 0 && filtered.startsWith(_botSettings.botNameForMenu);
+  bool noAnswerIfFromMenu = msg.data.length() > 0;// && filtered.startsWith(_botSettings.botNameForMenu);
   BOT_TRACE(F("Filtered: "), filtered);
   filtered = noAnswerIfFromMenu ? msg.data : filtered;
   BOT_TRACE(F("Filtered: "), filtered);
@@ -294,11 +304,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     INFO(F("Main Menu"));
     #ifdef USE_BUZZER
-    static const String BotMainMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-    static const String BotMainMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
+    static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
     #else
-    static const String BotMainMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-    static const String BotMainMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
+    static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
     #endif
 
     ESP.resetHeap();
@@ -306,15 +316,62 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     INFO(F(" HEAP: "), ESP.getFreeHeap());
     INFO(F("STACK: "), ESP.getFreeContStack());
+    
+    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);
 
-    #ifdef USE_BOT_MAIN_MENU_INLINE
-    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotMainMenu, BotMainMenuCall, msg.chatID);
-    #else
-    //bot->showMenuText(BotMainMenu, BotMainMenuCall, msg.chatID, true);
+    //delay(100);
+    #ifdef USE_BOT_MAIN_MENU    
+    static const String BotFastMenu = String(BOT_MENU_UA_PRAPOR)    
+      + F(" \n ") + BOT_MENU_MIN_BR + F(" \t ") + BOT_MENU_MID_BR + F(" \t ") + BOT_MENU_MAX_BR + F(" \t ") + BOT_MENU_NIGHT_BR
+      + F(" \n ") + BOT_MENU_ALARMED + F(" \t ") + BOT_MENU_ALL
+    ;
+    bot->showMenuText(_botSettings.botNameForMenu, BotFastMenu, msg.chatID, true);
     #endif
     
-    delay(500);
+    //delay(500);
   } else
+  #ifdef USE_BOT_MAIN_MENU 
+  if(GetCommandValue(BOT_MENU_ALARMED, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    
+    answerCurrentAlarms = true;
+  } else
+  if(GetCommandValue(BOT_MENU_ALL, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    
+    answerAll = true;
+  } else
+  if(GetCommandValue(BOT_MENU_MIN_BR, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    _settings.Brightness = 2;
+    SetBrightness();    
+    value = String(F("Brightness: ")) + String(_settings.Brightness);
+  } else
+  if(GetCommandValue(BOT_MENU_MID_BR, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    _settings.Brightness = 30;
+    SetBrightness();    
+    value = String(F("Brightness: ")) + String(_settings.Brightness);
+  } else  
+  if(GetCommandValue(BOT_MENU_MAX_BR, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    _settings.Brightness = 255;
+    SetBrightness();    
+    value = String(F("Brightness: ")) + String(_settings.Brightness);
+  } else
+  if(GetCommandValue(BOT_MENU_NIGHT_BR, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    _settings.Brightness = 1;
+    SetBrightness();    
+    value = String(F("Brightness: ")) + String(_settings.Brightness);
+  } else
+  #endif
   if(GetCommandValue(BOT_COMMAND_UPDATE, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
@@ -473,7 +530,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     effectStarted = false;
     answerCurrentAlarms = false;
   }else
-  if(GetCommandValue(BOT_COMMAND_UA, filtered, value))
+  if(GetCommandValue(BOT_COMMAND_UA, filtered, value) || GetCommandValue(BOT_MENU_UA_PRAPOR, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
     //value = F("UA started...");
@@ -551,14 +608,21 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     {  
       String answerAllMsg = String(F("All regions count: ")) + String(MAX_REGIONS_COUNT);
       messages.push_back(answerAllMsg);
-    }
+    }    
     
     for(const auto &region : api->iotApiRegions)
     {      
       if(region.AlarmStatus == ApiAlarmStatus::Alarmed || answerAll)
       {
-        String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
-        messages.push_back(regionMsg);
+        if(USE_BOT_SIMPLE_ANSWER)
+        {
+          messages[0] += F("\n") + region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
+        }
+        else
+        {
+          String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
+          messages.push_back(regionMsg);
+        }
       }
     } 
   }

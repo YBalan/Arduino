@@ -29,8 +29,6 @@ std::unique_ptr<TelegramBot> bot(new TelegramBot());
 std::unique_ptr<TelegramBot> bot;
 #endif
 
-// показать юзер меню (\t - горизонтальное разделение кнопок, \n - вертикальное
-//bot.showMenu("Menu1 \t Menu2 \t Menu3 \n Close", CHAT_ID);  
 //https://stackoverflow.com/questions/72594564/how-can-i-add-menu-button-in-telegram-bot
 struct BotSettings
 {
@@ -95,11 +93,12 @@ void HangleBotMessages(FB_msg& msg)
     (!isGroup) //In private chat
     || (msg.text == F("/nstat") || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
-    || (msg.replyText.indexOf(REGISTRATION_MSG) >= 0) //In registration
-    || (msg.data.length() > 0 && msg.text.startsWith(_botSettings.botNameForMenu)) //From BOT menu
+    || (msg.replyText.indexOf(_botSettings.botName) == 0 && msg.replyText.indexOf(REGISTRATION_MSG, botNameIdx + _botSettings.botName.length()) > 0) //In registration
+    || (msg.data.length() > 0 && msg.text.indexOf(_botSettings.botNameForMenu) >= 0) //From BOT inline menu
+    || (msg.replyText == _botSettings.botNameForMenu) //From BOT fast menu
     )
   {
-    botNameIdx = botNameIdx == -1 ? 0 : (botNameIdx + _botSettings.botName.length());
+    //botNameIdx = botNameIdx == -1 ? 0 : botNameIdx; // for register unregister
 
     BOT_TRACE(F("Checking authorization: "), msg.chatID);
     if(_botSettings.toStore.registeredChannelIDs.count(msg.chatID) > 0) //REGISTERED
@@ -110,13 +109,13 @@ void HangleBotMessages(FB_msg& msg)
       //   BOT_TRACE(msg.chatID, "Banned");
       // }
       // else
-      if(msg.text.indexOf(F("/unregister"), botNameIdx) >= 0)
+      if(msg.text.indexOf(F("/unregister")) >= 0)
       {
         BOT_TRACE(F("Unregistered: "), msg.chatID);
         _botSettings.toStore.registeredChannelIDs.erase(msg.chatID);
         SaveChannelIDs();
       }else
-      if(msg.text.indexOf(F("/unregisterall"), botNameIdx) >= 0)
+      if(msg.text.indexOf(F("/unregisterall")) >= 0)
       {
         BOT_TRACE(F("Unregistered: "), msg.chatID);
         _botSettings.toStore.registeredChannelIDs.clear();
@@ -124,7 +123,9 @@ void HangleBotMessages(FB_msg& msg)
       }else
       {
         //MENU
-        auto filtered = msg.text.substring(botNameIdx, msg.text.length());
+        //auto filtered = msg.text.substring(botNameIdx, msg.text.length());
+        auto filtered = msg.text;
+        filtered.replace(_botSettings.botName, F(""));
         auto result = HandleBotMenu(msg, filtered, isGroup);
         if(result.size() > 0)
         {
@@ -149,10 +150,10 @@ void HangleBotMessages(FB_msg& msg)
     
     //REGISTRATION
     {      
-      if(msg.text.indexOf(F("/register"), botNameIdx) >= 0)
+      if(msg.text.indexOf(F("/register")) >= 0)
       {
         BOT_TRACE(F("Start registration: "), msg.chatID);
-        bot->replyMessage(REGISTRATION_MSG, msg.messageID, msg.chatID);      
+        bot->replyMessage(_botSettings.botName + F(" ") + REGISTRATION_MSG, msg.messageID, msg.chatID);      
       }else      
       if(msg.replyText.indexOf(REGISTRATION_MSG) >= 0)
       {

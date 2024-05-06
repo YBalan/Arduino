@@ -7,7 +7,7 @@
 class TelegramBot : public FastBot
 {
   public:
-  uint8_t tickManual() {
+  virtual uint8_t tickManual() {
         if (!*_callback) return 7;
         String req;
         req.reserve(120);
@@ -45,9 +45,9 @@ class TelegramBot : public FastBot
         // была попытка OTA обновления. Обновляемся после ответа серверу!
         if (OTAstate >= 0) {
             String ota;
-            if (OTAstate == 0) ota = F("Error");
+            if (OTAstate == 0) ota = F("OTA Error");
             else if (OTAstate == 1) ota = F("No updates");
-            else if (OTAstate == 2) ota = F("OK");
+            else if (OTAstate == 2) ota = String(F("OTA OK")) + F(" ") + VER;
             sendMessage(ota, _otaID);
             if (OTAstate == 2) ESP.restart();
             OTAstate = -1;
