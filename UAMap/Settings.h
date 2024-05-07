@@ -47,6 +47,7 @@ enum Effect : uint8_t
   Strobe,
   Gay,
   UA,
+  UAWithAnthem,
 
 } _effect;
 

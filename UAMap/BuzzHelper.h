@@ -281,6 +281,8 @@ namespace Buzz
       // stop the tone playing:
 
       noTone(pin);
+
+      yield(); // watchdog
     }    
 
     return melodySizeMs;

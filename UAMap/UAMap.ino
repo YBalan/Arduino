@@ -16,9 +16,9 @@
 
 #include <ezButton.h>
 
-#define VER F("1.17")
+#define VER F("1.18")
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
@@ -555,11 +555,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_UA, filtered, value) || GetCommandValue(BOT_MENU_UA_PRAPOR, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
-    //value = F("UA started...");
+    //value = F("UA started...");    
     value.clear();
-    _effect = Effect::UA;   
+    _effect = value.toInt() > 0 ? Effect::UAWithAnthem : Effect::UA;   
     effectStartTicks = millis();
-    effectStarted = false;
+    effectStarted = false;          
     answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_BASEURI, filtered, value))
@@ -1244,13 +1244,7 @@ void HandleEffects(const unsigned long &currentTicks)
     {
       FastLED.setBrightness(255);
       fill_rainbow_circular(leds, LED_COUNT, 0, 1);
-      for(auto &ledKvp : ledsState)
-      {
-        auto &led = ledKvp.second;
-        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
-
-        led.Color = leds[led.Idx];
-      }
+      SetStateFromRealLeds();
 
       DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
@@ -1263,13 +1257,21 @@ void HandleEffects(const unsigned long &currentTicks)
     {
       FastLED.setBrightness(255);
       fill_ua_prapor2();
-      for(auto &ledKvp : ledsState)
-      {
-        auto &led = ledKvp.second;
-        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+      SetStateFromRealLeds();
 
-        led.Color = leds[led.Idx];
-      }
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }
+  else
+  if(_effect == Effect::UAWithAnthem)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_ua_prapor2();
+      SetStateFromRealLeds();
 
       #ifdef USE_BUZZER
       FastLEDShow(500);
@@ -1467,44 +1469,6 @@ void FastLEDShow(const int &retryCount)
   }
 }
 
-void fill_ua_prapor()
-{
-  leds[0] = CRGB::Yellow;
-  leds[1] = CRGB::Yellow;
-  leds[2] = CRGB::Yellow;  
-  leds[3] = CRGB::Yellow;
-
-  leds[4] = CRGB::Blue;
-  leds[5] = CRGB::Blue;
-
-  leds[6] = CRGB::Yellow;
-  leds[7] = CRGB::Yellow;
-  leds[8] = CRGB::Yellow;
-  leds[9] = CRGB::Yellow;
-  leds[10] = CRGB::Yellow;
-
-  leds[11] = CRGB::Blue;
-  leds[12] = CRGB::Blue;
-  leds[13] = CRGB::Blue;
-  leds[14] = CRGB::Blue;
-  leds[15] = CRGB::Blue;
-
-  leds[16] = CRGB::Yellow;
-
-  leds[17] = CRGB::Blue;
-  leds[18] = CRGB::Blue;
-
-  leds[19] = CRGB::Yellow;
-  leds[20] = CRGB::Yellow;
-  leds[21] = CRGB::Yellow;
-  leds[22] = CRGB::Yellow;
-
-  leds[23] = CRGB::Blue;
-
-  leds[24] = CRGB::Yellow;
-  leds[25] = CRGB::Yellow;
-}
-
 void fill_ua_prapor2()
 { 
   SetRegionColor(UARegion::Crimea,            CRGB::Yellow);
@@ -1543,6 +1507,17 @@ void SetRegionColor(const UARegion &region, const CRGB &color)
   {    
     ledsState[idx].Color = color;
     leds[idx] = color;
+  }
+}
+
+void SetStateFromRealLeds()
+{
+  for(auto &ledKvp : ledsState)
+  {
+    auto &led = ledKvp.second;
+    if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+
+    led.Color = leds[led.Idx];
   }
 }
 
