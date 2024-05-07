@@ -4,14 +4,15 @@
 
 #include <vector>
 
+#include "DEBUGHelper.h"
 #ifdef ENABLE_INFO_WIFI
-#define WIFIP_INFO(...) SS_TRACE("[WiFi PARAMS INFO] ", __VA_ARGS__)
+#define WIFIP_INFO(...) SS_TRACE(F("[WiFi PARAMS INFO] "), __VA_ARGS__)
 #else
 #define WIFIP_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_WIFI
-#define WIFIP_TRACE(...) SS_TRACE("[WiFi PARAMS TRACE] ", __VA_ARGS__)
+#define WIFIP_TRACE(...) SS_TRACE(F("[WiFi PARAMS TRACE] "), __VA_ARGS__)
 #else
 #define WIFIP_TRACE(...) {}
 #endif
@@ -34,7 +35,7 @@ class WiFiParameter : public WiFiManagerParameter
   WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
   : WiFiParameter(id, label, json, defaultValue, length, 0)   
   {
-    WIFIP_TRACE("WiFiParameter ctor");    
+    WIFIP_TRACE(F("WiFiParameter ctor"));    
   }
   
   WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)  
@@ -43,7 +44,7 @@ class WiFiParameter : public WiFiManagerParameter
   , _value(defaultValue)
   , _json(json)
   {
-    WIFIP_TRACE("WiFiParameter ctor with place");    
+    WIFIP_TRACE(F("WiFiParameter ctor with place"));    
     Init(_id.c_str(), _label.c_str(), _value.c_str(), length, "", WFM_LABEL_DEFAULT);
   }
 
@@ -53,7 +54,7 @@ class WiFiParameter : public WiFiManagerParameter
     , _value(other._value)
     , _json(other._json)
   {    
-    WIFIP_TRACE("WiFiParameter copy ctor");   
+    WIFIP_TRACE(F("WiFiParameter copy ctor"));   
 
     Init(_id.c_str(), _label.c_str(), _value.c_str(), other.getValueLength(), other.getCustomHTML(), other.getLabelPlacement());
   }
@@ -64,18 +65,18 @@ class WiFiParameter : public WiFiManagerParameter
     , _value(std::move(other._value))
     , _json(std::move(other._json))
   {
-    WIFIP_TRACE("WiFiParameter move ctor");
+    WIFIP_TRACE(F("WiFiParameter move ctor"));
 
     Init(_id.c_str(), _label.c_str(), _value.c_str(), other.getValueLength(), other.getCustomHTML(), other.getLabelPlacement());
   }
 
   void Init(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement)
   {
-    WIFIP_TRACE("\tId: ", id);
-    WIFIP_TRACE("\tLabel: ", label);
-    WIFIP_TRACE("\tValue: ", defaultValue, " Length: ", length);
-    WIFIP_TRACE("\tCustom: ", custom);
-    WIFIP_TRACE("\tLabelPlacement: ", labelPlacement);
+    WIFIP_TRACE(F("\tId: "), id);
+    WIFIP_TRACE(F("\tLabel: "), label);
+    WIFIP_TRACE(F("\tValue: "), defaultValue, " Length: ", length);
+    WIFIP_TRACE(F("\tCustom: "), custom);
+    WIFIP_TRACE(F("\tLabelPlacement: "), labelPlacement);
     init(id, label, defaultValue, length, custom, labelPlacement);
   }
 
@@ -122,7 +123,6 @@ class WiFiNullParameter : public WiFiParameter
   virtual bool IsNull() {return true;}
 };
 
-template <int PARAMS_COUNT>
 class WiFiParameters
 {
   std::vector<WiFiParameter> _parameters;  
@@ -130,8 +130,7 @@ public:
   inline static WiFiNullParameter NullParam;
 public:
 
-  WiFiParameters() 
-  //: _parameters(PARAMS_COUNT)
+  WiFiParameters()  
   {}
 
   void AddParameter(const WiFiParameter &param)

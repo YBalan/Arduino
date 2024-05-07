@@ -2,6 +2,9 @@
 #ifndef LED_STATE_H
 #define LED_STATE_H
 
+#include "pixeltypes.h"
+#include "Settings.h"
+
 struct LedState
 {
   int8_t Idx = -1;
@@ -9,9 +12,13 @@ struct LedState
   int32_t BlinkTotalTime;
   bool FixedBrightnessIfAlarmed;
   bool IsAlarmed;
+  bool IsPartialAlarmed;
   CRGB Color;
   uint32_t PeriodTicks = 0;
-  uint32_t TotalTimeTicks = 0;
+  uint32_t TotalTimeTicks = 0;  
+
+  LedState() { }
+  LedState(const CRGB &color) : Color(color) { }  
 
   void StopBlink()
   {
@@ -37,6 +44,11 @@ struct LedState
 
     Color = _targetHSV;
     return _targetHSV.v;
+  }
+
+  void SetColors(const UAMap::Settings &settings)
+  {
+    Color = IsAlarmed ? (IsPartialAlarmed ? settings.PartialAlarmedColor : settings.AlarmedColor) : settings.NotAlarmedColor;
   }
 };
 
