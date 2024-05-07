@@ -16,9 +16,9 @@
 
 #include <ezButton.h>
 
-#define VER F("1.15")
+#define VER F("1.16")
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
@@ -28,7 +28,7 @@
 
 //#define USE_BUZZER_MELODIES 
 
-#define HTTP_TIMEOUT 500
+#define HTTP_TIMEOUT 1000
 
 //#define LANGUAGE_UA
 #define LANGUAGE_EN
@@ -263,6 +263,8 @@ rainbow - Rainbow with current Br
 #define BOT_COMMAND_UA F("/ua")
 #define BOT_COMMAND_CHID F("/chid")
 #define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
+#define BOT_COMMAND_PLAY F("/play")
+#define BOT_COMMAND_SAVEMELODY F("/savemelody")
 
 //Main Menu Main
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
@@ -610,6 +612,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     value = String(F("Color Schema: ")) + value;
     answerCurrentAlarms = false;
+  }else
+  if(GetCommandValue(BOT_COMMAND_PLAY, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    auto melodySizeMs = Buzz::PlayMelody(PIN_BUZZ, value);
+    value = String(melodySizeMs) + F("ms...");
   }
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
@@ -1334,57 +1342,63 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 104)
   {
-    INFO(F("AlarmStart"));
+    BUZZ_INFO(F("AlarmStart"));
     Buzz::AlarmStart(PIN_BUZZ, 5000);
   }
 
   if(debugButtonFromSerial == 105)
   {
-    INFO(F("AlarmEnd"));
+    BUZZ_INFO(F("AlarmEnd"));
     Buzz::AlarmEnd(PIN_BUZZ, 5000);
   }
 
   if(debugButtonFromSerial == 106)
   { 
-    INFO(F("Siren"));
+    BUZZ_INFO(F("Siren"));
     Buzz::Siren(PIN_BUZZ, 5000);
   }
 
   #ifdef USE_BUZZER_MELODIES    
   if(debugButtonFromSerial == 107)
   { 
-    INFO(F("Pitches"));
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::pitchesMelody, ARRAY_SIZE(Buzz::pitchesMelody)); 
+    BUZZ_INFO(F("Pitches"));
+    Buzz::PlayMelody(PIN_BUZZ, pitchesMelodyStr);
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::pitchesMelody));
   }
 
   if(debugButtonFromSerial == 108)
   {  
-    INFO(F("Nokia"));
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::nokiaMelody, ARRAY_SIZE(Buzz::nokiaMelody)); 
+    BUZZ_INFO(F("Nokia"));
+    Buzz::PlayMelody(PIN_BUZZ, nokiaMelodyStr); 
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::nokiaMelody));  
   }
 
   if(debugButtonFromSerial == 109)
   {  
-    INFO(F("Pacman"));
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::pacmanMelody, ARRAY_SIZE(Buzz::pacmanMelody)); 
+    BUZZ_INFO(F("Pacman"));
+    //Buzz::PlayMelody(PIN_BUZZ, Buzz::pacmanMelody); 
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::pacmanMelody));
   }
 
   if(debugButtonFromSerial == 110)
   {    
-    INFO(F("Happy Birthday"));
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::happyBirthdayMelody, ARRAY_SIZE(Buzz::happyBirthdayMelody)); 
+    BUZZ_INFO(F("Happy Birthday"));
+    Buzz::PlayMelody(PIN_BUZZ, happyBirthdayMelodyStr); 
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::happyBirthdayMelody));
   }
 
   if(debugButtonFromSerial == 111)
   {     
-    INFO(F("Xmas"));
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::xmasMelody, ARRAY_SIZE(Buzz::xmasMelody)); 
+    BUZZ_INFO(F("Xmas"));
+    Buzz::PlayMelody(PIN_BUZZ, xmasMelodyStr); 
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::xmasMelody));
   }
 
   if(debugButtonFromSerial == 112)
   {  
-    INFO(F("Star War"));    
-    Buzz::PlayMelody(PIN_BUZZ, Buzz::starWarMelody, ARRAY_SIZE(Buzz::starWarMelody));
+    BUZZ_INFO(F("Star War"));    
+    Buzz::PlayMelody(PIN_BUZZ, starWarMelodyStr);   
+    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::starWarMelody));
   }
   #endif
 

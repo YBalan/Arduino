@@ -168,22 +168,29 @@ namespace Buzz
     int duration = 4;
   };
 
+  typedef std::vector<NoteToPlay> Melody;
+
   #ifdef USE_BUZZER_MELODIES
-  static constexpr const NoteToPlay pitchesMelody[] = { {NOTE_C4, 4}, {NOTE_G3, 8}, {NOTE_G3, 8}, {NOTE_A3, 4}, {NOTE_G3, 4}, {NOTE_EMPTY, 4}, {NOTE_B3, 4}, {NOTE_C4, 4} };
+
+  #define pitchesMelodyStr F("262,4,196,8,196,8,220,4,196,4,0,4,247,4,262,4,")
+  /*static const Melody pitchesMelody = { {NOTE_C4, 4}, {NOTE_G3, 8}, {NOTE_G3, 8}, {NOTE_A3, 4}, {NOTE_G3, 4}, {NOTE_EMPTY, 4}, {NOTE_B3, 4}, {NOTE_C4, 4} };*/
 
   //Star Wars Main Theme
-  static constexpr const NoteToPlay starWarMelody[] = {
+  #define starWarMelodyStr F("440,500,0,500,440,500,0,500,440,500,0,500,349,350,523,150,440,500,0,500,349,350,523,150,440,650,0,500,659,500,0,500,659,500,0,500,659,500,0,350,698,150,523,500,415,500,349,350,523,150,440,650,0,500,")
+  /*static const Melody starWarMelody = {
   {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 500}, {NOTE_EMPTY, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 650}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 500}, {NOTE_E5, 500}, {NOTE_EMPTY, 350}, {NOTE_F5, 150}, {NOTE_C5, 500}, {NOTE_GS4, 500}, {NOTE_F4, 350}, {NOTE_C5, 150}, {NOTE_A4, 650}, {NOTE_EMPTY, 500},
-  };
+  };*/
 
-  static constexpr const NoteToPlay nokiaMelody[] = {
+  #define nokiaMelodyStr F("659,8,587,8,370,4,415,4,554,8,494,8,294,4,330,4,494,8,440,8,277,4,330,4,440,2,")
+  /*static const Melody nokiaMelody = {
     {NOTE_E5, 8}, {NOTE_D5, 8}, {NOTE_FS4, 4}, {NOTE_GS4, 4}, 
     {NOTE_CS5, 8}, {NOTE_B4, 8}, {NOTE_D4, 4}, {NOTE_E4, 4}, 
     {NOTE_B4, 8}, {NOTE_A4, 8}, {NOTE_CS4, 4}, {NOTE_E4, 4},
     {NOTE_A4, 2}
-  };
+  };*/
 
-  static constexpr const NoteToPlay happyBirthdayMelody[] = {
+  #define happyBirthdayMelodyStr F("262,4,262,8,294,4,262,4,349,4,330,2,262,4,262,8,294,4,262,4,392,4,349,2,262,4,262,8,523,4,440,4,349,4,330,4,294,4,466,4,466,8,440,4,349,4,392,4,349,2,")
+  /*static const Melody happyBirthdayMelody = {
     {NOTE_C4, 4}, {NOTE_C4, 8}, 
     {NOTE_D4, 4}, {NOTE_C4, 4}, {NOTE_F4, 4},
     {NOTE_E4, 2}, {NOTE_C4, 4}, {NOTE_C4, 8}, 
@@ -194,9 +201,9 @@ namespace Buzz
     {NOTE_E4, 4}, {NOTE_D4, 4}, {NOTE_AS4, 4}, {NOTE_AS4, 8},
     {NOTE_A4, 4}, {NOTE_F4, 4}, {NOTE_G4, 4},
     {NOTE_F4, 2},
-  };
+  };  */
 
-   static constexpr const NoteToPlay pacmanMelody[] = {
+   /*static const Melody pacmanMelody = {
     {NOTE_B4, 16}, {NOTE_B5, 16}, {NOTE_FS5, 16}, {NOTE_DS5, 16},
     {NOTE_B5, 32}, {NOTE_FS5, 16}, {NOTE_DS5, 8}, {NOTE_C5, 16},
     {NOTE_C6, 16}, {NOTE_G6, 16}, {NOTE_E6, 16}, {NOTE_C6, 32}, {NOTE_G6, 16}, {NOTE_E6, 8},
@@ -204,9 +211,10 @@ namespace Buzz
     {NOTE_B4, 16}, {NOTE_B5, 16}, {NOTE_FS5, 16}, {NOTE_DS5, 16}, {NOTE_B5, 32},
     {NOTE_FS5, 16}, {NOTE_DS5, 8}, {NOTE_DS5, 32}, {NOTE_E5, 32}, {NOTE_F5, 32},
     {NOTE_F5, 32}, {NOTE_FS5, 32}, {NOTE_G5, 32}, {NOTE_G5, 32}, {NOTE_GS5, 32}, {NOTE_A5, 16}, {NOTE_B5, 8},
-  };
+  };*/
 
-  static constexpr const NoteToPlay xmasMelody[] = {
+  #define xmasMelodyStr F("659,8,659,8,659,4,659,8,659,8,659,4,659,8,784,8,523,8,587,8,659,2,698,8,698,8,698,8,698,8,698,8,659,8,659,8,659,16,659,16,659,8,587,8,587,8,659,8,587,4,784,4,")
+  /*static const Melody xmasMelody = {
     {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 4},
     {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 4},
     {NOTE_E5, 8}, {NOTE_G5, 8}, {NOTE_C5, 8}, {NOTE_D5, 8},
@@ -215,20 +223,20 @@ namespace Buzz
     {NOTE_F5, 8}, {NOTE_E5, 8}, {NOTE_E5, 8}, {NOTE_E5, 16}, {NOTE_E5, 16},
     {NOTE_E5, 8}, {NOTE_D5, 8}, {NOTE_D5, 8}, {NOTE_E5, 8},
     {NOTE_D5, 4}, {NOTE_G5, 4},
-  };
+  };*/
   #endif
 
-  int MelodyLengthMs(const NoteToPlay *const melody, const int& melodySize, const bool &showTrace = true)
+  int MelodyLengthMs(const Melody &melody, const bool &showTrace = true)
   {
     int res = 0;   
     // iterate over the notes of the melody:
     
-    for (int thisNote = 0; thisNote < melodySize; thisNote++) 
+    for (int thisNote = 0; thisNote < melody.size(); thisNote++) 
     {
       int noteDuration = melody[thisNote].duration < 50 ? (1000 / melody[thisNote].duration) : melody[thisNote].duration;
       int pauseBetweenNotes = noteDuration * NOTES_MINIMUM_DISTINGUISH_SET;
 
-      res += noteDuration + pauseBetweenNotes;
+      res += pauseBetweenNotes;
     }    
 
     if(showTrace)
@@ -236,14 +244,15 @@ namespace Buzz
     return res;
   }
 
-  void PlayMelody(const uint8_t &pin, const NoteToPlay *const melody, const int& melodySize)
+  const int PlayMelody(const uint8_t &pin, const Melody &melody)
   { 
     BUZZ_INFO(F("Play Melody"));    
       // iterate over the notes of the melody:
 
-    BUZZ_INFO(F("\t"), F("Size: "), melodySize, F(" "), F("Length: "), MelodyLengthMs(melody, melodySize, /*showTrace:*/false), F("ms..."));
+    auto melodySizeMs = MelodyLengthMs(melody, /*showTrace:*/false);
+    BUZZ_INFO(F("\t"), F("Size: "), melody.size(), F(" "), F("Length: "), melodySizeMs, F("ms..."));
 
-    for (int thisNote = 0; thisNote < melodySize; thisNote++) 
+    for (int thisNote = 0; thisNote < melody.size(); thisNote++) 
     {
       // to calculate the note duration, take one second divided by the note type.
 
@@ -269,7 +278,54 @@ namespace Buzz
 
       noTone(pin);
     }    
+
+    return melodySizeMs;
   }  
+
+  const std::vector<NoteToPlay> GetMelody(const String &s)
+  {
+    const auto & tokens = CommonHelper::splitToInt(s, ',');
+    bool isOdd = tokens.size() % 2 != 0;
+    int melodySize = (tokens.size() / 2) + (isOdd ? 1 : 0);
+
+    std::vector<NoteToPlay> result(melodySize);
+
+    int resultIdx = 0;
+    for(int tokenIdx = 0; tokenIdx < tokens.size(); tokenIdx += 2)
+    {
+      result[resultIdx].note = tokens[tokenIdx];
+      if(tokenIdx + 1 < tokens.size())
+        result[resultIdx].duration = tokens[tokenIdx + 1];
+      else
+        result[resultIdx].duration = 50; //default duration
+
+      resultIdx++;
+    }
+
+    return std::move(result);
+  }
+
+  const String GetMelodyString(const Melody &melody)
+  {
+    String result;
+    for(const auto &n : melody)
+    {
+      result += String(n.note) + F(",") + String(n.duration) + F(",");
+    }
+    return std::move(result);
+  }
+
+  const int PlayMelody(const uint8_t &pin, const String &s)
+  {
+    const auto &melody = GetMelody(s);
+    // BUZZ_TRACE(F("Melody vector:"));    
+    // for(const auto &n : melody)
+    // {
+    //   BUZZ_TRACE(F("\t"), n.note, F(":"), n.duration);
+    // }
+    return PlayMelody(pin, melody);
+  }
+  
 };
 
 #endif //BUZZ_HELPER_H

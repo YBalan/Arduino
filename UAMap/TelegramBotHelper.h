@@ -22,6 +22,7 @@
 #define BOT_CONNECTION_ISSUES_MSG F(" faced with connection issues")
 
 #include "TelegramBot.h"
+#include "CommonHelper.h"
 
 #ifdef USE_BOT
 std::unique_ptr<TelegramBot> bot(new TelegramBot());
@@ -205,24 +206,6 @@ void SaveChannelIDs()
   }
 }
 
-std::vector<String> split(const String &s, char delimiter) {
-    std::vector<String> tokens;
-    int startIndex = 0; // Index where the current token starts
-
-    // Loop through each character in the string
-    for (int i = 0; i < s.length(); i++) {
-        // If the current character is the delimiter or it's the last character in the string
-        if (s.charAt(i) == delimiter || i == s.length() - 1) {
-            // Extract the substring from startIndex to the current position
-            String token = s.substring(startIndex, i);
-            token.trim();
-            tokens.push_back(token);
-            startIndex = i + 1; // Update startIndex for the next token
-        }
-    }
-    return tokens;
-}
-
 void LoadChannelIDs()
 {
   BOT_INFO(F("LoadChannelIDs"));
@@ -235,10 +218,10 @@ void LoadChannelIDs()
 
     BOT_TRACE(F("ChannelIDs in file: "), read);
 
-    for(const auto &r : split(read, ','))
+    for(const auto &r : CommonHelper::split(read, ','))
     {
       BOT_INFO(F("\tChannelID: "), r);
-      if(r != "")
+      if(r.length() > 0)
       {
         _botSettings.toStore.registeredChannelIDs[r] = 1;
       }      
