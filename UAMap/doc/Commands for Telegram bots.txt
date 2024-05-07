@@ -1,0 +1,35 @@
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
+token - Current Alerts.Api token
+nstat - Network Statistic
+rssi - WiFi Quality rssi db
+test - test by regionId
+ver - Version Info
+gay - trolololo
+ua - Ukrain Prapor
+changeconfig - change configuration WiFi, tokens...
+menu - Simple menu
+br - Current brightness
+br255 - Max brightness
+br2 - Min brightness
+br1 - Min brightness only alarmed visible
+alarmed - List of currently alarmed regions
+all - List of All regions
+relay1 - Region Id set for Relay1
+relay10 - Switch Off Relay1
+relay2 - Region Id set for Relay2
+relay20 - Switch Off Relay2
+buzztime - Current buzzer time in milliseconds
+buzztime3000 - Set buzzer time to 3secs
+buzztime0 - Switch off buzzer
+schema - Current Color schema
+schema0 - Set Color schema to Dark
+schema1 - Set Color schema to Light
+strobe - Stroboscope with current Br & Schema
+rainbow - Rainbow with current Br

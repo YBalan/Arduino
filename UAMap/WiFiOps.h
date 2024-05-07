@@ -24,10 +24,6 @@
 #define WIFI_TRACE(...) {}
 #endif
 
-//#define API_TOKEN_LENGTH 42
-//define your default values here, if there are different values in config.json, they are overwritten.
-//char api_token[API_TOKEN_LENGTH] = "YOUR_API_TOKEN";
-
 namespace WiFiOps
 {
 
@@ -46,19 +42,20 @@ namespace WiFiOps
 //   setPreSaveConfigCallback( std::function<void()> func );
 //  called just before doing OTA update
 //   setPreOtaUpdateCallback( std::function<void()> func );
-namespace SaveCallback
+namespace WiFiManagerCallBacks
 {
   //flag for saving data
   static bool _shouldSaveConfig = false;
 
   //callback notifying us of the need to save config
   void saveConfigCallback () {
-    WIFI_INFO("Should save config");
+    WIFI_INFO(F("Should save config"));
     _shouldSaveConfig = true;
-  }
+  }    
+
+  extern void whenAPStarted(WiFiManager *manager);
 }
 
-template <int PARAMS_COUNT = 0>
 class WiFiOps
 {
   private:
@@ -66,7 +63,7 @@ class WiFiOps
     String _APName;
     String _APPass;
     bool _addMacToAPName;
-    WiFiParameters<PARAMS_COUNT> _parameters;
+    WiFiParameters _parameters;
     uint8_t _lastPlace;
   public:
     
@@ -82,14 +79,14 @@ class WiFiOps
     }
     WiFiOps &AddParameter(const WiFiParameter& param)
     {
-      WIFI_TRACE("AddParameter...");
+      WIFI_TRACE(F("AddParameter..."));
       _parameters.AddParameter(param);
       _lastPlace++;
       return *this;
     }
     WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
     {
-      WIFI_TRACE("AddParameter...");
+      WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, _lastPlace);
       _parameters.AddParameter(p);
       _lastPlace++;
@@ -97,7 +94,7 @@ class WiFiOps
     }
     WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)
     {
-      WIFI_TRACE("AddParameter...");
+      WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, place);
       _parameters.AddParameter(p);
       _lastPlace = place + 1;
@@ -121,9 +118,9 @@ class WiFiOps
       return _parameters.Count();
     }
 
-    const WiFiParameters<PARAMS_COUNT> &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
+    const WiFiParameters &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
     {
-      WIFI_TRACE("TryToConnectOrOpenConfigPortal...");
+      WIFI_TRACE(F("TryToConnectOrOpenConfigPortal..."));
 
       LoadFSSettings(_parameters);
 
@@ -140,30 +137,34 @@ class WiFiOps
       wifiManager.setTitle(_title);
 
       //set config save notify callback
-      wifiManager.setSaveConfigCallback(SaveCallback::saveConfigCallback);
+      wifiManager.setSaveConfigCallback(WiFiManagerCallBacks::saveConfigCallback);
+
+      //when AP started
+      wifiManager.setAPCallback(WiFiManagerCallBacks::whenAPStarted);
+
+      wifiManager.setWiFiAutoReconnect(true);
 
       //set static ip
       //wifiManager.setSTAStaticIPConfig(IPAddress(172, 16, 1, 99), IPAddress(172, 16, 1, 1), IPAddress(255, 255, 255, 0));
 
       //wifiManager.setHttpPort(8080);
 
-      WIFI_TRACE("Adding parameters to WiFiManager...");
+      WIFI_TRACE(F("Adding parameters to WiFiManager..."));
       //add all your parameters here
-      //wifiManager.addParameter(&custom_api_token);
-      
+           
       for(uint8_t pIdx = 0; pIdx < _parameters.Count(); pIdx++)
       {
         auto &parameter = _parameters.GetAt(pIdx);
-        WIFI_TRACE("\tAdding parameter: ", parameter.GetId(), " value: ", parameter.GetValue());
+        WIFI_TRACE(F("\tAdding parameter: "), parameter.GetId(), F(" value: "), parameter.GetValue());
         wifiManager.addParameter(parameter.GetParameter()); 
       }     
 
-      WIFI_TRACE("WiFiManager parameters count: ", wifiManager.getParametersCount());
+      WIFI_TRACE(F("WiFiManager parameters count: "), wifiManager.getParametersCount());
 
       //reset settings - for testing
       if(resetSettings)
       {
-        WIFI_TRACE("Reset Settings");
+        WIFI_TRACE(F("Reset Settings"));
         wifiManager.resetSettings();
       }
 
@@ -182,44 +183,45 @@ class WiFiOps
       //if it does not connect it starts an access point with the specified name
       //here  "AutoConnectAP"
       //and goes into a blocking loop awaiting configuration
+      /*WiFi.enableInsecureWEP();
+      WiFi.encryptionType(int networkItem);*/
+
       if (!wifiManager.autoConnect((_APName + (_addMacToAPName ? "_" + mac : "")).c_str(), _APPass.c_str())) {
-        WIFI_INFO("failed to connect and hit timeout");
+        WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
         ESP.restart();
         delay(5000);
       }
 
-      //if you get here you have connected to the WiFi
-      WIFI_INFO("connected...yeey :)");
+      WiFi.setAutoReconnect(true);
+      WiFi.setAutoConnect(true); 
 
-      //read updated parameters
-      //strcpy(api_token, custom_api_token.getValue());
-      //WIFI_TRACE("The values in the file are: ");
-      //WIFI_TRACE("\tapi_token : ", String(api_token));      
+      //if you get here you have connected to the WiFi
+      WIFI_INFO(F("connected...yeey :)"));
 
       SaveFSSettings(_parameters);
 
-      WIFI_TRACE("The values in the file are: ");
+      WIFI_TRACE(F("The values in the file are: "));
       for(const auto &p : _parameters)
       {
-        WIFI_TRACE("\tParameter: ", p.GetId(), " json property: ", p.GetJson(), " value: ", p.GetValue());
+        WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
       }
 
-      WIFI_INFO("local ip");
+      WIFI_INFO(F("IP: "));
       WIFI_INFO(WiFi.localIP());
-      WIFI_INFO("MAC:");
+      WIFI_INFO(F("MAC: "));
       WIFI_INFO(WiFi.macAddress());
 
       return _parameters;
     }
 
     //save the custom parameters to FS
-    void SaveFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToSave)
+    void SaveFSSettings(WiFiParameters &parametersToSave)
     {  
-      WIFI_TRACE("Save Settings...");
-      if (SaveCallback::_shouldSaveConfig) {
-        WIFI_TRACE("saving config");
+      WIFI_TRACE(F("Save Settings..."));
+      if (WiFiManagerCallBacks::_shouldSaveConfig) {
+        WIFI_TRACE(F("saving config"));
     #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
         DynamicJsonDocument json(1024);
     #else
@@ -232,13 +234,13 @@ class WiFiOps
         {                
           auto &p = parametersToSave.GetAt(pIdx);
           auto &readValue = p.ReadValue();
-          WIFI_TRACE("Save parameter: ", p.GetId(), " json property: ", p.GetJson(), " json value: ", readValue);
+          WIFI_TRACE(F("Save parameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" json value: "), readValue);
           json[p.GetJson()] = readValue;
         }
 
         File configFile = SPIFFS.open("/config.json", "w");
         if (!configFile) {
-          WIFI_INFO("failed to open config file for writing");
+          WIFI_INFO(F("failed to open config file for writing"));
         }
 
     #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
@@ -254,19 +256,19 @@ class WiFiOps
     }
 
     //read configuration from FS json
-    void LoadFSSettings(WiFiParameters<PARAMS_COUNT> &parametersToLoad)
+    void LoadFSSettings(WiFiParameters &parametersToLoad)
     { 
-      WIFI_TRACE("Load Settings...");
-      WIFI_TRACE("mounting FS...");
+      WIFI_TRACE(F("Load Settings..."));
+      WIFI_TRACE(F("mounting FS..."));
 
       if (SPIFFS.begin()) {
-        WIFI_TRACE("mounted file system");
+        WIFI_TRACE(F("mounted file system"));
         if (SPIFFS.exists("/config.json")) {
           //file exists, reading and loading
-          WIFI_TRACE("reading config file");
+          WIFI_TRACE(F("reading config file"));
           File configFile = SPIFFS.open("/config.json", "r");
           if (configFile) {
-            WIFI_TRACE("opened config file");
+            WIFI_TRACE(F("opened config file"));
             size_t size = configFile.size();
             // Allocate a buffer to store contents of the file.
             std::unique_ptr<char[]> buf(new char[size]);
@@ -285,7 +287,7 @@ class WiFiOps
             json.printTo(Serial); Serial.println();
             if (json.success()) {
     #endif
-              WIFI_TRACE("parsed json");         
+              WIFI_TRACE(F("parsed json"));         
               //strcpy(apiToken, json["api_token"]);
 
               for(int pIdx = 0; pIdx < parametersToLoad.Count(); pIdx++)
@@ -294,7 +296,7 @@ class WiFiOps
                 
                 bool isJsonValueExist = json.containsKey(p.GetJson());
                 const char * jsonValue = json[p.GetJson()];
-                WIFI_TRACE("Load parameter: ", p.GetId(), " json property: ", p.GetJson(), " json value: ", jsonValue, " json exist: ", (isJsonValueExist ? "true" : "false"));
+                WIFI_TRACE(F("Load parameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" json value: "), jsonValue, F(" json exist: "), (isJsonValueExist ? F("true") : F("false")));
                 if(isJsonValueExist)
                 {
                   p.SetValue(jsonValue);
@@ -302,13 +304,13 @@ class WiFiOps
               }
 
             } else {
-              WIFI_TRACE("failed to load json config");
+              WIFI_TRACE(F("failed to load json config"));
             }
             configFile.close();
           }
         }
       } else {
-        WIFI_TRACE("failed to mount FS");
+        WIFI_TRACE(F("failed to mount FS"));
       }
       //end read
     }
