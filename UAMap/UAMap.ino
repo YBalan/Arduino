@@ -16,17 +16,15 @@
 
 #include <ezButton.h>
 
-#define VER F("1.16")
+#define VER F("1.17")
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
 #define USE_BOT_MAIN_MENU 
 #define USE_BOT_SIMPLE_ANSWER false
 #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
-
-//#define USE_BUZZER_MELODIES 
 
 #define HTTP_TIMEOUT 1000
 
@@ -38,6 +36,8 @@
 #define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
+
+#define USE_BUZZER_MELODIES 
 
 #define ENABLE_TRACE_MAIN
 
@@ -64,6 +64,7 @@
 #include "WiFiOps.h"
 #include "TelegramBotHelper.h"
 #include "BuzzHelper.h"
+#include "UAAnthem.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -1270,6 +1271,10 @@ void HandleEffects(const unsigned long &currentTicks)
         led.Color = leds[led.Idx];
       }
 
+      #ifdef USE_BUZZER
+      FastLEDShow(500);
+      UAAnthem::play(PIN_BUZZ, 0);
+      #endif
       //DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
     }  
@@ -1375,9 +1380,10 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 109)
   {  
-    BUZZ_INFO(F("Pacman"));
-    //Buzz::PlayMelody(PIN_BUZZ, Buzz::pacmanMelody); 
-    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::pacmanMelody));
+    BUZZ_INFO(F("UAAnthemMelody"));
+    /*Buzz::PlayMelody(PIN_BUZZ, Buzz::UAAnthemMelody); 
+    BUZZ_TRACE(Buzz::GetMelodyString(Buzz::UAAnthemMelody));*/
+    BUZZ_TRACE(UAAnthem::play(PIN_BUZZ, 2));
   }
 
   if(debugButtonFromSerial == 110)

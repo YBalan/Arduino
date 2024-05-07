@@ -3,6 +3,8 @@
 #define BUZZ_HELPER_H
 
 #include "DEBUGHelper.h"
+#include "CommonHelper.h"
+
 #ifdef ENABLE_INFO_BUZZ
 #define BUZZ_INFO(...) SS_TRACE("[BUZZ INFO] ", __VA_ARGS__)
 #else
@@ -226,6 +228,8 @@ namespace Buzz
   };*/
   #endif
 
+  
+
   int MelodyLengthMs(const Melody &melody, const bool &showTrace = true)
   {
     int res = 0;   
@@ -244,7 +248,7 @@ namespace Buzz
     return res;
   }
 
-  const int PlayMelody(const uint8_t &pin, const Melody &melody)
+  const int PlayMelody(const uint8_t &pin, const Melody &melody, const float &distinguishFactor = NOTES_MINIMUM_DISTINGUISH_SET)
   { 
     BUZZ_INFO(F("Play Melody"));    
       // iterate over the notes of the melody:
@@ -268,7 +272,7 @@ namespace Buzz
 
       // the note's duration + NOTES_MINIMUM_DISTINGUISH_SET% seems to work well:
 
-      int pauseBetweenNotes = noteDuration * NOTES_MINIMUM_DISTINGUISH_SET;
+      int pauseBetweenNotes = noteDuration * distinguishFactor;
 
       BUZZ_TRACE(F("\tPause"), pauseBetweenNotes);
 
@@ -315,7 +319,7 @@ namespace Buzz
     return std::move(result);
   }
 
-  const int PlayMelody(const uint8_t &pin, const String &s)
+  const int PlayMelody(const uint8_t &pin, const String &s, const float &distinguishFactor = NOTES_MINIMUM_DISTINGUISH_SET)
   {
     const auto &melody = GetMelody(s);
     // BUZZ_TRACE(F("Melody vector:"));    
@@ -323,7 +327,7 @@ namespace Buzz
     // {
     //   BUZZ_TRACE(F("\t"), n.note, F(":"), n.duration);
     // }
-    return PlayMelody(pin, melody);
+    return PlayMelody(pin, melody, distinguishFactor);
   }
   
 };
