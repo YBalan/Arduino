@@ -16,9 +16,9 @@
 
 #include <ezButton.h>
 
-#define VER F("1.14")
+#define VER F("1.15")
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define USE_BOT
 #define USE_BUZZER
@@ -281,12 +281,31 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   { 
     INFO(F("Update check..."));
     String fileName = msg.fileName;
-    fileName.replace(F(".bin"), F(""));    
-    if(fileName.length() > 0)
-    {
-      INFO(F("Update..."));
-      bot->update();
+    fileName.replace(F(".bin"), F(""));
+    auto uidx = fileName.lastIndexOf(F("_"));
+
+    if(uidx >= 0 && uidx < fileName.length() - 1)
+    {    
+      bot->OTAVersion = fileName.substring(uidx + 1);
+      String currentVersion = String(VER);
+      if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
+      {
+        messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+        INFO(messages[0]);
+        bot->update();
+      }
+      else
+      {        
+        messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
+        bot->OTAVersion.clear();
+        INFO(messages[0]);
+      }
     }
+    else
+    {      
+      messages.push_back(String(F("Unknown version")) + F(". NO Updates..."));
+      INFO(messages[0]);      
+    }    
     return std::move(messages);
   }
   
