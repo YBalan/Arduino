@@ -285,28 +285,37 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     String fileName = msg.fileName;
     fileName.replace(F(".bin"), F(""));
     auto uidx = fileName.lastIndexOf(F("_"));
+    bool isEsp32Frmw = fileName.lastIndexOf(F("esp32")) >= 0;
 
     if(uidx >= 0 && uidx < fileName.length() - 1)
     {    
-      bot->OTAVersion = fileName.substring(uidx + 1);
-      String currentVersion = String(VER);
-      if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
+      if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw))
       {
-        messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
-        INFO(messages[0]);
-        bot->update();
+        bot->OTAVersion = fileName.substring(uidx + 1);
+        String currentVersion = String(VER);
+        if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
+        {
+          messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+          INFO(messages[0]);
+          bot->update();
+        }
+        else
+        {        
+          messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
+          bot->OTAVersion.clear();   
+          INFO(messages[0]);     
+        }
       }
       else
-      {        
-        messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
-        bot->OTAVersion.clear();
+      {
+        messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
         INFO(messages[0]);
       }
     }
     else
     {      
       messages.push_back(String(F("Unknown version")) + F(". NO Updates..."));
-      INFO(messages[0]);      
+      INFO(messages[0]);
     }    
     return std::move(messages);
   }
