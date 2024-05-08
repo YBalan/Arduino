@@ -164,12 +164,12 @@ void HangleBotMessages(FB_msg& msg)
           _botSettings.toStore.registeredChannelIDs[msg.chatID] = 1;
           SaveChannelIDs();
           BOT_TRACE(F("Registration succeed: "), msg.chatID);
-          bot->replyMessage(F("Registration succeed: ") + msg.username, msg.messageID, msg.chatID);
+          bot->replyMessage(String(F("Registration succeed: ")) + msg.username, msg.messageID, msg.chatID);
         }
         else
         {
           BOT_TRACE(F("Registration failed: "), msg.chatID);
-          bot->replyMessage(F("Registration failed: ") + msg.username, msg.messageID, msg.chatID);
+          bot->replyMessage(String(F("Registration failed: ")) + msg.username, msg.messageID, msg.chatID);
         }
       }
     }    
@@ -196,7 +196,11 @@ void SaveChannelIDs()
     for(const auto &v : _botSettings.toStore.registeredChannelIDs)
       store += v.first + ',';
 
+    #ifdef ESP8266
     configFile.write(store.c_str());
+    #else
+    configFile.write((uint8_t*)store.c_str(), store.length());
+    #endif
     configFile.close();
         //end save
   }

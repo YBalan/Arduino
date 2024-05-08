@@ -16,28 +16,8 @@
 #define SETTINGS_TRACE(...) {}
 #endif
 
-#define ALARMS_UPDATE_TIMEOUT 25000
-#define ALARMS_CHECK_WITHOUT_STATUS false
-
-#define LED_STATUS_IDX 14 //Kyivska
-#define LED_STATUS_NO_CONNECTION_COLOR CRGB::White
-#define LED_STATUS_NO_CONNECTION_PERIOD 1000
-#define LED_STATUS_NO_CONNECTION_TOTALTIME -1
-
-#define LED_PORTAL_MODE_COLOR CRGB::Green
-#define LED_LOAD_MODE_COLOR CRGB::White
-#define LED_ALARMED_COLOR CRGB::Red
-#define LED_NOT_ALARMED_COLOR CRGB::Blue
-#define LED_PARTIAL_ALARMED_COLOR CRGB::Yellow
-
-#define LED_NEW_ALARMED_PERIOD 500
-#define LED_NEW_ALARMED_TOTALTIME 15000
-
-#define LED_ALARMED_SCALE_FACTOR 0//50% 
-
 #define MAX_BASE_URI_LENGTH 50
 
-#define EFFECT_TIMEOUT 15000
 uint32_t effectStartTicks = 0;
 bool effectStarted = false;
 enum Effect : uint8_t
@@ -73,7 +53,7 @@ namespace UAMap
     uint8_t Brightness = 2;
 
     bool alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
-    uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+    uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_DEFAULT_TIMEOUT;
     uint8_t alarmedScale = LED_ALARMED_SCALE_FACTOR;
     bool alarmScaleDown = true;
 
@@ -98,7 +78,7 @@ namespace UAMap
       Brightness = 2;
 
       alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
-      alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+      alarmsUpdateTimeout = ALARMS_UPDATE_DEFAULT_TIMEOUT;
       alarmedScale = LED_ALARMED_SCALE_FACTOR;
       alarmScaleDown = true;
       resetFlag = 200;

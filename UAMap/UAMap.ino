@@ -1,35 +1,11 @@
 //Estimates: https://docs.google.com/spreadsheets/d/1mYA_Bc687Y8no1yJDxv83fimtd0WU4nvcGI80_jnJME/edit?usp=sharing
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include "Config.h"
 
-#ifdef ESP32
-  #include <SPIFFS.h>
-#endif
-
-#include <map>
-
-#define FASTLED_ESP8266_RAW_PIN_ORDER
-//#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
-//#define FASTLED_ESP8266_D1_PIN_ORDER
-#include <FastLED.h>
-
-#include <ezButton.h>
-
-#define VER F("1.18")
+#define VER F("1.19")
 //#define RELEASE
-#define DEBUG
-
-#define USE_BOT
-#define USE_BUZZER
-#define USE_BOT_MAIN_MENU 
-#define USE_BOT_SIMPLE_ANSWER false
-#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
-
-#define HTTP_TIMEOUT 1000
-
-//#define LANGUAGE_UA
-#define LANGUAGE_EN
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -57,6 +33,38 @@
 #define ENABLE_TRACE_BUZZ
 #endif
 
+#define RELAY_OFF HIGH
+#define RELAY_ON  LOW
+
+//DebounceTime
+#define DebounceTime 50
+
+#ifdef ESP32
+  #include <SPIFFS.h>
+#endif
+
+// Platform specific
+#ifdef ESP8266 
+  #define ESPgetFreeContStack ESP.getFreeContStack()
+  #define ESPresetHeap ESP.resetHeap()
+  #define ESPresetFreeContStack ESP.resetFreeContStack()
+#else
+  #define ESPgetFreeContStack F("Not supported")
+  #define ESPresetHeap {}
+  #define ESPresetFreeContStack {}
+#endif
+
+#ifdef ESP8266 
+  #define FASTLED_ESP8266_RAW_PIN_ORDER
+  //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
+  //#define FASTLED_ESP8266_D1_PIN_ORDER  
+#endif
+#include <FastLED.h>  
+
+#include <map>
+#include <ezButton.h>
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
 #include "LedState.h"
@@ -83,22 +91,9 @@ struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 
-#define RELAY_OFF HIGH
-#define RELAY_ON  LOW
-
-#define PIN_RELAY1    D1
-#define PIN_RELAY2    D2
-#define PIN_BUZZ      D3
-#define PIN_RESET_BTN D5
-#define PIN_LED_STRIP D6
-#define LED_COUNT 26
-#define BRIGHTNESS_STEP 25
-
-//DebounceTime
-#define DebounceTime 50
-
 std::unique_ptr<AlarmsApi> api(new AlarmsApi());
-CRGBArray<LED_COUNT> leds;
+//CRGBArray<LED_COUNT> leds;
+CRGB *leds = new CRGB[LED_COUNT];
 
 typedef std::map<uint8_t, RegionInfo*> LedIndexMappedToRegionInfo;
 LedIndexMappedToRegionInfo alarmedLedIdx;
@@ -110,7 +105,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   while (!Serial);   
-
+ 
   pinMode(PIN_RELAY1, INPUT_PULLUP);
   pinMode(PIN_RELAY1, OUTPUT);
   pinMode(PIN_RELAY2, INPUT_PULLUP);
@@ -121,7 +116,7 @@ void setup() {
   digitalWrite(PIN_BUZZ, LOW);
 
   digitalWrite(PIN_RELAY1, RELAY_OFF);
-  digitalWrite(PIN_RELAY2, RELAY_OFF);  
+  digitalWrite(PIN_RELAY2, RELAY_OFF);    
 
   resetBtn.setDebounceTime(DebounceTime);  
 
@@ -129,7 +124,7 @@ void setup() {
   Serial.println(F("!!!! Start UA Map !!!!"));
   Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
-  Serial.print(F("STACK: ")); Serial.println(ESP.getFreeContStack());    
+  Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
   LoadSettings();
   //_settings.reset();
@@ -145,11 +140,11 @@ void setup() {
   WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
   wifiOps
-  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 47)  
+  .AddParameter(F("apiToken"), F("Alarms API Token"), F("api_token"), F("YOUR_ALARMS_API_TOKEN"), 47)  
   #ifdef USE_BOT
-  .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
-  .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
-  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
+  .AddParameter(F("telegramToken"), F("Telegram Bot Token"), F("telegram_token"), F("TELEGRAM_TOKEN"), 47)
+  .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
+  .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
   ;    
 
@@ -172,9 +167,9 @@ void setup() {
   #ifdef USE_BOT
   //bot.setChatID(CHAT_ID);
   LoadChannelIDs();
-  bot->setToken(wifiOps.GetParameterValueById("telegramToken"));  
-  _botSettings.SetBotName(wifiOps.GetParameterValueById("telegramName"));  
-  _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
+  bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
+  _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
+  _botSettings.botSecure = wifiOps.GetParameterValueById(F("telegramSec"));
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_TEXT); 
   //bot->setPeriod(_settings.alarmsUpdateTimeout);
@@ -333,11 +328,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
     #endif
 
-    ESP.resetHeap();
-    ESP.resetFreeContStack();
+    ESPresetHeap;
+    ESPresetFreeContStack;
 
     INFO(F(" HEAP: "), ESP.getFreeHeap());
-    INFO(F("STACK: "), ESP.getFreeContStack());
+    INFO(F("STACK: "), ESPgetFreeContStack);
     
     bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);
 
@@ -457,7 +452,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);    
 
     auto regionId = value.toInt();
-    String answer = F(" Region: ") + String(regionId);
+    String answer = String(F(" Region: ")) + String(regionId);
     if(value.length() > 0 && regionId > 2 && regionId < 31)
     {      
       LedState state;
@@ -483,7 +478,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    value = F("Flash Date: ") + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
+    value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
@@ -503,7 +498,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_RSSI, filtered, value))
   {
-    value = F("SSID: ") + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
+    value = String(F("SSID: ")) + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
           + F("RSSI: ") + String(WiFi.RSSI()) + F("db") + F(" ")
           + F("Channel: ") + WiFi.channel() + F(" ")
           + F("IP: ") + WiFi.localIP().toString() + F(" ")
@@ -519,7 +514,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     for(const auto &channel : _botSettings.toStore.registeredChannelIDs)  
     {
       INFO(F("\t"), channel.first);
-      value += F("[") + channel.first + F("]") + F("; ");
+      value += String(F("[")) + channel.first + F("]") + F("; ");
     }
   }else
   if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
@@ -644,11 +639,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       {
         if(USE_BOT_SIMPLE_ANSWER)
         {
-          messages[0] += F("\n") + region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
+          messages[0] += String(F("\n")) + region.Name + F(": ") + F("[") + String((uint8_t)region.Id) + F("]");
         }
         else
         {
-          String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
+          String regionMsg = region.Name + F(": ") + F("[") + String((uint8_t)region.Id) + F("]") + F(": ") 
+                            // + F("[") 
+                            // + (region.AlarmStatus == ApiAlarmStatus::Alarmed ? F("A") : (region.AlarmStatus == ApiAlarmStatus::PartialAlarmed ? F("P") : F("N"))) 
+                            // + F("]")
+                            ;
           messages.push_back(regionMsg);
         }
       }
@@ -668,13 +667,13 @@ const bool HandleRelay(const String &relayName, const String &relayCommand, Stri
   if(value == F("menu"))
     {
       INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack()); 
+      INFO(F("STACK: "), ESPgetFreeContStack); 
 
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
+      ESPresetHeap;
+      ESPresetFreeContStack;
 
       INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
+      INFO(F("STACK: "), ESPgetFreeContStack);
 
       SendInlineRelayMenu(relayName, relayCommand, chatID);   
 
@@ -734,11 +733,11 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
 
       regionPlace = 1;      
 
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
+      ESPresetHeap;
+      ESPresetFreeContStack;
 
       INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());  
+      INFO(F("STACK: "), ESPgetFreeContStack);  
 
       INFO(menu);
       INFO(call);    
@@ -913,7 +912,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
       //ESP.resetHeap();
       //ESP.resetFreeContStack();
       INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
+      INFO(F("STACK: "), ESPgetFreeContStack);
 
       bool statusChanged = api->IsStatusChanged(status, statusMsg);
       if(status == ApiStatusCode::API_OK || status == HTTP_CODE_METHOD_NOT_ALLOWED)
@@ -932,7 +931,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
             for(uint8_t idx = 0; idx < alarmedRegions.size(); idx++)
             {
               RegionInfo * const alarmedRegion = alarmedRegions[idx];
-              const auto &ledRange = AlarmsApi::getLedIndexesByRegion(alarmedRegion->Id);
+              const auto &ledRange = getLedIndexesByRegion(alarmedRegion->Id);
               for(auto &ledIdx : ledRange)
               {
                 TRACE(F(" Region: "), alarmedRegion->Id, F("\t"), F("Led idx: "), ledIdx, F("\tName: "), alarmedRegion->Name);
@@ -947,8 +946,8 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
           if(status == ApiStatusCode::JSON_ERROR)
           {
             _settings.alarmsCheckWithoutStatus = true;
-            ESP.resetHeap();
-            ESP.resetFreeContStack();
+            ESPresetHeap;
+            ESPresetFreeContStack;
           }         
         } 
 
@@ -1182,7 +1181,7 @@ void PrintNetworkStatToSerial()
 
 void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
 {  
-  str += F("[\"") + info.description + F("\": ") + String(info.count) + F("]; ");
+  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
 }
 
 void PrintNetworkStatistic(String &str)
@@ -1287,24 +1286,33 @@ void HandleEffects(const unsigned long &currentTicks)
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
-  if(debugButtonFromSerial == 2) // Reset Settings
-  {
-    _settings.init();
-    SaveSettings();
-    api->setBaseUri(_settings.BaseUri);
-  }
-
   if(debugButtonFromSerial == 1) // Reset WiFi
   {    
+    SPIFFS.format();
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();
   }
 
+  if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
+  {    
+    SPIFFS.format();
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
+  }
+
+  if(debugButtonFromSerial == 2) // Reset Settings
+  {
+    _settings.init();
+    SaveSettings();
+    api->setBaseUri(_settings.BaseUri);
+  }  
+
   if(debugButtonFromSerial == 100) // Show Network Statistic
   {
     INFO(F(" HEAP: "), ESP.getFreeHeap());
-    INFO(F("STACK: "), ESP.getFreeContStack());
+    INFO(F("STACK: "), ESPgetFreeContStack);
     INFO(F(" BR: "), _settings.Brightness);
     INFO(F("Alarmed regions count: "), alarmedLedIdx.size());
     INFO(F("alarmsCheckWithoutStatus: "), _settings.alarmsCheckWithoutStatus);  
@@ -1503,7 +1511,7 @@ void fill_ua_prapor2()
 
 void SetRegionColor(const UARegion &region, const CRGB &color)
 {
-  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  for(const auto &idx : getLedIndexesByRegion(region))
   {    
     ledsState[idx].Color = color;
     leds[idx] = color;
@@ -1523,7 +1531,7 @@ void SetStateFromRealLeds()
 
 void SetRegionState(const UARegion &region, LedState &state)
 {
-  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  for(const auto &idx : getLedIndexesByRegion(region))
   {
     state.Idx = idx;
     // state.IsAlarmed = ledsState[idx].IsAlarmed;

@@ -84,7 +84,7 @@ class WiFiOps
       _lastPlace++;
       return *this;
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
+    WiFiOps &AddParameter(const String &name, const String &label,const String &json, const String &defaultValue, const uint8_t &length) 
     {
       WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, _lastPlace);
@@ -92,7 +92,7 @@ class WiFiOps
       _lastPlace++;
       return *this;      
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)
+    WiFiOps &AddParameter(const String &name, const String &label, const String &json, const String &defaultValue, const uint8_t &length, const uint8_t &place)
     {
       WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, place);
@@ -107,7 +107,7 @@ class WiFiOps
     }
 
   public:
-    void ClearFSSettings()
+    void FormatFS()
     {
       //clean FS, for testing
       SPIFFS.format();
@@ -203,8 +203,9 @@ class WiFiOps
       SaveFSSettings(_parameters);
 
       WIFI_TRACE(F("The values in the file are: "));
-      for(const auto &p : _parameters)
+      for(uint8_t pIdx = 0; pIdx < _parameters.Count();  pIdx++)
       {
+        const auto &p = _parameters.GetAt(pIdx);
         WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
       }
 
@@ -219,7 +220,7 @@ class WiFiOps
     //save the custom parameters to FS
     void SaveFSSettings(WiFiParameters &parametersToSave)
     {  
-      WIFI_TRACE(F("Save Settings..."));
+      WIFI_TRACE(F("Save WiFi Settings..."));
       if (WiFiManagerCallBacks::_shouldSaveConfig) {
         WIFI_TRACE(F("saving config"));
     #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
@@ -258,7 +259,7 @@ class WiFiOps
     //read configuration from FS json
     void LoadFSSettings(WiFiParameters &parametersToLoad)
     { 
-      WIFI_TRACE(F("Load Settings..."));
+      WIFI_TRACE(F("Load WiFi Settings..."));
       WIFI_TRACE(F("mounting FS..."));
 
       if (SPIFFS.begin()) {
