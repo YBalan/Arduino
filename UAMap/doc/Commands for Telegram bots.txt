@@ -1,19 +1,6 @@
-register - Register chat
-unregister - Unregister chat
-unregisterall - Unregister all chat(s)
-update - Current period of update in milliseconds
-update10000 - Set period of update to 10secs
-baseuri - Current alerts.api uri
-relay1menu - Relay1 Menu to choose region
-relay2menu - Relay2 Menu to choose region
-token - Current Alerts.Api token
-nstat - Network Statistic
-rssi - WiFi Quality rssi db
-test - test by regionId
-ver - Version Info
 gay - trolololo
-ua - Ukrain Prapor
-changeconfig - change configuration WiFi, tokens...
+ua - Ukraine Prapor
+ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
 br - Current brightness
 br255 - Max brightness
@@ -33,3 +20,19 @@ schema0 - Set Color schema to Dark
 schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
+play - Play tones 500,800
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
+token - Current Alerts.Api token
+nstat - Network Statistic
+rssi - WiFi Quality rssi db
+test - test by regionId
+ver - Version Info
+changeconfig - change configuration WiFi, tokens...
+chid - List of registered channels

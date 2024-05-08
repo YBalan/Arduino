@@ -5,7 +5,7 @@
 
 #define VER F("1.19")
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -40,7 +40,10 @@
 #define DebounceTime 50
 
 #ifdef ESP32
+  #define IsESP32 true
   #include <SPIFFS.h>
+#else
+  #define IsESP32 false
 #endif
 
 // Platform specific
@@ -152,7 +155,7 @@ void setup() {
   INFO(F("ResetBtn: "), resetButtonState);
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
   _settings.resetFlag = 200;
-  api->setApiKey(wifiOps.GetParameterValueById("apiToken")); 
+  api->setApiKey(wifiOps.GetParameterValueById(F("apiToken"))); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
  
@@ -201,19 +204,20 @@ unregisterall - Unregister all chat(s)
 update - Current period of update in milliseconds
 update10000 - Set period of update to 10secs
 baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
 token - Current Alerts.Api token
 nstat - Network Statistic
 rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
 changeconfig - change configuration WiFi, tokens...
-chid - Registered ChannelIDs
-relay1menu - Relay1 Menu to choose region
-relay2menu - Relay2 Menu to choose region
+chid - List of registered channels
 
 !!!!!!!!!!!!!!!! - Bot Commands for Users
 gay - trolololo
-ua - Ukrain Prapor
+ua - Ukraine Prapor
+ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
 br - Current brightness
 br255 - Max brightness
@@ -233,7 +237,7 @@ schema0 - Set Color schema to Dark
 schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
-
+play - Play tones 500,800
 */
 
 #define BOT_COMMAND_BR F("/br")
@@ -707,8 +711,9 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
 
   String menu;
   String call;
-
-  bool sendWholeMenu = false;
+  
+  bool sendWholeMenu = IsESP32;
+  
   static const uint8_t RegionsInLine = 2;
   static const uint8_t RegionsInGroup = 6;
 
@@ -729,7 +734,7 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
     if(!sendWholeMenu && isEndOfGoup)      
     {
       menu += String(F(" \n ")) + relayName + F(" ") + F("Off");
-      call += String(F(", ")) + relayCommand + F(" 0");
+      call += String(F(", ")) + relayCommand + F("0");
 
       regionPlace = 1;      
 
@@ -753,8 +758,8 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
 
   if(sendWholeMenu)
   {
-    menu += String(F(" \n ")) + F("Disable");
-    call += String(F(", ")) + relayCommand + F(" 0");
+    menu += String(F(" \n ")) + relayName + F(" ") + F("Off");
+    call += String(F(", ")) + relayCommand + F("0");
 
     INFO(menu);
     INFO(call);   
@@ -1287,8 +1292,7 @@ uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 1) // Reset WiFi
-  {    
-    SPIFFS.format();
+  { 
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();

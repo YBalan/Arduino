@@ -6,13 +6,14 @@
 #define USE_BUZZER
 #define USE_BOT_MAIN_MENU 
 #define USE_BOT_SIMPLE_ANSWER false
-#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
 
 #define BRIGHTNESS_STEP 25
 #ifdef ESP32
 #define LANGUAGE_UA
+#define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
 #else
 #define LANGUAGE_EN
+#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
 #endif
 
 #define HTTP_TIMEOUT 1000
