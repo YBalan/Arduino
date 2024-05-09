@@ -4,17 +4,29 @@
 
 #define USE_BOT
 #define USE_BUZZER
-#define USE_BOT_MAIN_MENU 
-#define USE_BOT_SIMPLE_ANSWER false
+#define USE_BOT_FAST_MENU 
+#define USE_BOT_INLINE_MENU
 
 #define BRIGHTNESS_STEP 25
+
 #ifdef ESP32
-#define LANGUAGE_UA
-#define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
+  #define USE_POWER_MONITOR
+  #define LANGUAGE_UA
+  #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
+  #define USE_BOT_ONE_MSG_ANSWER true
 #else
-#define LANGUAGE_EN
-#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
+  #define LANGUAGE_EN
+  #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot  
+  #define USE_BOT_ONE_MSG_ANSWER false
 #endif
+
+#ifdef USE_POWER_MONITOR
+  #define PM_UPDATE_PERIOD 60000
+  #define PM_FAST_UPDATE_PERIOD 30000  
+#endif
+#define PM_MENU_VOLTAGE_FIRST true
+#define PM_MENU_VOLTAGE_UNIT F("V")
+#define PM_MENU_NAME F("PM")
 
 #define HTTP_TIMEOUT 1000
 
@@ -40,12 +52,14 @@
 
 // PINS
 #ifdef ESP8266
+  #define PIN_CLOCK     D0
   #define PIN_RELAY1    D1
   #define PIN_RELAY2    D2
   #define PIN_BUZZ      D3
   #define PIN_RESET_BTN D5
   #define PIN_LED_STRIP D6 
 #else //ESP32
+  #define PIN_CLOCK     13
   #define PIN_RELAY1    18
   #define PIN_RELAY2    19
   #define PIN_BUZZ      21

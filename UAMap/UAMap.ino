@@ -3,7 +3,7 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include "Config.h"
 
-#define VER F("1.19")
+#define VER F("1.20")
 //#define RELEASE
 #define DEBUG
 
@@ -29,6 +29,9 @@
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 
+#define ENABLE_INFO_PMONITOR
+#define ENABLE_TRACE_PMONITOR
+
 #define ENABLE_INFO_BUZZ
 #define ENABLE_TRACE_BUZZ
 #endif
@@ -51,7 +54,7 @@
   #define ESPgetFreeContStack ESP.getFreeContStack()
   #define ESPresetHeap ESP.resetHeap()
   #define ESPresetFreeContStack ESP.resetFreeContStack()
-#else
+#else //ESP32
   #define ESPgetFreeContStack F("Not supported")
   #define ESPresetHeap {}
   #define ESPresetFreeContStack {}
@@ -59,12 +62,16 @@
 
 #ifdef ESP8266 
   #define FASTLED_ESP8266_RAW_PIN_ORDER
+  ///#define FASTLED_ALL_PINS_HARDWARE_SPI
   //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
   //#define FASTLED_ESP8266_D1_PIN_ORDER  
+#else //ESP32
+  //#define FASTLED_ESP32_SPI_BUS HSPI
 #endif
 #include <FastLED.h>  
 
 #include <map>
+#include <set>
 #include <ezButton.h>
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 
@@ -76,6 +83,7 @@
 #include "TelegramBotHelper.h"
 #include "BuzzHelper.h"
 #include "UAAnthem.h"
+#include "PMonitor.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -132,6 +140,8 @@ void setup() {
   LoadSettings();
   //_settings.reset();
 
+  PMonitor::Init();
+
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
 
   FastLED.clear();   
@@ -168,7 +178,7 @@ void setup() {
   SetBrightness(); 
 
   #ifdef USE_BOT
-  //bot.setChatID(CHAT_ID);
+  
   LoadChannelIDs();
   bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
   _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
@@ -238,6 +248,7 @@ schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
 play - Play tones 500,800
+pm - Show Power monitor
 */
 
 #define BOT_COMMAND_BR F("/br")
@@ -266,7 +277,7 @@ play - Play tones 500,800
 #define BOT_COMMAND_PLAY F("/play")
 #define BOT_COMMAND_SAVEMELODY F("/savemelody")
 
-//Main Menu Main
+//Fast Menu
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
 #define BOT_MENU_ALARMED F("Alarmed")
 #define BOT_MENU_ALL F("All")
@@ -274,6 +285,11 @@ play - Play tones 500,800
 #define BOT_MENU_MID_BR F("Mid Br")
 #define BOT_MENU_MAX_BR F("Max Br")
 #define BOT_MENU_NIGHT_BR F("Night Br")
+
+#ifdef USE_POWER_MONITOR
+#define BOT_COMMAND_PM F("/pm")
+static std::map<String, int32_t> pmChatIds;
+#endif
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -331,36 +347,52 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    bot->sendTyping(msg.chatID);
-    INFO(F("Main Menu"));
-    #ifdef USE_BUZZER
-    static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
-    #else
-    static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
-    #endif
+    bot->sendTyping(msg.chatID);    
 
-    ESPresetHeap;
-    ESPresetFreeContStack;
+    #ifdef USE_BOT_INLINE_MENU
+      BOT_INFO(F("Inline Menu"));
+      #ifdef USE_BUZZER
+      static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
+      #else
+      static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
+      #endif
 
-    INFO(F(" HEAP: "), ESP.getFreeHeap());
-    INFO(F("STACK: "), ESPgetFreeContStack);
-    
-    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);
+      ESPresetHeap;
+      ESPresetFreeContStack;
 
-    //delay(100);
-    #ifdef USE_BOT_MAIN_MENU    
-    static const String BotFastMenu = String(BOT_MENU_UA_PRAPOR)    
-      + F(" \n ") + BOT_MENU_MIN_BR + F(" \t ") + BOT_MENU_MID_BR + F(" \t ") + BOT_MENU_MAX_BR + F(" \t ") + BOT_MENU_NIGHT_BR
-      + F(" \n ") + BOT_MENU_ALARMED + F(" \t ") + BOT_MENU_ALL
-    ;
-    bot->showMenuText(_botSettings.botNameForMenu, BotFastMenu, msg.chatID, true);
+      BOT_INFO(F(" HEAP: "), ESP.getFreeHeap());
+      BOT_INFO(F("STACK: "), ESPgetFreeContStack);
+      
+      bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);    
     #endif
     
-    //delay(500);
+    #ifdef USE_BOT_FAST_MENU    
+      BOT_INFO(F("Fast Menu"));        
+      static const String BotFastMenu = String(BOT_MENU_UA_PRAPOR)    
+        + F(" \n ") + BOT_MENU_MIN_BR + F(" \t ") + BOT_MENU_MID_BR + F(" \t ") + BOT_MENU_MAX_BR + F(" \t ") + BOT_MENU_NIGHT_BR
+        + F(" \n ") + BOT_MENU_ALARMED + F(" \t ") + BOT_MENU_ALL
+      ;     
+      bot->showMenuText(_botSettings.botNameForMenu, BotFastMenu, msg.chatID, true);
+    #endif  
+    
   } else
-  #ifdef USE_BOT_MAIN_MENU 
+  #ifdef USE_POWER_MONITOR
+  if(GetCommandValue(BOT_COMMAND_PM, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    
+    const String &menu = GetPMMenu(PMonitor::GetVoltage());
+    const String &call = GetPMMenuCall();
+    PM_TRACE(F("\t"), menu, F(" -> "), msg.chatID);
+
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + PM_MENU_NAME, menu, call, msg.chatID);
+    pmChatIds[msg.chatID] = bot->lastBotMsg(); 
+    //bot->skipUpdates();    
+  } else
+  #endif
+  #ifdef USE_BOT_FAST_MENU 
   if(GetCommandValue(BOT_MENU_ALARMED, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
@@ -650,7 +682,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     {      
       if(region.AlarmStatus == ApiAlarmStatus::Alarmed || answerAll)
       {
-        if(USE_BOT_SIMPLE_ANSWER)
+        if(USE_BOT_ONE_MSG_ANSWER)
         {
           messages[0] += String(F("\n")) + region.Name + F(": ") + F("[") + String((uint8_t)region.Id) + F("]");
         }
@@ -750,11 +782,11 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
       ESPresetHeap;
       ESPresetFreeContStack;
 
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESPgetFreeContStack);  
+      BOT_INFO(F(" HEAP: "), ESP.getFreeHeap());
+      BOT_INFO(F("STACK: "), ESPgetFreeContStack);  
 
-      INFO(menu);
-      INFO(call);    
+      BOT_INFO(menu);
+      BOT_INFO(call);    
 
       bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
 
@@ -828,10 +860,10 @@ void loop()
   
   FastLEDShow(false); 
 
-  HandleDebugSerialCommands();   
+  HandleDebugSerialCommands();     
 
   #ifdef USE_BOT
-  uint8_t botStatus = bot->tick();
+  uint8_t botStatus = bot->tick();  
   if(botStatus == 0)
   {
     // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
@@ -845,8 +877,42 @@ void loop()
   }
   #endif   
 
+  #ifdef USE_POWER_MONITOR
+  #ifdef PM_UPDATE_PERIOD  
+  EVERY_N_MILLISECONDS_I(PM, PM_UPDATE_PERIOD)
+  {    
+    const auto &voltage = PMonitor::GetVoltage();
+    const String &menu = GetPMMenu(voltage);
+    const String &call = GetPMMenuCall();
+
+    for(const auto &chatID : pmChatIds)
+    {
+      PM_TRACE(F("\t"), menu, F(" -> "), chatID.first);
+      
+      bot->editMenuCallback(chatID.second, menu, call, chatID.first);      
+    }
+  }
+  #endif
+  #endif
+
   firstRun = false;
 }
+
+#ifdef USE_POWER_MONITOR
+const String GetPMMenu(const float &voltage)
+{
+  String voltageMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT;
+
+  //String menu = PM_MENU_VOLTAGE_FIRST ?  (voltageMenu + F(" \n ") + BotFastMenu) : (BotFastMenu +  F(" \n ") + voltageMenu);
+  return std::move(voltageMenu);
+}
+
+const String GetPMMenuCall()
+{  
+  String call = String(BOT_COMMAND_PM);
+  return std::move(call);
+}
+#endif
 
 const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks, const bool &effectStarted)
 {
