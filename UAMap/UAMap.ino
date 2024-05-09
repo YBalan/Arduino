@@ -288,7 +288,11 @@ pm - Show Power monitor
 
 #ifdef USE_POWER_MONITOR
 #define BOT_COMMAND_PM F("/pm")
-static std::map<String, int32_t> pmChatIds;
+#define BOT_COMMAND_PMALARM F("/alarmpm")
+#define BOT_COMMAND_PMALARMOFF F("/offalarmpm")
+struct PMChatInfo { int32_t MsgID = -1; float AlarmValue = 0.0; float CurrentValue = 0.0; };
+static std::map<String, PMChatInfo> pmChatIds; // = new (std::map<String, PMChatInfo>());
+static uint32_t pmUpdatePeriod = PM_UPDATE_PERIOD;
 #endif
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -300,6 +304,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     INFO(F("Update check..."));
     String fileName = msg.fileName;
     fileName.replace(F(".bin"), F(""));
+    fileName.replace(F(".gz"), F(""));
     auto uidx = fileName.lastIndexOf(F("_"));
     bool isEsp32Frmw = fileName.lastIndexOf(F("esp32")) >= 0;
 
@@ -383,14 +388,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   { 
     bot->sendTyping(msg.chatID);
     
-    const String &menu = GetPMMenu(PMonitor::GetVoltage());
-    const String &call = GetPMMenuCall();
+    const float &voltage = PMonitor::GetVoltage();
+    pmChatIds[msg.chatID].CurrentValue = voltage;
+
+    const String &menu = GetPMMenu(voltage, msg.chatID);
+    const String &call = GetPMMenuCall(voltage, msg.chatID);
     PM_TRACE(F("\t"), menu, F(" -> "), msg.chatID);
 
     bot->inlineMenuCallback(_botSettings.botNameForMenu + PM_MENU_NAME, menu, call, msg.chatID);
-    pmChatIds[msg.chatID] = bot->lastBotMsg(); 
-    //bot->skipUpdates();    
+    pmChatIds[msg.chatID].MsgID = bot->lastBotMsg(); 
+      
   } else
+  if(GetCommandValue(BOT_COMMAND_PMALARM, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);    
+    if(value.length() > 0)
+    {
+      auto &chatIdInfo = pmChatIds[msg.chatID];
+      chatIdInfo.AlarmValue = value.toFloat();      
+      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
+      value = String(F("PM Alarm set: <= ")) + String(chatIdInfo.AlarmValue, 2) + PM_MENU_VOLTAGE_UNIT;
+      noAnswerIfFromMenu = true;
+    }    
+  } else  
+  if(GetCommandValue(BOT_COMMAND_PMALARMOFF, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);  
+    auto &chatIdInfo = pmChatIds[msg.chatID];
+    chatIdInfo.AlarmValue = 0;
+    SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
+    value = String(F("PM Alarm set: Off"));
+    noAnswerIfFromMenu = true;
+  } else  
   #endif
   #ifdef USE_BOT_FAST_MENU 
   if(GetCommandValue(BOT_MENU_ALARMED, filtered, value))
@@ -879,17 +908,20 @@ void loop()
 
   #ifdef USE_POWER_MONITOR
   #ifdef PM_UPDATE_PERIOD  
-  EVERY_N_MILLISECONDS_I(PM, PM_UPDATE_PERIOD)
+  EVERY_N_MILLISECONDS_I(PM, pmUpdatePeriod)
   {    
-    const auto &voltage = PMonitor::GetVoltage();
-    const String &menu = GetPMMenu(voltage);
-    const String &call = GetPMMenuCall();
+    const auto &voltage = PMonitor::GetVoltage();      
 
-    for(const auto &chatID : pmChatIds)
+    for(const auto &chatIDkv : pmChatIds)
     {
-      PM_TRACE(F("\t"), menu, F(" -> "), chatID.first);
-      
-      bot->editMenuCallback(chatID.second, menu, call, chatID.first);      
+      const auto &chatID = chatIDkv.first;
+      pmChatIds[chatID].CurrentValue = voltage;
+      SetPMMenu(chatID, chatIDkv.second.MsgID, voltage);
+
+      if(chatIDkv.second.AlarmValue > 0)
+      {
+        bot->sendMessage(String(PM_MENU_ALARM_NAME) + F(": ") + String(voltage, 2) + PM_MENU_VOLTAGE_UNIT, chatID);
+      }
     }
   }
   #endif
@@ -899,17 +931,36 @@ void loop()
 }
 
 #ifdef USE_POWER_MONITOR
-const String GetPMMenu(const float &voltage)
+void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage)
 {
-  String voltageMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT;
+  const String &menu = GetPMMenu(voltage, chatId);
+  const String &call = GetPMMenuCall(voltage, chatId);
 
-  //String menu = PM_MENU_VOLTAGE_FIRST ?  (voltageMenu + F(" \n ") + BotFastMenu) : (BotFastMenu +  F(" \n ") + voltageMenu);
+  PM_TRACE(F("\t"), menu, F(" -> "), chatId);
+  
+  bot->editMenuCallback(msgId, menu, call, chatId);
+}
+
+const String GetPMMenu(const float &voltage, const String &chatId)
+{
+  const auto &chatIdInfo = pmChatIds[chatId];
+  String voltageMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT 
+    + F(" \n ") + PM_MENU_ALARM_NAME + F(" <= ") + String(voltage - PM_MENU_ALARM_DECREMENT, 2) + PM_MENU_VOLTAGE_UNIT
+    + (chatIdInfo.AlarmValue > 0 ? String(F(" \t ")) +  String(F("!")) + F(" <= ") + String(chatIdInfo.AlarmValue, 2) : String(F("")))
+    + (chatIdInfo.AlarmValue > 0 ? String(F(" \t ")) + F("Off") : String(F("")))
+  ;
+  
   return std::move(voltageMenu);
 }
 
-const String GetPMMenuCall()
+const String GetPMMenuCall(const float &voltage, const String &chatId)
 {  
-  String call = String(BOT_COMMAND_PM);
+  const auto &chatIdInfo = pmChatIds[chatId];
+  String call = String(BOT_COMMAND_PM) 
+        + F(",") + BOT_COMMAND_PMALARM + String(voltage - PM_MENU_ALARM_DECREMENT, 2)  
+        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM : String(F("")))
+        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARMOFF : String(F(""))) 
+    ;
   return std::move(call);
 }
 #endif

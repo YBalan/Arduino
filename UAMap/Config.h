@@ -27,6 +27,8 @@
 #define PM_MENU_VOLTAGE_FIRST true
 #define PM_MENU_VOLTAGE_UNIT F("V")
 #define PM_MENU_NAME F("PM")
+#define PM_MENU_ALARM_NAME F("Alarm")
+#define PM_MENU_ALARM_DECREMENT 0.2
 
 #define HTTP_TIMEOUT 1000
 
