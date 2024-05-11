@@ -260,10 +260,10 @@ class WiFiOps
     void LoadFSSettings(WiFiParameters &parametersToLoad)
     { 
       WIFI_TRACE(F("Load WiFi Settings..."));
-      WIFI_TRACE(F("mounting FS..."));
+      WIFI_TRACE(F("Mounting FS..."));
 
       if (SPIFFS.begin()) {
-        WIFI_TRACE(F("mounted file system"));
+        WIFI_TRACE(F("File system mounted"));
         if (SPIFFS.exists("/config.json")) {
           //file exists, reading and loading
           WIFI_TRACE(F("reading config file"));
@@ -311,7 +311,7 @@ class WiFiOps
           }
         }
       } else {
-        WIFI_TRACE(F("failed to mount FS"));
+        WIFI_TRACE(F("Failed to mount FS"));
       }
       //end read
     }

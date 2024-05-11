@@ -54,19 +54,23 @@
 
 // PINS
 #ifdef ESP8266
-  #define PIN_CLOCK     D0
-  #define PIN_RELAY1    D1
-  #define PIN_RELAY2    D2
-  #define PIN_BUZZ      D3
-  #define PIN_RESET_BTN D5
-  #define PIN_LED_STRIP D6 
+  #define PIN_CLOCK         D0
+  #define PIN_RELAY1        D1
+  #define PIN_RELAY2        D2
+  #define PIN_BUZZ          D3
+  #define PIN_RESET_BTN     D5
+  #define PIN_LED_STRIP     D6 
+  #define PIN_PMONITOR_SDA  D8
+  #define PIN_PMONITOR_SCL  D9 
 #else //ESP32
-  #define PIN_CLOCK     13
-  #define PIN_RELAY1    18
-  #define PIN_RELAY2    19
-  #define PIN_BUZZ      21
-  #define PIN_RESET_BTN 22
-  #define PIN_LED_STRIP 23  
+  #define PIN_CLOCK         13
+  #define PIN_RELAY1        18
+  #define PIN_RELAY2        19
+  #define PIN_BUZZ          21
+  #define PIN_RESET_BTN     22
+  #define PIN_LED_STRIP     23 
+  #define PIN_PMONITOR_SDA  4
+  #define PIN_PMONITOR_SCL  5  
 #endif
 
 #include <vector>

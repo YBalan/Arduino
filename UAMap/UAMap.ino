@@ -3,9 +3,14 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include "Config.h"
 
-#define VER F("1.20")
+#ifdef ESP8266
+  #define VER F("1.20")
+#else //ESP32
+  #define VER F("1.22")
+#endif
+
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -140,7 +145,8 @@ void setup() {
   LoadSettings();
   //_settings.reset();
 
-  PMonitor::Init();
+  PMonitor::LoadSettings();
+  PMonitor::Init(PIN_PMONITOR_SDA, PIN_PMONITOR_SCL);
 
   FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
 
@@ -290,6 +296,7 @@ pm - Show Power monitor
 #define BOT_COMMAND_PM F("/pm")
 #define BOT_COMMAND_PMALARM F("/alarmpm")
 #define BOT_COMMAND_PMUPDATE F("/powerupdate")
+#define BOT_COMMAND_PMADJ F("/adjpm")
 struct PMChatInfo { int32_t MsgID = -1; float AlarmValue = 0.0; float CurrentValue = 0.0; };
 static std::map<String, PMChatInfo> pmChatIds; // = new (std::map<String, PMChatInfo>());
 static uint32_t pmUpdatePeriod = PM_UPDATE_PERIOD;
@@ -414,7 +421,27 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       chatIdInfo.AlarmValue = value.toFloat();      
       SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
       value = String(F("PM Alarm set: <= ")) + String(chatIdInfo.AlarmValue, 2) + PM_MENU_VOLTAGE_UNIT;
+      PM_TRACE(value);
       noAnswerIfFromMenu = true;
+    }    
+  } else    
+  if(GetCommandValue(BOT_COMMAND_PMADJ, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);    
+    if(value.length() > 0)
+    {
+      auto &chatIdInfo = pmChatIds[msg.chatID];
+
+      const auto &adjValue = PMonitor::AdjCalibration(value.toFloat());
+
+      const float &voltage = PMonitor::GetVoltage();
+      chatIdInfo.CurrentValue = voltage;
+      
+      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
+      value = String(F("PM Adjust set: ")) + String(adjValue, 3);
+      PMonitor::SaveSettings();
+      PM_TRACE(value);
+      noAnswerIfFromMenu = false;
     }    
   } else    
   if(GetCommandValue(BOT_COMMAND_PMUPDATE, filtered, value))
@@ -428,7 +455,18 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       pmUpdateTicks = pmUpdatePeriod == 0 ? 0 : millis();
       SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
       value = String(F("PM Update set: ")) + String(pmUpdatePeriod) + F("ms...");
+      PM_TRACE(value);
       noAnswerIfFromMenu = true;
+    }
+
+    if(pmUpdatePeriod == 0)
+    {
+      for(const auto &chatIDkv : pmChatIds)
+      {
+        const auto &chatID = chatIDkv.first;
+        const auto &chatIDInfo = chatIDkv.second;        
+        SetPMMenu(chatID, chatIDInfo.MsgID, chatIdInfo.CurrentValue);
+      }
     }
     
     PM_TRACE(F("PM Update period: "), pmUpdatePeriod);
@@ -929,15 +967,21 @@ void loop()
     {    
       const auto &voltage = PMonitor::GetVoltage();      
 
-      for(const auto &chatIDkv : pmChatIds)
+      for(auto &chatIDkv : pmChatIds)
       {
         const auto &chatID = chatIDkv.first;
-        pmChatIds[chatID].CurrentValue = voltage;
-        SetPMMenu(chatID, chatIDkv.second.MsgID, voltage);
+        auto &chatIDInfo = chatIDkv.second;
+        chatIDInfo.CurrentValue = voltage;
+        SetPMMenu(chatID, chatIDInfo.MsgID, voltage);
 
-        if(chatIDkv.second.AlarmValue > 0)
+        if(chatIDInfo.AlarmValue > 0)
         {
-          bot->sendMessage(String(PM_MENU_ALARM_NAME) + F(": ") + String(voltage, 2) + PM_MENU_VOLTAGE_UNIT, chatID);
+          if(voltage <= chatIDInfo.AlarmValue)
+          {
+            String alarmMessage = String(PM_MENU_ALARM_NAME) + F(": ") + String(voltage, 2) + PM_MENU_VOLTAGE_UNIT;
+            PM_TRACE(alarmMessage);
+            bot->sendMessage(alarmMessage, chatID);
+          }
         }
       }
     }
@@ -1452,6 +1496,12 @@ void HandleDebugSerialCommands()
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();
+  }
+
+  if(debugButtonFromSerial == 140)
+  {
+    LoadSettings();
+    PMonitor::LoadSettings();
   }
 
   if(debugButtonFromSerial == 2) // Reset Settings
