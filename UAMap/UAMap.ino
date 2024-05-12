@@ -952,7 +952,23 @@ void loop()
   { 
     if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
+      //when updated
       //FastLEDShow(true);
+      #ifdef USE_BOT
+        #ifdef USE_NOTIFY
+          if(_settings.notifyHttpCode != 0 
+            &&(
+                  (_settings.notifyHttpCode == -200 && httpCode != 200)
+                || (_settings.notifyHttpCode == httpCode)
+              )
+           )
+          {
+            String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode);
+            TRACE(notifyMessage);
+            bot->sendMessage(notifyMessage, notifyChatId);
+          }
+        #endif
+      #endif
     }
 
     if(CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/false))
@@ -1183,18 +1199,10 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode
     INFO(F("Waiting "), _settings.alarmsUpdateTimeout, F("ms..."));
     PrintNetworkStatToSerial();
 
-    #ifdef USE_BOT
-    #ifdef USE_NOTIFY
-    if(_settings.notifyHttpCode > 0 && _settings.notifyHttpCode == httpCode)
-    {
-      String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode);
-      TRACE(notifyMessage);
-      bot->sendMessage(notifyMessage, notifyChatId);
-    }
-    #endif
-    #endif
+    return true;    
   }
-  return changed;
+  //return changed;
+  return false;
 }
 
 void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
