@@ -9,8 +9,11 @@
 
 #define BRIGHTNESS_STEP 25
 
-#ifdef ESP32
-  #define USE_POWER_MONITOR
+#ifdef ESP32  
+  #ifdef USE_BOT
+    #define USE_POWER_MONITOR
+    #define USE_NOTIFY
+  #endif
   #define LANGUAGE_UA
   #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
   #define USE_BOT_ONE_MSG_ANSWER true

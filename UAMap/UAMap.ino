@@ -10,7 +10,7 @@
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -183,8 +183,7 @@ void setup() {
   CheckAndUpdateRealLeds(millis(), /*effectStarted:*/false);
   SetBrightness(); 
 
-  #ifdef USE_BOT
-  
+  #ifdef USE_BOT  
   LoadChannelIDs();
   bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
   _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
@@ -229,6 +228,8 @@ test - test by regionId
 ver - Version Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
+adjpm - Adjust voltage 0.50-1.0
+notify - Notify http code result
 
 !!!!!!!!!!!!!!!! - Bot Commands for Users
 gay - trolololo
@@ -301,6 +302,11 @@ struct PMChatInfo { int32_t MsgID = -1; float AlarmValue = 0.0; float CurrentVal
 static std::map<String, PMChatInfo> pmChatIds; // = new (std::map<String, PMChatInfo>());
 static uint32_t pmUpdatePeriod = PM_UPDATE_PERIOD;
 static uint32_t pmUpdateTicks = 0;
+#endif
+
+#ifdef USE_NOTIFY
+#define BOT_COMMANDS_NOTIFY F("/notify")
+String notifyChatId;
 #endif
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -391,6 +397,20 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     #endif  
     
   } else
+  #ifdef USE_NOTIFY
+  if(GetCommandValue(BOT_COMMANDS_NOTIFY, filtered, value))
+  { 
+    bot->sendTyping(msg.chatID);
+    notifyChatId = msg.chatID;
+    if(value.length() > 0)
+    {
+      _settings.notifyHttpCode = value.toInt();      
+      SaveSettings();
+    }
+    value = String(F("NotifyHttpCode: ")) + String(_settings.notifyHttpCode);
+    TRACE(value);
+  }else
+  #endif
   #ifdef USE_POWER_MONITOR
   if(GetCommandValue(BOT_COMMAND_PM, filtered, value))
   { 
@@ -432,17 +452,18 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     {
       auto &chatIdInfo = pmChatIds[msg.chatID];
 
-      const auto &adjValue = PMonitor::AdjCalibration(value.toFloat());
+      PMonitor::AdjCalibration(value.toFloat());
 
       const float &voltage = PMonitor::GetVoltage();
       chatIdInfo.CurrentValue = voltage;
       
       SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
-      value = String(F("PM Adjust set: ")) + String(adjValue, 3);
-      PMonitor::SaveSettings();
-      PM_TRACE(value);
-      noAnswerIfFromMenu = false;
+      
+      PMonitor::SaveSettings();      
     }    
+    const auto &adjValue = PMonitor::GetCalibration();
+    value = String(F("PM Adjust set: ")) + String(adjValue, 3);
+    PM_TRACE(value);    
   } else    
   if(GetCommandValue(BOT_COMMAND_PMUPDATE, filtered, value))
   { 
@@ -925,9 +946,11 @@ void loop()
 
   HandleEffects(currentTicks);
  
+  int httpCode;
+  String statusMsg;
   if(_effect == Effect::Normal)
   { 
-    if(CheckAndUpdateAlarms(currentTicks))
+    if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
       //FastLEDShow(true);
     }
@@ -954,7 +977,7 @@ void loop()
     BOT_INFO(F("Bot overloaded!"));
     bot->skipUpdates();
     //bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
-  }
+  }  
   #endif   
 
   #ifdef USE_POWER_MONITOR
@@ -1088,7 +1111,7 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks, const bool 
 }
 
 //uint32_t alarmsTicks = 0;
-const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
+const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {  
   //INFO("CheckAndUpdateAlarms");  
   static uint32_t alarmsTicks = 0;
@@ -1098,12 +1121,12 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
     alarmsTicks = currentTicks;
 
     // wait for WiFi connection
-    int status = ApiStatusCode::NO_WIFI;
-    String statusMsg = F("No WiFi");
+    httpCode = ApiStatusCode::NO_WIFI;
+    statusMsg = F("No WiFi");
    
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
-      status = ApiStatusCode::UNKNOWN;
+      httpCode = ApiStatusCode::UNKNOWN;
       statusMsg.clear();
       //INFO("WiFi - CONNECTED");
       //ESP.resetHeap();
@@ -1111,17 +1134,17 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
       INFO(F(" HEAP: "), ESP.getFreeHeap());
       INFO(F("STACK: "), ESPgetFreeContStack);
 
-      bool statusChanged = api->IsStatusChanged(status, statusMsg);
-      if(status == ApiStatusCode::API_OK || status == HTTP_CODE_METHOD_NOT_ALLOWED)
+      bool statusChanged = api->IsStatusChanged(httpCode, statusMsg);
+      if(httpCode == ApiStatusCode::API_OK || httpCode == HTTP_CODE_METHOD_NOT_ALLOWED)
       {        
         INFO(F("IsStatusChanged: "), statusChanged ? F("true") : F("false"));
         TRACE(F("alarmsCheckWithoutStatus: "), _settings.alarmsCheckWithoutStatus ? F("true") : F("false"));
 
         if(statusChanged || _settings.alarmsCheckWithoutStatus || ALARMS_CHECK_WITHOUT_STATUS)
         {              
-          auto alarmedRegions = api->getAlarmedRegions2(status, statusMsg);    
+          auto alarmedRegions = api->getAlarmedRegions2(httpCode, statusMsg);    
           TRACE(F("HTTP "), F("Alarmed regions count: "), alarmedRegions.size());
-          if(status == ApiStatusCode::API_OK)
+          if(httpCode == ApiStatusCode::API_OK)
           { 
             _settings.alarmsCheckWithoutStatus = false;           
             alarmedLedIdx.clear();
@@ -1140,7 +1163,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
             changed = true;
           } 
 
-          if(status == ApiStatusCode::JSON_ERROR)
+          if(httpCode == ApiStatusCode::JSON_ERROR)
           {
             _settings.alarmsCheckWithoutStatus = true;
             ESPresetHeap;
@@ -1152,13 +1175,24 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
       }                       
     }   
     
-    bool statusChanged = SetStatusLED(status, statusMsg);
+    bool statusChanged = SetStatusLED(httpCode, statusMsg);
     changed = (changed || statusChanged);
 
     INFO(F(""));
     INFO(F("Alarmed regions count: "), alarmedLedIdx.size());
     INFO(F("Waiting "), _settings.alarmsUpdateTimeout, F("ms..."));
     PrintNetworkStatToSerial();
+
+    #ifdef USE_BOT
+    #ifdef USE_NOTIFY
+    if(_settings.notifyHttpCode > 0 && _settings.notifyHttpCode == httpCode)
+    {
+      String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode);
+      TRACE(notifyMessage);
+      bot->sendMessage(notifyMessage, notifyChatId);
+    }
+    #endif
+    #endif
   }
   return changed;
 }

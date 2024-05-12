@@ -209,6 +209,16 @@ namespace PMonitor
     #endif
   }
 
+  const float GetCalibration(void)
+  {
+    #ifndef USE_POWER_MONITOR
+      //PM_INFO(PM_NOT_USED_MSG);
+      return 0.0;
+    #else                    
+      return _inaSettings.adjFactor;    
+    #endif
+  }
+
   const bool SaveSettings()
   {
     #ifndef USE_POWER_MONITOR

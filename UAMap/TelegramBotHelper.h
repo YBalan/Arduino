@@ -151,7 +151,7 @@ void HangleBotMessages(FB_msg& msg)
     
     //REGISTRATION
     {      
-      if(msg.text.indexOf(F("/register")) >= 0)
+      if(msg.text.indexOf(F("/register")) >= 0 || msg.text.indexOf(F("/start")) >= 0 )
       {
         BOT_TRACE(F("Start registration: "), msg.chatID);
         bot->replyMessage(_botSettings.botName + F(" ") + REGISTRATION_MSG, msg.messageID, msg.chatID);      

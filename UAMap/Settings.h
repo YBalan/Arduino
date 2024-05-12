@@ -58,7 +58,7 @@ namespace UAMap
     bool alarmScaleDown = true;
 
     int16_t resetFlag = 200;
-    int reserved = 0;
+    int notifyHttpCode = 0;
 
     uint8_t Relay1Region = 0;
     uint8_t Relay2Region = 0;
@@ -82,7 +82,7 @@ namespace UAMap
       alarmedScale = LED_ALARMED_SCALE_FACTOR;
       alarmScaleDown = true;
       resetFlag = 200;
-      reserved = 0;
+      notifyHttpCode = 0;
 
       Relay1Region = 0;
       Relay2Region = 0;
@@ -161,8 +161,8 @@ const bool LoadSettings()
   
   SETTINGS_INFO(F("BR: "), _settings.Brightness);  
   SETTINGS_INFO(F("resetFlag: "), _settings.resetFlag);
-  SETTINGS_INFO(F("reserved: "), _settings.reserved);
-  if(_settings.reserved != 0 || !res)
+  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
+  if(!res)
   {
     SETTINGS_INFO(F("Reset Settings..."));
     _settings.init();
