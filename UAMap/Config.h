@@ -14,26 +14,26 @@
     #define USE_POWER_MONITOR
     #define USE_NOTIFY
   #endif
+  #define HTTP_TIMEOUT 1500
   #define LANGUAGE_UA
   #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
   #define USE_BOT_ONE_MSG_ANSWER true
 #else
+  #define HTTP_TIMEOUT 1000
   #define LANGUAGE_EN
   #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot  
   #define USE_BOT_ONE_MSG_ANSWER false
 #endif
 
-#ifdef USE_POWER_MONITOR
+#ifdef USE_POWER_MONITOR  
+  #define PM_MENU_VOLTAGE_FIRST true
+  #define PM_MENU_VOLTAGE_UNIT F("V")
+  #define PM_MENU_NAME F("PM")
+  #define PM_MENU_ALARM_NAME F("Alarm")
+  #define PM_MENU_ALARM_DECREMENT 0.2
   #define PM_UPDATE_PERIOD 60000
-  #define PM_MIN_UPDATE_PERIOD 15000  
+  #define PM_MIN_UPDATE_PERIOD 15000 
 #endif
-#define PM_MENU_VOLTAGE_FIRST true
-#define PM_MENU_VOLTAGE_UNIT F("V")
-#define PM_MENU_NAME F("PM")
-#define PM_MENU_ALARM_NAME F("Alarm")
-#define PM_MENU_ALARM_DECREMENT 0.2
-
-#define HTTP_TIMEOUT 1000
 
 #define EFFECT_TIMEOUT 15000
 #define ALARMS_UPDATE_DEFAULT_TIMEOUT 25000
