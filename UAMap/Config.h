@@ -14,11 +14,14 @@
     #define USE_POWER_MONITOR
     #define USE_NOTIFY
   #endif
-  #define HTTP_TIMEOUT 1500
+  //#define HTTP_TIMEOUT 3000
   #define LANGUAGE_UA
   #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
   #define USE_BOT_ONE_MSG_ANSWER true
-#else
+#else  
+  #ifdef USE_BOT
+    #define USE_NOTIFY
+  #endif  
   #define HTTP_TIMEOUT 1000
   #define LANGUAGE_EN
   #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot  

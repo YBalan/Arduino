@@ -236,7 +236,9 @@ IotApiRegions iotApiRegions =
       std::vector<RegionInfo *> res;
       status = ApiStatusCode::UNKNOWN;    
 
+      #ifdef HTTP_TIMEOUT
       https2->setTimeout(HTTP_TIMEOUT);            
+      #endif
       // https2->useHTTP10(true);
       https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
@@ -248,14 +250,18 @@ IotApiRegions iotApiRegions =
       #ifdef ESP8266      
       BearSSL::WiFiClientSecure client;
       client.setInsecure();
-      client.setTimeout(HTTP_TIMEOUT);      
+      #ifdef HTTP_TIMEOUT
+      client.setTimeout(HTTP_TIMEOUT);    
+      #endif  
       if (https2->begin(client, uri)) 
       #else
       if(https2->begin(uri))
       #endif
       { // HTTPS    
 
+        #ifdef HTTP_TIMEOUT
         https2->setTimeout(HTTP_TIMEOUT);
+        #endif
 
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
@@ -359,6 +365,9 @@ IotApiRegions iotApiRegions =
           break;
         case HTTP_CODE_METHOD_NOT_ALLOWED: //405
           statusMsg = String(F("Method not allowed")) + F("(") + httpCode + F(")");
+          break;          
+        case HTTP_CODE_BAD_GATEWAY: //502
+          statusMsg = String(F("Bad gateway")) + F("(") + httpCode + F(")");
           break;
         // ------------------- ERRORS
         case HTTPC_ERROR_READ_TIMEOUT:
@@ -393,8 +402,11 @@ IotApiRegions iotApiRegions =
 
     const String sendRequest(const String& resource, const String &apiKey, int &status, String &statusMsg, const bool &closeHttp = true)
     {
-      status = ApiStatusCode::UNKNOWN;   
+      status = ApiStatusCode::UNKNOWN; 
+
+      #ifdef HTTP_TIMEOUT  
       https2->setTimeout(HTTP_TIMEOUT);
+      #endif
       //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
       const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
@@ -405,14 +417,17 @@ IotApiRegions iotApiRegions =
       #ifdef ESP8266     
       BearSSL::WiFiClientSecure client;
       client.setInsecure();
+      #ifdef HTTP_TIMEOUT
       client.setTimeout(HTTP_TIMEOUT);      
+      #endif
       if (https2->begin(client, uri)) 
       #else
       if(https2->begin(uri))
       #endif
       {  // HTTPS
-
+        #ifdef HTTP_TIMEOUT
         https2->setTimeout(HTTP_TIMEOUT);
+        #endif
         String payload;
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + apiKey);        
         https2->addHeader("Accept", "application/json");      

@@ -305,7 +305,7 @@ static uint32_t pmUpdateTicks = 0;
 #endif
 
 #ifdef USE_NOTIFY
-#define BOT_COMMANDS_NOTIFY F("/notify")
+#define BOT_COMMAND_NOTIFY F("/notify")
 String notifyChatId;
 #endif
 
@@ -398,7 +398,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     
   } else
   #ifdef USE_NOTIFY
-  if(GetCommandValue(BOT_COMMANDS_NOTIFY, filtered, value))
+  if(GetCommandValue(BOT_COMMAND_NOTIFY, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
     notifyChatId = msg.chatID;
