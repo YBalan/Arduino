@@ -1,4 +1,3 @@
-#include <memory>
 #pragma once
 #ifndef ALARMS_API_H
 #define ALARMS_API_H
@@ -524,5 +523,7 @@ IotApiRegions iotApiRegions =
     }   
     
 };
+
+std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 
 #endif //ALARMS_API_H
