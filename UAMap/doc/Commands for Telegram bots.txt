@@ -21,6 +21,10 @@ schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
 play - Play tones 500,800
+pm - Show Power monitor
+powerupdate - Power Monitor update period in milliseconds
+alarmpm - Alarm - send message when voltage <= value
+adjpm - Adjust voltage 0.50-1.0
 register - Register chat
 unregister - Unregister chat
 unregisterall - Unregister all chat(s)
@@ -36,3 +40,7 @@ test - test by regionId
 ver - Version Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
+notify - Notify saved http code result
+notify1 - Notify All http code result
+notifynot200 - Notify all http code exclude OK(200)
+notify429 - Notify To-many Requests (429)

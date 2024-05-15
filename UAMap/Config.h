@@ -20,7 +20,7 @@
   #define USE_BOT_ONE_MSG_ANSWER true
   #define USE_STOPWATCH
 #else  
-  #ifdef USE_BOT
+  #if defined(DEBUG) && defined(USE_BOT)
     #define USE_NOTIFY
   #endif  
   #define HTTP_TIMEOUT 1000

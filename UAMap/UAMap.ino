@@ -1,16 +1,15 @@
 //Estimates: https://docs.google.com/spreadsheets/d/1mYA_Bc687Y8no1yJDxv83fimtd0WU4nvcGI80_jnJME/edit?usp=sharing
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
-#include "Config.h"
 
 #ifdef ESP8266
   #define VER F("1.20")
 #else //ESP32
-  #define VER F("1.22")
+  #define VER F("1.23")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -74,6 +73,8 @@
   //#define FASTLED_ESP32_SPI_BUS HSPI
 #endif
 #include <FastLED.h>  
+
+#include "Config.h"
 
 #include <map>
 #include <set>
@@ -228,8 +229,16 @@ test - test by regionId
 ver - Version Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
+notify - Notify saved http code result
+notify1 - Notify All http code result
+notifynot200 - Notify all http code exclude OK(200)
+notify429 - Notify To-many Requests (429)
+
+!!!!!!!!!!!!!!!! - Bot Commands for Power Monitor
+pm - Show Power monitor
+powerupdate - Power Monitor update period in milliseconds
+alarmpm - Alarm - send message when voltage <= value
 adjpm - Adjust voltage 0.50-1.0
-notify - Notify http code result
 
 !!!!!!!!!!!!!!!! - Bot Commands for Users
 gay - trolololo
@@ -255,7 +264,6 @@ schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
 play - Play tones 500,800
-pm - Show Power monitor
 */
 
 #define BOT_COMMAND_BR F("/br")
@@ -404,7 +412,10 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     notifyChatId = msg.chatID;
     if(value.length() > 0)
     {
-      _settings.notifyHttpCode = value.toInt();      
+      bool negate = value.startsWith(F("not"));
+      if(negate) value.replace(F("not"), F(""));
+      int newValue = negate ? -value.toInt() : value.toInt();
+      _settings.notifyHttpCode = newValue;
       SaveSettings();
     }
     value = String(F("NotifyHttpCode: ")) + String(_settings.notifyHttpCode);
@@ -843,8 +854,6 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
   }
 }
 
-/*String BotRelayMenu1("Odeska \n Kharkivska \t Mykolaivska \t Vinnytska \t Kyivska \n Kirovohradska \t Poltavska \t Sumska \t Ternopilska");
-String BotRelayMenuCall1("{0} 18, {0} 22, {0} 17, {0} 4, {0} 14, {0} 15, {0} 19, {0} 20, {0} 21");*/
 void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID)
 {
   // String call1 = BotRelayMenuCall1;
@@ -964,10 +973,12 @@ void loop()
 
       #ifdef USE_BOT
         #ifdef USE_NOTIFY
-          if(_settings.notifyHttpCode != 0 
-            &&(
-                  (_settings.notifyHttpCode == -200 && httpCode != 200)
-                || (_settings.notifyHttpCode == httpCode)
+          if(_settings.notifyHttpCode == 1 || //All http codes
+              (_settings.notifyHttpCode != 0  // Notify is ON
+                &&(
+                      (_settings.notifyHttpCode < 0 && httpCode != abs(_settings.notifyHttpCode)) //-200 means - All except 200
+                    || (_settings.notifyHttpCode == httpCode)
+                  )
               )
            )
           {
