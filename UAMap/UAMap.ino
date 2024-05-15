@@ -628,11 +628,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
-    noAnswerIfFromMenu = !HandleRelay(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, msg.chatID);
+    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
   {
-    noAnswerIfFromMenu = !HandleRelay(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
+    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_TOKEN, filtered, value))
   {
@@ -808,39 +808,39 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
-const bool HandleRelay(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID)
+const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID)
 {
   if(value == F("menu"))
+  {
+    INFO(F(" HEAP: "), ESP.getFreeHeap());
+    INFO(F("STACK: "), ESPgetFreeContStack); 
+
+    ESPresetHeap;
+    ESPresetFreeContStack;
+
+    INFO(F(" HEAP: "), ESP.getFreeHeap());
+    INFO(F("STACK: "), ESPgetFreeContStack);
+
+    SendInlineRelayMenu(relayName, relayCommand, chatID);   
+
+    value.clear();   
+    return false;   
+  }
+  else
+  {
+    if(value.length() > 0)
     {
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESPgetFreeContStack); 
-
-      ESPresetHeap;
-      ESPresetFreeContStack;
-
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESPgetFreeContStack);
-
-      SendInlineRelayMenu(relayName, relayCommand, chatID);   
-
-      value.clear();   
-      return false;   
-    }
-    else
-    {
-      if(value.length() > 0)
+      auto regionId = value.toInt();    
+      if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
       {
-        auto regionId = value.toInt();    
-        if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
-        {
-          relaySetting = regionId;
-          SaveSettings();
-        }
+        relaySetting = regionId;
+        SaveSettings();
       }
-      value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting));
-      BOT_TRACE(F("Bot answer: "), value);
-      return true;
     }
+    value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting));
+    BOT_TRACE(F("Bot answer: "), value);
+    return true;
+  }
 }
 
 /*String BotRelayMenu1("Odeska \n Kharkivska \t Mykolaivska \t Vinnytska \t Kyivska \n Kirovohradska \t Poltavska \t Sumska \t Ternopilska");
@@ -950,10 +950,18 @@ void loop()
   String statusMsg;
   if(_effect == Effect::Normal)
   { 
+    #ifdef USE_STOPWATCH
+    uint32_t sw = millis();
+    #endif
     if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
       //when updated
       //FastLEDShow(true);
+
+      #ifdef USE_STOPWATCH
+      sw = millis() - sw;
+      #endif
+
       #ifdef USE_BOT
         #ifdef USE_NOTIFY
           if(_settings.notifyHttpCode != 0 
@@ -963,13 +971,21 @@ void loop()
               )
            )
           {
-            String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode);
+            String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode)
+            #ifdef USE_STOPWATCH
+            + F(" (") + String(sw) + F("ms") + F(")")
+            #endif
+            ;
             TRACE(notifyMessage);
             bot->sendMessage(notifyMessage, notifyChatId);
           }
         #endif
       #endif
-    }
+
+      #ifdef USE_STOPWATCH
+       TRACE(F("API Stop watch: "), sw, F("ms..."));
+      #endif
+    }   
 
     if(CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/false))
     {

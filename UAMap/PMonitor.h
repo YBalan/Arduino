@@ -41,11 +41,13 @@ namespace PMonitor
     //https://wolles-elektronikkiste.de/en/ina226-current-and-power-sensor    
     INA226_WE ina226 = INA226_WE(I2C_ADDRESS);
     static bool IsPMAvaliable = false;
-    struct INASettings
+    struct PMSettings
     {
       float adjFactor = PM_DEFAULT_ADJUST_FACTOR;
-      void reset(){ adjFactor = PM_DEFAULT_ADJUST_FACTOR; }
-    } _inaSettings;    
+      float relay1Alarm = 0.0;
+      float relay2Alarm = 0.0;
+      void reset(){ adjFactor = PM_DEFAULT_ADJUST_FACTOR; relay1Alarm = 0.0; relay2Alarm = 0.0; }
+    } _pmSettings;    
     void (*PMVoltageCallBack)(const float value) = nullptr;
     #ifdef DEBUG
     float fakeVoltage = 14.6;
@@ -174,7 +176,7 @@ namespace PMonitor
         GetValues();
         #endif
 
-        return ina226.getBusVoltage_V()  * _inaSettings.adjFactor;
+        return ina226.getBusVoltage_V()  * _pmSettings.adjFactor;
       }      
       PM_INFO(PM_NOT_AVALIABLE_MSG);
       #ifdef DEBUG
@@ -189,7 +191,7 @@ namespace PMonitor
   {
     #ifndef USE_POWER_MONITOR
       //PM_INFO(PM_NOT_USED_MSG);
-      return 1.0;
+      return 0.0;
     #else  
       if(IsPMAvaliable)
       {    
@@ -198,14 +200,14 @@ namespace PMonitor
         // PM_INFO(F("\tINA Calibration value: "), value);            
         //return value;
         //ina226.setCorrectionFactor(adj);
-        _inaSettings.adjFactor = adj;
+        _pmSettings.adjFactor = adj;
         return adj;
       }      
       PM_INFO(PM_NOT_AVALIABLE_MSG);
       #ifdef DEBUG
       Init();      
       #endif
-      return _inaSettings.adjFactor;    
+      return _pmSettings.adjFactor;    
     #endif
   }
 
@@ -215,7 +217,7 @@ namespace PMonitor
       //PM_INFO(PM_NOT_USED_MSG);
       return 0.0;
     #else                    
-      return _inaSettings.adjFactor;    
+      return _pmSettings.adjFactor;    
     #endif
   }
 
@@ -227,7 +229,7 @@ namespace PMonitor
     #else  
       String fileName = F("/pmconfig.bin");
       PM_INFO(F("Save Settings to: "), fileName);
-      if(SaveFile(fileName.c_str(), (byte *)&_inaSettings, sizeof(_inaSettings)))
+      if(SaveFile(fileName.c_str(), (byte *)&_pmSettings, sizeof(_pmSettings)))
       {
         PM_INFO(F("Write to: "), fileName);
         return true;
@@ -246,14 +248,14 @@ namespace PMonitor
       String fileName = F("/pmconfig.bin");
       SETTINGS_INFO(F("Load Settings from: "), fileName);
 
-      const bool &res = LoadFile(fileName.c_str(), (byte *)&_inaSettings, sizeof(_inaSettings));
+      const bool &res = LoadFile(fileName.c_str(), (byte *)&_pmSettings, sizeof(_pmSettings));
 
-      if(_inaSettings.adjFactor <= 0 || _inaSettings.adjFactor > 1)
+      if(_pmSettings.adjFactor <= 0 || _pmSettings.adjFactor > 1)
       {
-        _inaSettings.reset();
+        _pmSettings.reset();
       }
 
-      PM_INFO(F("adjFactor: "), _inaSettings.adjFactor);
+      PM_INFO(F("adjFactor: "), _pmSettings.adjFactor);
       
       return res;
     #endif
