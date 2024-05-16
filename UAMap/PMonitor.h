@@ -26,6 +26,7 @@
 
   #include <Wire.h>
   #include <INA226_WE.h>
+  #include <math.h>
   #include "Settings.h"
   #define I2C_ADDRESS 0x40  
 
@@ -159,7 +160,7 @@ namespace PMonitor
     #endif
   }
 
-  const float GetVoltage(const bool &sleep = false)
+  const float GetVoltage(const bool &sleep = true)
   {
     #ifndef USE_POWER_MONITOR
       //PM_INFO(PM_NOT_USED_MSG);
@@ -174,16 +175,20 @@ namespace PMonitor
         //return result;
         #ifdef DEBUG
         GetValues();
-        #endif
-
-        return ina226.getBusVoltage_V()  * _pmSettings.adjFactor;
+        #endif        
+        //ina226.powerUp();
+        ina226.startSingleMeasurement();
+        ina226.readAndClearFlags();
+        auto result = ina226.getBusVoltage_V()  * _pmSettings.adjFactor;
+        //if(sleep) ina226.powerDown();
+        return result;
       }      
       PM_INFO(PM_NOT_AVALIABLE_MSG);
       #ifdef DEBUG
       Init();
       return fakeVoltage -= PM_MENU_ALARM_DECREMENT;
       #endif
-      return 0.0;    
+      return NAN;    
     #endif
   }
 
