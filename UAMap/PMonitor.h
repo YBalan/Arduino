@@ -87,7 +87,7 @@ namespace PMonitor
 
         ina226.setMeasureMode(TRIGGERED); // choose mode and uncomment for change of default
 
-        //ina226.setAverage(AVERAGE_1024); 
+        ina226.setAverage(AVERAGE_16); 
 
         ina226.setResistorRange(0.1, 1.3); // choose resistor 0.1 Ohm and gain range up to 1.3A
  

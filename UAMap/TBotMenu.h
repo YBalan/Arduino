@@ -302,6 +302,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);      
     auto &chatIdInfo = pmChatIds[msg.chatID];
     auto newValue = value.toInt();
+    value.clear();
     if(newValue == 0 || (newValue >= PM_MIN_UPDATE_PERIOD && newValue <= PM_UPDATE_PERIOD))
     {
       pmUpdatePeriod = newValue;      
