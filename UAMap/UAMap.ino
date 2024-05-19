@@ -3,13 +3,13 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.20")
+  #define VER F("1.21")
 #else //ESP32
-  #define VER F("1.24")
+  #define VER F("1.25")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -321,14 +321,15 @@ void loop()
     pmUpdateTicks = millis();
     //EVERY_N_MILLISECONDS_I(PM, pmUpdatePeriod)
     {    
-      const auto &voltage = PMonitor::GetVoltage();      
+      const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
+      const auto &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);      
 
       for(auto &chatIDkv : pmChatIds)
       {
         const auto &chatID = chatIDkv.first;
         auto &chatIDInfo = chatIDkv.second;
         chatIDInfo.CurrentValue = voltage;
-        SetPMMenu(chatID, chatIDInfo.MsgID, voltage);
+        SetPMMenu(chatID, chatIDInfo.MsgID, voltage, led_consumption_voltage_factor);
 
         if(chatIDInfo.AlarmValue > 0)
         {
@@ -809,6 +810,39 @@ void HandleEffects(const unsigned long &currentTicks)
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
   }
 }
+
+#ifdef USE_POWER_MONITOR
+#define PM_SUPPLIER_VOTAGE 5.30 //Volts
+#define PM_LEDS_RESIST 0.17 //Ohms
+const float GetLEDVoltageFactor()
+{
+  if(_settings.Brightness > 2)
+  {
+    //https://www.reddit.com/r/FastLED/comments/gowuga/fastled_power_consumption_functions/
+    const auto& power_mW_unscaled =  calculate_unscaled_power_mW(leds, LED_COUNT);
+    // Adjust power consumption for brightness
+    float power_mW_actual = (power_mW_unscaled * _settings.Brightness) / 255;
+
+    float ledsA = (power_mW_actual / PM_SUPPLIER_VOTAGE) / 1000;
+    float Vdrop = ledsA * PM_LEDS_RESIST;
+    float VEffective = PM_SUPPLIER_VOTAGE - Vdrop;
+
+    float factor = PM_SUPPLIER_VOTAGE / VEffective;
+    
+    PM_TRACE(F("\tLEDS cons: BR: "), _settings.Brightness);
+    PM_TRACE(F("\tLEDS cons: "), power_mW_unscaled, F(" mW unscaled"));
+    PM_TRACE(F("\tLEDS cons: "), power_mW_actual, F(" mW actual"));
+    PM_TRACE(F("\tLEDS cons: "), ledsA, F(" A")); 
+    PM_TRACE(F("\tLEDS cons: "), Vdrop, F(" V drop")); 
+    PM_TRACE(F("\tLEDS cons: "), VEffective, F(" V effective"));
+
+    PM_TRACE(F("\tLEDS cons: "), factor, F("%"));  
+    
+    return factor;
+  }
+  return 1.0;
+}
+#endif
 
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()

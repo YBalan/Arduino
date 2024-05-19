@@ -160,7 +160,7 @@ namespace PMonitor
     #endif
   }
 
-  const float GetVoltage(const bool &sleep = true)
+  const float GetVoltage(const float &additionalAdjustmentFactor, const bool &sleep = true)
   {
     #ifndef USE_POWER_MONITOR
       //PM_INFO(PM_NOT_USED_MSG);
@@ -179,7 +179,7 @@ namespace PMonitor
         //ina226.powerUp();
         ina226.startSingleMeasurement();
         ina226.readAndClearFlags();
-        auto result = ina226.getBusVoltage_V()  * _pmSettings.adjFactor;
+        auto result = ina226.getBusVoltage_V()  * _pmSettings.adjFactor * additionalAdjustmentFactor;
         //if(sleep) ina226.powerDown();
         return result;
       }      

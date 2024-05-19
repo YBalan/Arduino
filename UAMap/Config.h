@@ -12,6 +12,7 @@
 #ifdef ESP32  
   #ifdef USE_BOT
     #define USE_POWER_MONITOR
+    #define SHOW_PM_FACTOR
     #define USE_NOTIFY
   #endif
   //#define HTTP_TIMEOUT 3000
@@ -23,6 +24,7 @@
   #if defined(DEBUG) && defined(USE_BOT)
     #define USE_NOTIFY
   #endif  
+  #define USE_NOTIFY
   //#define HTTP_TIMEOUT 1000
   #define LANGUAGE_EN
   #define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot  

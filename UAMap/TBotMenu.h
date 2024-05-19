@@ -1,6 +1,7 @@
 #pragma once
 #ifndef TELEGRAM_BOT_MENU_H
 #define TELEGRAM_BOT_MENU_H
+//#include <math.h>
 #include "DEBUGHelper.h"
 #include "Settings.h"
 #include "LedState.h"
@@ -118,6 +119,7 @@ struct PMChatInfo { int32_t MsgID = -1; float AlarmValue = 0.0; float CurrentVal
 static std::map<String, PMChatInfo> pmChatIds; // = new (std::map<String, PMChatInfo>());
 static uint32_t pmUpdatePeriod = PM_UPDATE_PERIOD;
 static uint32_t pmUpdateTicks = 0;
+const float GetLEDVoltageFactor();
 #endif
 
 #ifdef USE_NOTIFY
@@ -134,9 +136,9 @@ void SetRelayStatus();
 void PrintNetworkStatistic(String &str);
 void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID);
 const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID);
-const String GetPMMenu(const float &voltage, const String &chatId);
+const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
-void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage);
+void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -253,10 +255,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     BOT_MENU_TRACE(F("PM Update period: "), pmUpdatePeriod);
     
-    const float &voltage = PMonitor::GetVoltage();
+    const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
+    const float &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);
     pmChatIds[msg.chatID].CurrentValue = voltage;
 
-    const String &menu = GetPMMenu(voltage, msg.chatID);
+    const String &menu = GetPMMenu(voltage, msg.chatID, led_consumption_voltage_factor);
     const String &call = GetPMMenuCall(voltage, msg.chatID);
     BOT_MENU_TRACE(F("\t"), menu, F(" -> "), msg.chatID);
 
@@ -286,10 +289,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
       PMonitor::AdjCalibration(value.toFloat());
 
-      const float &voltage = PMonitor::GetVoltage();
+      const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
+      const float &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);
       chatIdInfo.CurrentValue = voltage;
       
-      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
+      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue, led_consumption_voltage_factor);
       
       PMonitor::SaveSettings();      
     }    
@@ -671,7 +675,7 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
         SaveSettings();
       }
     }
-    value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting));
+    value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting)) + F(" (") + BOT_COMMAND_TEST + String(relaySetting) + F(")");
     BOT_MENU_TRACE(F("Bot answer: "), value);
     return true;
   }
@@ -743,9 +747,9 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
 }
 
 #ifdef USE_POWER_MONITOR
-void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage)
+void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float &led_consumption_voltage_factor)
 {
-  const String &menu = GetPMMenu(voltage, chatId);
+  const String &menu = GetPMMenu(voltage, chatId, led_consumption_voltage_factor);
   const String &call = GetPMMenuCall(voltage, chatId);
 
   BOT_MENU_TRACE(F("\t"), menu, F(" -> "), chatId);
@@ -753,11 +757,17 @@ void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage)
   bot->editMenuCallback(msgId, menu, call, chatId);
 }
 
-const String GetPMMenu(const float &voltage, const String &chatId)
+const String GetPMMenu(const float &voltage, const String &chatId, const float &led_consumption_voltage_factor)
 {
   const auto &chatIdInfo = pmChatIds[chatId];
   const auto periodStr = String(pmUpdatePeriod / 1000) + F("s.");
-  String voltageMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT 
+  String voltageMainMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT
+  #ifdef SHOW_PM_FACTOR
+    + (led_consumption_voltage_factor > 0.0 && !isnan(led_consumption_voltage_factor) ? String(F(" (")) + String(led_consumption_voltage_factor, 3) + F(")") : String(F("")))
+  #endif
+  ;
+
+  String voltageMenu = voltageMainMenu 
     + F(" \n ") + F("Set ") + PM_MENU_ALARM_NAME + F(" <= ") + String(voltage - PM_MENU_ALARM_DECREMENT, 2) + PM_MENU_VOLTAGE_UNIT
     + (chatIdInfo.AlarmValue > 0 ? String(F(" \t ")) + PM_MENU_ALARM_NAME + F(" <= ") + String(chatIdInfo.AlarmValue, 2) : String(F("")))
     + (chatIdInfo.AlarmValue > 0 ? String(F(" \n ")) + PM_MENU_ALARM_NAME + F(" ") + F("Off") : String(F("")))
