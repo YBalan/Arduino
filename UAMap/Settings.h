@@ -135,7 +135,12 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
       return false;
     }
   }
-  SETTINGS_INFO(F("Failed to mount FS"));
+  else
+  {
+    SETTINGS_INFO(F("Failed to mount FS"));
+    Serial.println(F("\t\t\tFormat..."));
+    SPIFFS.format();
+  }
   return false;
 }
 

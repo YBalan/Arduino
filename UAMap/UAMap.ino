@@ -9,13 +9,15 @@
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
+
+#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
 #define USE_BUZZER_MELODIES 
 
@@ -41,6 +43,12 @@
 
 #define ENABLE_INFO_BUZZ
 #define ENABLE_TRACE_BUZZ
+
+#else
+
+#define WM_NODEBUG
+//#define WM_DEBUG_LEVEL 0
+
 #endif
 
 #define RELAY_OFF HIGH
@@ -82,7 +90,6 @@
 #include <map>
 #include <set>
 #include <ezButton.h>
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -162,6 +169,12 @@ void setup() {
   
   WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
+  #ifdef WM_DEBUG_LEVEL
+    INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
+  #else
+    INFO(F("WM_DEBUG_LEVEL: "), F("Off"));
+  #endif
+
   wifiOps
   .AddParameter(F("apiToken"), F("Alarms API Token"), F("api_token"), F("YOUR_ALARMS_API_TOKEN"), 47)  
   #ifdef USE_BOT
@@ -172,7 +185,7 @@ void setup() {
   ;    
 
   auto resetButtonState = resetBtn.getState();
-  INFO(F("ResetBtn: "), resetButtonState);
+  INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
   _settings.resetFlag = 200;
   api->setApiKey(wifiOps.GetParameterValueById(F("apiToken"))); 
@@ -202,7 +215,7 @@ void setup() {
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("AP Started Call Back"));
+  INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());
   FastLED.clear(); 
   leds[LED_STATUS_IDX] = _settings.PortalModeColor;
 
@@ -855,7 +868,8 @@ void HandleDebugSerialCommands()
   }
 
   if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
-  {    
+  { 
+    INFO(F("\t\t\tFormat..."));   
     SPIFFS.format();
     _settings.resetFlag = 1985;
     SaveSettings();

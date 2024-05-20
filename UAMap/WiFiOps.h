@@ -186,7 +186,9 @@ class WiFiOps
       /*WiFi.enableInsecureWEP();
       WiFi.encryptionType(int networkItem);*/
 
-      if (!wifiManager.autoConnect((_APName + (_addMacToAPName ? "_" + mac : "")).c_str(), _APPass.c_str())) {
+      const String apName = (_APName + (_addMacToAPName ? "_" + mac : ""));
+      WIFI_INFO(F("Autoconnect: "), apName);
+      if (!wifiManager.autoConnect(apName.c_str(), _APPass.c_str())) {
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
