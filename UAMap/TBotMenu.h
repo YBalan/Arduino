@@ -534,9 +534,9 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_UA, filtered, value) || GetCommandValue(BOT_MENU_UA_PRAPOR, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
-    //value = F("UA started...");    
-    value.clear();
+    //value = F("UA started...");        
     _effect = value.toInt() > 0 ? Effect::UAWithAnthem : Effect::UA;   
+    value.clear();
     effectStartTicks = millis();
     effectStarted = false;          
     answerCurrentAlarms = false;

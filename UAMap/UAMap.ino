@@ -3,13 +3,13 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.21")
+  #define VER F("1.22")
 #else //ESP32
-  #define VER F("1.25")
+  #define VER F("1.26")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -814,6 +814,7 @@ void HandleEffects(const unsigned long &currentTicks)
       SetStateFromRealLeds();
 
       #ifdef USE_BUZZER
+      TRACE(F("\t\t\tUA Prapor with Anthem playing!!!!"));
       FastLEDShow(500);
       UAAnthem::play(PIN_BUZZ, 0);
       #endif
