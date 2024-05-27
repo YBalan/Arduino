@@ -92,9 +92,34 @@ namespace UAMap
       strcpy(BaseUri, ALARMS_API_IOT_BASE_URI);
     }
   };
+
+  enum ExtMode : uint8_t
+  {
+    Alarms,
+    Souvenir,
+  };
+
+  enum ExtSouvenirMode : uint8_t
+  {
+    UAPrapor,    
+  };
+
+  class SettingsExt
+  {
+    public:
+    UAMap::ExtMode Mode;
+    UAMap::ExtSouvenirMode SouvenirMode;
+    public:
+    void init()
+    {
+      Mode = ExtMode::Alarms;
+      SouvenirMode = ExtSouvenirMode::UAPrapor;
+    }
+  };
 };
 
 UAMap::Settings _settings;
+UAMap::SettingsExt _settingsExt;
 
 const bool SaveFile(const char* const fileName, const byte* const data, const size_t& size)
 {  
@@ -157,6 +182,19 @@ const bool SaveSettings()
   return false;
 }
 
+const bool SaveSettingsExt()
+{
+  String fileName = F("/configExt.bin");
+  SETTINGS_INFO(F("EXT: "), F("Save Settings to: "), fileName);
+  if(SaveFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settings)))
+  {
+    SETTINGS_INFO(F("Write to: "), fileName);
+    return true;
+  }
+  SETTINGS_INFO(F("Failed to open: "), fileName);
+  return false;
+}
+
 const bool LoadSettings()
 {
   String fileName = F("/config.bin");
@@ -175,6 +213,25 @@ const bool LoadSettings()
   SETTINGS_INFO(F("BR: "), _settings.Brightness);  
   SETTINGS_INFO(F("resetFlag: "), _settings.resetFlag);
 
+  return res;
+}
+
+const bool LoadSettingsExt()
+{
+  String fileName = F("/configExt.bin");
+  SETTINGS_INFO(F("EXT: "), F("Load Settings from: "), fileName);
+
+  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settings));
+  
+  SETTINGS_INFO(F("EXT MODE: "), _settingsExt.Mode);  
+  SETTINGS_INFO(F("EXT Souvenir MODE: "), _settingsExt.SouvenirMode);
+ 
+  if(!res)
+  {
+    SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));
+    _settingsExt.init();
+  }
+ 
   return res;
 }
 

@@ -36,6 +36,10 @@ nstat - Network Statistic
 rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
+fs - File System Info
+modealarms - Alarms Mode
+modesouvenir - Souvenir Mode
+modesouvenir0 - Souvenir Mode UA Prapor
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
@@ -100,6 +104,9 @@ play - Play tones 500,800
 #define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
 #define BOT_COMMAND_PLAY F("/play")
 #define BOT_COMMAND_SAVEMELODY F("/savemelody")
+#define BOT_COMMAND_MODEALARMS F("/modealarms")
+#define BOT_COMMAND_MODESOUVENIR F("/modesouvenir")
+#define BOT_COMMAND_FS F("/fs")
 
 //Fast Menu
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
@@ -139,6 +146,7 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
+void PrintFSInfo(String &fsInfo);
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -195,6 +203,33 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   filtered = noAnswerIfFromMenu ? msg.data : filtered;
   BOT_MENU_TRACE(F("Filtered: "), filtered);
 
+  if(GetCommandValue(BOT_COMMAND_MODEALARMS, filtered, value))
+  {
+    bot->sendTyping(msg.chatID); 
+    _settingsExt.Mode = UAMap::ExtMode::Alarms;
+    value = String(F("Ext mode: ")) + String(_settingsExt.Mode);
+    SaveSettingsExt();
+
+  }else
+  if(GetCommandValue(BOT_COMMAND_MODESOUVENIR, filtered, value))
+  {
+    bot->sendTyping(msg.chatID); 
+    //if(value.length() > 0)
+    {
+      const auto &newMode = value.toInt();
+      switch (newMode)
+      {
+        case 0:
+        default:
+          _settingsExt.SouvenirMode = UAMap::ExtSouvenirMode::UAPrapor;
+          break;
+      }
+    }
+    _settingsExt.Mode = UAMap::ExtMode::Souvenir;
+    value = String(F("Souvenir mode: ")) + String(_settingsExt.SouvenirMode);
+    SaveSettingsExt();
+
+  }else
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
     bot->sendTyping(msg.chatID);    
@@ -463,6 +498,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     bot->sendTyping(msg.chatID);
     value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
+  }else
+  if(GetCommandValue(BOT_COMMAND_FS, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    PrintFSInfo(value);
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {

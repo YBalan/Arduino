@@ -6,6 +6,9 @@ br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
 br1 - Min brightness only alarmed visible
+modealarms - Alarms Mode
+modesouvenir - Souvenir Mode
+modesouvenir0 - Souvenir Mode UA Prapor
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1
@@ -38,6 +41,7 @@ nstat - Network Statistic
 rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
+fs - File System Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result

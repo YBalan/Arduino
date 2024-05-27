@@ -3,13 +3,13 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.22")
+  #define VER F("1.23")
 #else //ESP32
-  #define VER F("1.26")
+  #define VER F("1.27")
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -154,6 +154,7 @@ void setup() {
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
   LoadSettings();
+  LoadSettingsExt();
   //_settings.reset();
 
   PMonitor::LoadSettings();
@@ -244,6 +245,14 @@ void loop()
       nextBr = 1;
       brBtnChangeDirectionUp = true;
     }else
+    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
+    {
+      nextBr = 2;
+    }else
+    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
+    {
+      nextBr = BRIGHTNESS_STEP;
+    }else
     if(nextBr > 255)
     {
       nextBr = 255;
@@ -257,7 +266,24 @@ void loop()
   }  
 
   HandleEffects(currentTicks);
- 
+
+  if(_settingsExt.Mode == UAMap::ExtMode::Souvenir && _effect == Effect::Normal)
+  {
+    if(!effectStarted)
+    {    
+      if(_settingsExt.SouvenirMode == UAMap::ExtSouvenirMode::UAPrapor)
+      {
+        INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode);
+        fill_ua_prapor2();
+        SetStateFromRealLeds();
+        effectStarted = true;
+      }
+    }
+  }
+  else
+  if(_settingsExt.Mode == UAMap::ExtMode::Alarms)
+  { 
+  effectStarted = false;
   int httpCode;
   String statusMsg;
   if(_effect == Effect::Normal)
@@ -267,6 +293,7 @@ void loop()
     #endif
     if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
+      INFO(F("\t\t"), F("MODE: "), F("ALARMS"));
       //when updated
       //FastLEDShow(true);
 
@@ -306,6 +333,7 @@ void loop()
       //FastLEDShow(false);
     }        
   }  
+  }
   
   FastLEDShow(false); 
 
@@ -858,6 +886,20 @@ const float GetLEDVoltageFactor()
 }
 #endif
 
+void PrintFSInfo(String &fsInfo)
+{
+  #ifdef ESP8266
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);   
+  const auto &total = fs_info.totalBytes;
+  const auto &used = fs_info.usedBytes;
+  #else //ESP32
+  const auto &total = SPIFFS.totalBytes();
+  const auto &used = SPIFFS.usedBytes();
+  #endif
+  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+}
+
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
@@ -902,6 +944,9 @@ void HandleDebugSerialCommands()
     {
       INFO(F("\t"), channel.first);
     }
+    String fsInfo;
+    PrintFSInfo(fsInfo);
+    INFO(fsInfo);
     PrintNetworkStatToSerial();
   }
 
