@@ -3,13 +3,13 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.23")
+  #define VER F("1.24")
 #else //ESP32
-  #define VER F("1.27")
+  #define VER F("1.28")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -99,6 +99,7 @@
 #include "TelegramBotHelper.h"
 #include "BuzzHelper.h"
 #include "UAAnthem.h"
+#include "Prapors.h"
 #include "PMonitor.h"
 #include "TBotMenu.h"
 
@@ -267,21 +268,31 @@ void loop()
 
   HandleEffects(currentTicks);
 
-  if(_settingsExt.Mode == UAMap::ExtMode::Souvenir && _effect == Effect::Normal)
+  if(_settingsExt.Mode == ExtMode::Souvenir && _effect == Effect::Normal)
   {
     if(!effectStarted)
-    {    
-      if(_settingsExt.SouvenirMode == UAMap::ExtSouvenirMode::UAPrapor)
-      {
-        INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode);
+    {   
+      INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode); 
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::UAPrapor)
+      {        
         fill_ua_prapor2();
-        SetStateFromRealLeds();
-        effectStarted = true;
+        SetStateFromRealLeds();        
+      }else
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::BGPrapor)
+      {        
+        fill_bg_prapor();
+        SetStateFromRealLeds();        
+      }else
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::MDPrapor)
+      {        
+        fill_md_prapor();
+        SetStateFromRealLeds();        
       }
+      effectStarted = true;
     }
   }
   else
-  if(_settingsExt.Mode == UAMap::ExtMode::Alarms)
+  if(_settingsExt.Mode == ExtMode::Alarms)
   { 
   effectStarted = false;
   int httpCode;
@@ -851,6 +862,32 @@ void HandleEffects(const unsigned long &currentTicks)
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
   }
+  if(_effect == Effect::BG)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_bg_prapor();
+      SetStateFromRealLeds();
+      
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }
+  if(_effect == Effect::MD)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_md_prapor();
+      SetStateFromRealLeds();
+      
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }
 }
 
 #ifdef USE_POWER_MONITOR
@@ -1101,38 +1138,6 @@ void FastLEDShow(const int &retryCount)
     FastLED.show();   
     yield(); // watchdog
   }
-}
-
-void fill_ua_prapor2()
-{ 
-  SetRegionColor(UARegion::Crimea,            CRGB::Yellow);
-  SetRegionColor(UARegion::Khersonska,        CRGB::Yellow);
-  SetRegionColor(UARegion::Zaporizka,         CRGB::Yellow);
-  SetRegionColor(UARegion::Donetska,          CRGB::Yellow);
-  SetRegionColor(UARegion::Dnipropetrovska,   CRGB::Yellow);
-  SetRegionColor(UARegion::Mykolaivska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Odeska,            CRGB::Yellow);
-  SetRegionColor(UARegion::Kirovohradska,     CRGB::Yellow);
-  SetRegionColor(UARegion::Vinnytska,         CRGB::Yellow);
-  SetRegionColor(UARegion::Khmelnitska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Chernivetska,      CRGB::Yellow);
-  SetRegionColor(UARegion::Ivano_Frankivska,  CRGB::Yellow);
-  SetRegionColor(UARegion::Ternopilska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Lvivska,           CRGB::Yellow);
-  SetRegionColor(UARegion::Zakarpatska,       CRGB::Yellow);
-
-
-  SetRegionColor(UARegion::Luhanska,          CRGB::Blue);
-  SetRegionColor(UARegion::Kharkivska,        CRGB::Blue);
-  SetRegionColor(UARegion::Poltavska,         CRGB::Blue);
-  SetRegionColor(UARegion::Sumska,            CRGB::Blue);
-  SetRegionColor(UARegion::Chernihivska,      CRGB::Blue);
-  SetRegionColor(UARegion::Kyivska,           CRGB::Blue);
-  SetRegionColor(UARegion::Cherkaska,         CRGB::Blue);
-  SetRegionColor(UARegion::Zhytomyrska,       CRGB::Blue);
-  SetRegionColor(UARegion::Rivnenska,         CRGB::Blue);
-  SetRegionColor(UARegion::Volynska,          CRGB::Blue);
-
 }
 
 void SetRegionColor(const UARegion &region, const CRGB &color)

@@ -28,8 +28,24 @@ enum Effect : uint8_t
   Gay,
   UA,
   UAWithAnthem,
+  BG,
+  MD,
 
 } _effect;
+
+enum ExtSouvenirMode : uint8_t
+{
+  UAPrapor,
+  Reserved,    //NotUsed
+  BGPrapor,    
+  MDPrapor,    
+};
+
+enum ExtMode : uint8_t
+{
+  Alarms,
+  Souvenir,
+};
 
 enum ColorSchema : uint8_t
 {
@@ -93,22 +109,11 @@ namespace UAMap
     }
   };
 
-  enum ExtMode : uint8_t
-  {
-    Alarms,
-    Souvenir,
-  };
-
-  enum ExtSouvenirMode : uint8_t
-  {
-    UAPrapor,    
-  };
-
   class SettingsExt
   {
     public:
-    UAMap::ExtMode Mode;
-    UAMap::ExtSouvenirMode SouvenirMode;
+    ExtMode Mode;
+    ExtSouvenirMode SouvenirMode;
     public:
     void init()
     {

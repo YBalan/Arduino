@@ -40,6 +40,8 @@ fs - File System Info
 modealarms - Alarms Mode
 modesouvenir - Souvenir Mode
 modesouvenir0 - Souvenir Mode UA Prapor
+modesouvenir2 - Souvenir Mode BG Prapor
+modesouvenir3 - Souvenir Mode MD Prapor
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
@@ -206,10 +208,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_MODEALARMS, filtered, value))
   {
     bot->sendTyping(msg.chatID); 
-    _settingsExt.Mode = UAMap::ExtMode::Alarms;
+    _settingsExt.Mode = ExtMode::Alarms;
     value = String(F("Ext mode: ")) + String(_settingsExt.Mode);
     SaveSettingsExt();
-
+    effectStarted = false;
+    _effect = Effect::Normal;
   }else
   if(GetCommandValue(BOT_COMMAND_MODESOUVENIR, filtered, value))
   {
@@ -219,16 +222,23 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       const auto &newMode = value.toInt();
       switch (newMode)
       {
+        case 2:
+          _settingsExt.SouvenirMode = ExtSouvenirMode::BGPrapor;
+          break;
+        case 3:
+          _settingsExt.SouvenirMode = ExtSouvenirMode::MDPrapor;
+          break;
         case 0:
         default:
-          _settingsExt.SouvenirMode = UAMap::ExtSouvenirMode::UAPrapor;
+          _settingsExt.SouvenirMode = ExtSouvenirMode::UAPrapor;
           break;
       }
     }
-    _settingsExt.Mode = UAMap::ExtMode::Souvenir;
+    _settingsExt.Mode = ExtMode::Souvenir;
     value = String(F("Souvenir mode: ")) + String(_settingsExt.SouvenirMode);
     SaveSettingsExt();
-
+    effectStarted = false;
+    _effect = Effect::Normal;
   }else
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
@@ -574,8 +584,25 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_UA, filtered, value) || GetCommandValue(BOT_MENU_UA_PRAPOR, filtered, value))
   {   
     bot->sendTyping(msg.chatID);
-    //value = F("UA started...");        
-    _effect = value.toInt() > 0 ? Effect::UAWithAnthem : Effect::UA;   
+    //value = F("UA started...");  
+    const auto &prapor = value.toInt();
+    //_effect = value.toInt() > 0 ? Effect::UAWithAnthem : Effect::UA; 
+    switch (prapor)
+    {
+      case 3:
+        _effect = Effect::MD;
+      break;
+      case 2:
+        _effect = Effect::BG;
+      break;
+      case 1:
+        _effect = Effect::UAWithAnthem;
+        break;
+      case 0:
+      default:
+        _effect = Effect::UA;
+      break;
+    }  
     value.clear();
     effectStartTicks = millis();
     effectStarted = false;          
