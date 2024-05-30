@@ -26,6 +26,7 @@ enum Effect : uint8_t
   Rainbow,
   Strobe,
   Gay,
+  FillRGB,
   UA,
   UAWithAnthem,
   BG,

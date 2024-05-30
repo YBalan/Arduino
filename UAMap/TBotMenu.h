@@ -109,6 +109,7 @@ play - Play tones 500,800
 #define BOT_COMMAND_MODEALARMS F("/modealarms")
 #define BOT_COMMAND_MODESOUVENIR F("/modesouvenir")
 #define BOT_COMMAND_FS F("/fs")
+#define BOT_COMMAND_FILLRGB F("/fillrgb")
 
 //Fast Menu
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
@@ -665,6 +666,25 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     auto melodySizeMs = Buzz::PlayMelody(PIN_BUZZ, value);
     value = String(melodySizeMs) + F("ms...");
+  }else
+  if(GetCommandValue(BOT_COMMAND_FILLRGB, filtered, value))
+  {
+    BOT_MENU_TRACE(value);
+    bot->sendTyping(msg.chatID);
+    const auto & tokens = CommonHelper::splitToInt(value, ',');
+    if(tokens.size() >= 3)
+    {
+      _settings.NoConnectionColor = CRGB(tokens[0], tokens[1], tokens[2]);
+      _effect = Effect::FillRGB;
+      effectStartTicks = millis();
+      effectStarted = false;
+    }
+    else
+    {
+      _settings.NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
+      value = String(F("Wrong RGB: ")) + value;
+      BOT_MENU_TRACE(value);
+    }
   }
 
   if(value.length() > 0 && !noAnswerIfFromMenu)

@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.24")
+  #define VER F("1.25")
 #else //ESP32
-  #define VER F("1.28")
+  #define VER F("1.29")
 #endif
 
 //#define RELEASE
@@ -816,7 +816,7 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
-  }  else
+  }else
   if(_effect == Effect::Gay)
   {     
     if(!effectStarted)
@@ -826,6 +826,18 @@ void HandleEffects(const unsigned long &currentTicks)
       SetStateFromRealLeds();
 
       DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::FillRGB)
+  {     
+    if(!effectStarted)
+    {
+      //FastLED.setBrightness(255);      
+      fill_solid(leds, LED_COUNT, _settings.NoConnectionColor);
+      SetStateFromRealLeds();      
+      //DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
