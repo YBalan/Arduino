@@ -11,7 +11,7 @@
 #define AVOID_FLICKERING
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -227,6 +227,10 @@ void setup() {
   bot->setLimit(1);
   bot->skipUpdates();
   #endif
+
+  #ifdef DEBUG  
+  Buzz::PlayMelody(PIN_BUZZ, F("500, 200"));
+  #endif
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -284,6 +288,7 @@ void loop()
 
   if(_settingsExt.Mode == ExtMode::Souvenir && _effect == Effect::Normal)
   {
+    yield(); // watchdog
     if(!effectStarted)
     {   
       INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode); 
@@ -307,7 +312,8 @@ void loop()
   }
   else
   if(_settingsExt.Mode == ExtMode::Alarms)
-  {   
+  {  
+    yield(); // watchdog 
   int httpCode;
   String statusMsg;
   if(_effect == Effect::Normal)
@@ -366,6 +372,7 @@ void loop()
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
+  yield(); // watchdog
   if(botStatus == 0)
   {
     // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
@@ -409,6 +416,7 @@ void loop()
       }
     }
   }
+  yield(); // watchdog
   #endif
   #endif
 
@@ -761,14 +769,18 @@ void PrintNetworkStatToSerial()
 {
   #ifdef NETWORK_STATISTIC
   Serial.print(F("Network Statistic: "));
-  if(networkStat.count(ApiStatusCode::API_OK) > 0)
-    PrintNetworkStatInfoToSerial(networkStat[ApiStatusCode::API_OK]);
-  for(const auto &de : networkStat)
+  if(networkStat.size() > 0)
   {
-    const auto &info = de.second;
-    if(info.code != ApiStatusCode::API_OK)
-      PrintNetworkStatInfoToSerial(info);
+    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+      PrintNetworkStatInfoToSerial(networkStat[ApiStatusCode::API_OK]);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != ApiStatusCode::API_OK)
+        PrintNetworkStatInfoToSerial(info);
+    }
   }
+  Serial.print(F(" ")); Serial.print(millis() / 1000); Serial.print(F("sec"));
   Serial.println();
   #endif
 }
@@ -782,14 +794,21 @@ void PrintNetworkStatistic(String &str)
 {
   str = F("Network Statistic: ");
   #ifdef NETWORK_STATISTIC  
-  if(networkStat.count(ApiStatusCode::API_OK) > 0)
-    PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
-  for(const auto &de : networkStat)
+  if(networkStat.size() > 0)
   {
-    const auto &info = de.second;
-    if(info.code != ApiStatusCode::API_OK)
-      PrintNetworkStatInfo(info, str);
+    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+      PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != ApiStatusCode::API_OK)
+        PrintNetworkStatInfo(info, str);
+    }
   }
+  const auto &millisec = millis();
+  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
+      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
+      
   //str.replace("(", "");
   //str.replace(")", "");
   #else
