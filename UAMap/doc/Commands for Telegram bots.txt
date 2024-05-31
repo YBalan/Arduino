@@ -11,6 +11,7 @@ modesouvenir - Souvenir Mode
 modesouvenir0 - Souvenir Mode UA Prapor
 modesouvenir2 - Souvenir Mode BG Prapor
 modesouvenir3 - Souvenir Mode MD Prapor
+fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1

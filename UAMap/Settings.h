@@ -60,7 +60,7 @@ namespace UAMap
   {
     public:
 
-    Settings(){ init(); }
+    Settings(){ SETTINGS_INFO(F("Reset Settings...")); init(); }
 
     CRGB PortalModeColor = LED_PORTAL_MODE_COLOR;
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
@@ -118,6 +118,7 @@ namespace UAMap
     public:
     void init()
     {
+      SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));
       Mode = ExtMode::Alarms;
       SouvenirMode = ExtSouvenirMode::UAPrapor;
     }
@@ -192,7 +193,7 @@ const bool SaveSettingsExt()
 {
   String fileName = F("/configExt.bin");
   SETTINGS_INFO(F("EXT: "), F("Save Settings to: "), fileName);
-  if(SaveFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settings)))
+  if(SaveFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt)))
   {
     SETTINGS_INFO(F("Write to: "), fileName);
     return true;
@@ -209,15 +210,16 @@ const bool LoadSettings()
   const bool &res = LoadFile(fileName.c_str(), (byte *)&_settings, sizeof(_settings));
   
   SETTINGS_INFO(F("BR: "), _settings.Brightness);  
-  SETTINGS_INFO(F("resetFlag: "), _settings.resetFlag);
+  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
   SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
   if(!res)
   {
-    SETTINGS_INFO(F("Reset Settings..."));
+    //SETTINGS_INFO(F("Reset Settings..."));
     _settings.init();
   }
   SETTINGS_INFO(F("BR: "), _settings.Brightness);  
-  SETTINGS_INFO(F("resetFlag: "), _settings.resetFlag);
+  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
+  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
 
   return res;
 }
@@ -227,14 +229,13 @@ const bool LoadSettingsExt()
   String fileName = F("/configExt.bin");
   SETTINGS_INFO(F("EXT: "), F("Load Settings from: "), fileName);
 
-  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settings));
+  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt));
   
   SETTINGS_INFO(F("EXT MODE: "), _settingsExt.Mode);  
   SETTINGS_INFO(F("EXT Souvenir MODE: "), _settingsExt.SouvenirMode);
  
   if(!res)
-  {
-    SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));
+  {    
     _settingsExt.init();
   }
  

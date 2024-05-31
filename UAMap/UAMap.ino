@@ -3,15 +3,15 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.26")
+  #define VER F("1.27")
 #else //ESP32
-  #define VER F("1.30")
+  #define VER F("1.31")
 #endif
 
 #define AVOID_FLICKERING
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -197,8 +197,13 @@ void setup() {
 
   auto resetButtonState = resetBtn.getState();
   INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
+  INFO(F("ResetFlag: "), _settings.resetFlag);
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
-  _settings.resetFlag = 200;
+  if(_settings.resetFlag == 1985)
+  {
+    _settings.resetFlag = 200;
+    SaveSettings();
+  }
   api->setApiKey(wifiOps.GetParameterValueById(F("apiToken"))); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
