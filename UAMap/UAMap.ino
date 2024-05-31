@@ -3,10 +3,12 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.25")
+  #define VER F("1.26")
 #else //ESP32
-  #define VER F("1.29")
+  #define VER F("1.30")
 #endif
+
+#define AVOID_FLICKERING
 
 //#define RELEASE
 //#define DEBUG
@@ -75,13 +77,18 @@
   #define ESPresetFreeContStack {}
 #endif
 
+#define LED_TYPE    WS2812B
 #ifdef ESP8266 
   #define FASTLED_ESP8266_RAW_PIN_ORDER
-  ///#define FASTLED_ALL_PINS_HARDWARE_SPI
   //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
   //#define FASTLED_ESP8266_D1_PIN_ORDER  
-#else //ESP32
+#else //ESP32  
   //#define FASTLED_ESP32_SPI_BUS HSPI
+#endif
+#ifdef AVOID_FLICKERING
+  #define FASTLED_ALL_PINS_HARDWARE_SPI
+  #define FASTLED_ALLOW_INTERRUPTS 0
+  #define FASTLED_INTERRUPT_RETRY_COUNT 0  
 #endif
 #include <FastLED.h>  
 
@@ -161,7 +168,9 @@ void setup() {
   PMonitor::LoadSettings();
   PMonitor::Init(PIN_PMONITOR_SDA, PIN_PMONITOR_SCL);
 
-  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000);
+  //FastLED.setMaxRefreshRate(10);
 
   FastLED.clear();   
   fill_ua_prapor2();
@@ -293,12 +302,12 @@ void loop()
   }
   else
   if(_settingsExt.Mode == ExtMode::Alarms)
-  { 
-  effectStarted = false;
+  {   
   int httpCode;
   String statusMsg;
   if(_effect == Effect::Normal)
   { 
+    effectStarted = false;
     #ifdef USE_STOPWATCH
     uint32_t sw = millis();
     #endif
@@ -854,8 +863,7 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
-  }
-  else
+  }else
   if(_effect == Effect::UAWithAnthem)
   {     
     if(!effectStarted)
@@ -873,7 +881,7 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
-  }
+  }else
   if(_effect == Effect::BG)
   {     
     if(!effectStarted)
@@ -886,7 +894,7 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
-  }
+  }else
   if(_effect == Effect::MD)
   {     
     if(!effectStarted)
