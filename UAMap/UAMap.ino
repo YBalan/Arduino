@@ -5,7 +5,7 @@
 #ifdef ESP8266
   #define VER F("1.27")
 #else //ESP32
-  #define VER F("1.31")
+  #define VER F("1.32")
 #endif
 
 #define AVOID_FLICKERING
