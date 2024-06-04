@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.27")
+  #define VER F("1.28")
 #else //ESP32
-  #define VER F("1.32")
+  #define VER F("1.33")
 #endif
 
 #define AVOID_FLICKERING
@@ -868,7 +868,7 @@ void HandleEffects(const unsigned long &currentTicks)
     if(!effectStarted)
     {
       //FastLED.setBrightness(255);      
-      fill_solid(leds, LED_COUNT, _settings.NoConnectionColor);
+      fill_solid(leds, LED_COUNT, _settings.NotAlarmedColor);
       SetStateFromRealLeds();      
       //DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;

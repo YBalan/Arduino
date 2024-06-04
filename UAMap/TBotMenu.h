@@ -674,14 +674,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     const auto & tokens = CommonHelper::splitToInt(value, ',');
     if(tokens.size() >= 3)
     {
-      _settings.NoConnectionColor = CRGB(tokens[0], tokens[1], tokens[2]);
+      _settings.NotAlarmedColor = CRGB(tokens[0], tokens[1], tokens[2]);
       _effect = Effect::FillRGB;
       effectStartTicks = millis();
       effectStarted = false;
+      SaveSettings();
     }
     else
     {
-      _settings.NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
+      //_settings.NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
       value = String(F("Wrong RGB: ")) + value;
       BOT_MENU_TRACE(value);
     }
