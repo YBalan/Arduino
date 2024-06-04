@@ -5,6 +5,20 @@
 
 namespace CommonHelper
 {
+  const String join(const std::set<String> &v, const char &delimiter)
+  {
+    String res;
+    for(const auto &value : v) res += value + delimiter;
+    return std::move(res);
+  }
+
+  const String join(const std::map<String, int32_t> &v, const char &delimiter)
+  {
+    String res;
+    for(const auto &value : v) res += value.first + delimiter;
+    return std::move(res);
+  }
+
   std::vector<String> split(const String &s, const char &delimiter) {
       std::vector<String> tokens;
       int startIndex = 0; // Index where the current token starts

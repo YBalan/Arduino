@@ -1,24 +1,17 @@
-register - Register chat
-unregister - Unregister chat
-unregisterall - Unregister all chat(s)
-update - Current period of update in milliseconds
-update10000 - Set period of update to 10secs
-baseuri - Current alerts.api uri
-relay1menu - Relay1 Menu to choose region
-relay2menu - Relay2 Menu to choose region
-token - Current Alerts.Api token
-nstat - Network Statistic
-rssi - WiFi Quality rssi db
-test - test by regionId
-ver - Version Info
 gay - trolololo
-ua - Ukrain Prapor
-changeconfig - change configuration WiFi, tokens...
+ua - Ukraine Prapor
+ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
 br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
 br1 - Min brightness only alarmed visible
+modealarms - Alarms Mode
+modesouvenir - Souvenir Mode
+modesouvenir0 - Souvenir Mode UA Prapor
+modesouvenir2 - Souvenir Mode BG Prapor
+modesouvenir3 - Souvenir Mode MD Prapor
+fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1
@@ -33,3 +26,28 @@ schema0 - Set Color schema to Dark
 schema1 - Set Color schema to Light
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
+play - Play tones 500,800
+pm - Show Power monitor
+powerupdate - Power Monitor update period in milliseconds
+alarmpm - Alarm - send message when voltage <= value
+adjpm - Adjust voltage 0.50-1.0
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
+token - Current Alerts.Api token
+nstat - Network Statistic
+rssi - WiFi Quality rssi db
+test - test by regionId
+ver - Version Info
+fs - File System Info
+changeconfig - change configuration WiFi, tokens...
+chid - List of registered channels
+notify - Notify saved http code result
+notify1 - Notify All http code result
+notifynot200 - Notify all http code exclude OK(200)
+notify429 - Notify To-many Requests (429)

@@ -37,6 +37,12 @@ class WiFiParameter : public WiFiManagerParameter
   {
     WIFIP_TRACE(F("WiFiParameter ctor"));    
   }
+
+  WiFiParameter(const String &id, const String &label, const String &json, const String &defaultValue, const uint8_t &length) 
+  : WiFiParameter(id, label, json, defaultValue, length, 0)   
+  {
+    WIFIP_TRACE(F("WiFiParameter ctor (String)"));    
+  }
   
   WiFiParameter(const char *const id, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)  
   : _id(id)
@@ -45,6 +51,16 @@ class WiFiParameter : public WiFiManagerParameter
   , _json(json)
   {
     WIFIP_TRACE(F("WiFiParameter ctor with place"));    
+    Init(_id.c_str(), _label.c_str(), _value.c_str(), length, "", WFM_LABEL_DEFAULT);
+  }
+
+  WiFiParameter(const String &id, const String &label, const String &json, const String &defaultValue, const uint8_t &length, const uint8_t &place)  
+  : _id(id)
+  , _label(label)
+  , _value(defaultValue)
+  , _json(json)
+  {
+    WIFIP_TRACE(F("WiFiParameter ctor with place (String)"));    
     Init(_id.c_str(), _label.c_str(), _value.c_str(), length, "", WFM_LABEL_DEFAULT);
   }
 
@@ -161,15 +177,15 @@ public:
     return NullParam;
   }
 
-  // Iterator to the beginning of the custom vector
-    auto begin() const {
-        return _parameters.begin();
-    }
+  // // Iterator to the beginning of the custom vector
+  //   auto begin() const {
+  //       return _parameters.begin();
+  //   }
 
-    // Iterator to the end of the custom vector
-    auto end() const {
-        return _parameters.end();
-    }
+  //   // Iterator to the end of the custom vector
+  //   auto end() const {
+  //       return _parameters.end();
+  //   }
 
   WiFiParameter &GetAt(const int& index) { return _parameters[index]; }
 

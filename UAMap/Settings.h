@@ -16,28 +16,8 @@
 #define SETTINGS_TRACE(...) {}
 #endif
 
-#define ALARMS_UPDATE_TIMEOUT 25000
-#define ALARMS_CHECK_WITHOUT_STATUS false
-
-#define LED_STATUS_IDX 14 //Kyivska
-#define LED_STATUS_NO_CONNECTION_COLOR CRGB::White
-#define LED_STATUS_NO_CONNECTION_PERIOD 1000
-#define LED_STATUS_NO_CONNECTION_TOTALTIME -1
-
-#define LED_PORTAL_MODE_COLOR CRGB::Green
-#define LED_LOAD_MODE_COLOR CRGB::White
-#define LED_ALARMED_COLOR CRGB::Red
-#define LED_NOT_ALARMED_COLOR CRGB::Blue
-#define LED_PARTIAL_ALARMED_COLOR CRGB::Yellow
-
-#define LED_NEW_ALARMED_PERIOD 500
-#define LED_NEW_ALARMED_TOTALTIME 15000
-
-#define LED_ALARMED_SCALE_FACTOR 0//50% 
-
 #define MAX_BASE_URI_LENGTH 50
 
-#define EFFECT_TIMEOUT 15000
 uint32_t effectStartTicks = 0;
 bool effectStarted = false;
 enum Effect : uint8_t
@@ -46,9 +26,27 @@ enum Effect : uint8_t
   Rainbow,
   Strobe,
   Gay,
+  FillRGB,
   UA,
+  UAWithAnthem,
+  BG,
+  MD,
 
 } _effect;
+
+enum ExtSouvenirMode : uint8_t
+{
+  UAPrapor,
+  Reserved,    //NotUsed
+  BGPrapor,    
+  MDPrapor,    
+};
+
+enum ExtMode : uint8_t
+{
+  Alarms,
+  Souvenir,
+};
 
 enum ColorSchema : uint8_t
 {
@@ -62,7 +60,7 @@ namespace UAMap
   {
     public:
 
-    Settings(){ init(); }
+    Settings(){ SETTINGS_INFO(F("Reset Settings...")); init(); }
 
     CRGB PortalModeColor = LED_PORTAL_MODE_COLOR;
     CRGB NoConnectionColor = LED_STATUS_NO_CONNECTION_COLOR;
@@ -72,12 +70,12 @@ namespace UAMap
     uint8_t Brightness = 2;
 
     bool alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
-    uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+    uint32_t alarmsUpdateTimeout = ALARMS_UPDATE_DEFAULT_TIMEOUT;
     uint8_t alarmedScale = LED_ALARMED_SCALE_FACTOR;
     bool alarmScaleDown = true;
 
     int16_t resetFlag = 200;
-    int reserved = 0;
+    int notifyHttpCode = 0;
 
     uint8_t Relay1Region = 0;
     uint8_t Relay2Region = 0;
@@ -97,11 +95,11 @@ namespace UAMap
       Brightness = 2;
 
       alarmsCheckWithoutStatus = ALARMS_CHECK_WITHOUT_STATUS;
-      alarmsUpdateTimeout = ALARMS_UPDATE_TIMEOUT;
+      alarmsUpdateTimeout = ALARMS_UPDATE_DEFAULT_TIMEOUT;
       alarmedScale = LED_ALARMED_SCALE_FACTOR;
       alarmScaleDown = true;
       resetFlag = 200;
-      reserved = 0;
+      notifyHttpCode = 0;
 
       Relay1Region = 0;
       Relay2Region = 0;
@@ -111,54 +109,137 @@ namespace UAMap
       strcpy(BaseUri, ALARMS_API_IOT_BASE_URI);
     }
   };
+
+  class SettingsExt
+  {
+    public:
+    ExtMode Mode;
+    ExtSouvenirMode SouvenirMode;
+    public:
+    void init()
+    {
+      SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));
+      Mode = ExtMode::Alarms;
+      SouvenirMode = ExtSouvenirMode::UAPrapor;
+    }
+  };
 };
 
 UAMap::Settings _settings;
+UAMap::SettingsExt _settingsExt;
 
-void SaveSettings()
-{
-  SETTINGS_INFO("Save Settings...");
-  File configFile = SPIFFS.open("/config.bin", "w");
+const bool SaveFile(const char* const fileName, const byte* const data, const size_t& size)
+{  
+  File configFile = SPIFFS.open(fileName, "w");
   if (configFile) 
-  {
-    SETTINGS_INFO("Write config.bin file");
-    configFile.write((byte *)&_settings, sizeof(_settings));
+  { 
+    configFile.write(data, size);
     configFile.close();
-    return;
-  }
-  SETTINGS_INFO("failed to open config.bin file for writing");
+    return true;
+  }  
+  return false;
 }
 
-void LoadSettings()
+const bool LoadFile(const char* const fileName, byte* const data, const size_t& size)
 {
-  SETTINGS_INFO("Load Settings...");
-  if (SPIFFS.begin()) {
-        SETTINGS_TRACE("mounted file system");
-        if (SPIFFS.exists("/config.bin")) {
-        File configFile = SPIFFS.open("/config.bin", "r");
-        if (configFile) 
-        {
-          SETTINGS_INFO("Read config.bin file");    
-          configFile.read((byte *)&_settings, sizeof(_settings));
-          configFile.close();
-        }
-        else
-          SETTINGS_INFO("failed to open config.bin file for reading");
+  if (SPIFFS.begin()) 
+  {
+    SETTINGS_TRACE(F("File system mounted"));
+    if (SPIFFS.exists(fileName)) 
+    {
+      File configFile = SPIFFS.open(fileName, "r");
+      if (configFile) 
+      {
+        SETTINGS_INFO(F("Read file "), fileName);    
+        configFile.read(data, size);
+        configFile.close();
+        return true;
+      }
+      else
+      {
+        SETTINGS_INFO(F("Failed to open "), fileName);
+        return false;
+      }
     }
     else
-          SETTINGS_INFO("File config.bin does not exist");
+    {
+      SETTINGS_INFO(F("File does not exist "), fileName);
+      return false;
+    }
   }
-
-  SETTINGS_INFO("BR: ", _settings.Brightness);  
-  SETTINGS_INFO("resetFlag: ", _settings.resetFlag);
-  SETTINGS_INFO("reserved: ", _settings.reserved);
-  if(_settings.reserved != 0)
+  else
   {
-    SETTINGS_INFO("Reset Settings...");
+    SETTINGS_INFO(F("Failed to mount FS"));
+    Serial.println(F("\t\t\tFormat..."));
+    SPIFFS.format();
+  }
+  return false;
+}
+
+const bool SaveSettings()
+{
+  String fileName = F("/config.bin");
+  SETTINGS_INFO(F("Save Settings to: "), fileName);
+  if(SaveFile(fileName.c_str(), (byte *)&_settings, sizeof(_settings)))
+  {
+    SETTINGS_INFO(F("Write to: "), fileName);
+    return true;
+  }
+  SETTINGS_INFO(F("Failed to open: "), fileName);
+  return false;
+}
+
+const bool SaveSettingsExt()
+{
+  String fileName = F("/configExt.bin");
+  SETTINGS_INFO(F("EXT: "), F("Save Settings to: "), fileName);
+  if(SaveFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt)))
+  {
+    SETTINGS_INFO(F("Write to: "), fileName);
+    return true;
+  }
+  SETTINGS_INFO(F("Failed to open: "), fileName);
+  return false;
+}
+
+const bool LoadSettings()
+{
+  String fileName = F("/config.bin");
+  SETTINGS_INFO(F("Load Settings from: "), fileName);
+
+  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settings, sizeof(_settings));
+  
+  SETTINGS_INFO(F("BR: "), _settings.Brightness);  
+  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
+  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
+  if(!res)
+  {
+    //SETTINGS_INFO(F("Reset Settings..."));
     _settings.init();
   }
-  SETTINGS_INFO("BR: ", _settings.Brightness);  
-  SETTINGS_INFO("resetFlag: ", _settings.resetFlag);
+  SETTINGS_INFO(F("BR: "), _settings.Brightness);  
+  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
+  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
+
+  return res;
+}
+
+const bool LoadSettingsExt()
+{
+  String fileName = F("/configExt.bin");
+  SETTINGS_INFO(F("EXT: "), F("Load Settings from: "), fileName);
+
+  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt));
+  
+  SETTINGS_INFO(F("EXT MODE: "), _settingsExt.Mode);  
+  SETTINGS_INFO(F("EXT Souvenir MODE: "), _settingsExt.SouvenirMode);
+ 
+  if(!res)
+  {    
+    _settingsExt.init();
+  }
+ 
+  return res;
 }
 
 

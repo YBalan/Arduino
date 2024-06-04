@@ -1,43 +1,27 @@
 //Estimates: https://docs.google.com/spreadsheets/d/1mYA_Bc687Y8no1yJDxv83fimtd0WU4nvcGI80_jnJME/edit?usp=sharing
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 
-#ifdef ESP32
-  #include <SPIFFS.h>
+#ifdef ESP8266
+  #define VER F("1.28")
+#else //ESP32
+  #define VER F("1.33")
 #endif
 
-#include <map>
+#define AVOID_FLICKERING
 
-#define FASTLED_ESP8266_RAW_PIN_ORDER
-//#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
-//#define FASTLED_ESP8266_D1_PIN_ORDER
-#include <FastLED.h>
-
-#include <ezButton.h>
-
-#define VER F("1.16")
 //#define RELEASE
-#define DEBUG
-
-#define USE_BOT
-#define USE_BUZZER
-#define USE_BOT_MAIN_MENU 
-#define USE_BOT_SIMPLE_ANSWER false
-#define BOT_MAX_INCOME_MSG_SIZE 2000 //should not be less because of menu action takes a lot
-
-//#define USE_BUZZER_MELODIES 
-
-#define HTTP_TIMEOUT 1000
-
-//#define LANGUAGE_UA
-#define LANGUAGE_EN
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
+
+#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+
+#define USE_BUZZER_MELODIES 
 
 #define ENABLE_TRACE_MAIN
 
@@ -47,15 +31,72 @@
 #define ENABLE_INFO_BOT
 #define ENABLE_TRACE_BOT
 
+#define ENABLE_INFO_BOT_MENU
+#define ENABLE_TRACE_BOT_MENU
+
 #define ENABLE_INFO_ALARMS
 #define ENABLE_TRACE_ALARMS
 
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 
+#define ENABLE_INFO_PMONITOR
+#define ENABLE_TRACE_PMONITOR
+
 #define ENABLE_INFO_BUZZ
 #define ENABLE_TRACE_BUZZ
+
+#else
+
+#define WM_NODEBUG
+//#define WM_DEBUG_LEVEL 0
+
 #endif
+
+#define RELAY_OFF HIGH
+#define RELAY_ON  LOW
+
+//DebounceTime
+#define DebounceTime 50
+
+#ifdef ESP32
+  #define IsESP32 true
+  #include <SPIFFS.h>
+#else
+  #define IsESP32 false
+#endif
+
+// Platform specific
+#ifdef ESP8266 
+  #define ESPgetFreeContStack ESP.getFreeContStack()
+  #define ESPresetHeap ESP.resetHeap()
+  #define ESPresetFreeContStack ESP.resetFreeContStack()
+#else //ESP32
+  #define ESPgetFreeContStack F("Not supported")
+  #define ESPresetHeap {}
+  #define ESPresetFreeContStack {}
+#endif
+
+#define LED_TYPE    WS2812B
+#ifdef ESP8266 
+  #define FASTLED_ESP8266_RAW_PIN_ORDER
+  //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
+  //#define FASTLED_ESP8266_D1_PIN_ORDER  
+#else //ESP32  
+  //#define FASTLED_ESP32_SPI_BUS HSPI
+#endif
+#ifdef AVOID_FLICKERING
+  #define FASTLED_ALL_PINS_HARDWARE_SPI
+  #define FASTLED_ALLOW_INTERRUPTS 0
+  #define FASTLED_INTERRUPT_RETRY_COUNT 0  
+#endif
+#include <FastLED.h>  
+
+#include "Config.h"
+
+#include <map>
+#include <set>
+#include <ezButton.h>
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -64,6 +105,10 @@
 #include "WiFiOps.h"
 #include "TelegramBotHelper.h"
 #include "BuzzHelper.h"
+#include "UAAnthem.h"
+#include "Prapors.h"
+#include "PMonitor.h"
+#include "TBotMenu.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -82,22 +127,8 @@ struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 
-#define RELAY_OFF HIGH
-#define RELAY_ON  LOW
-
-#define PIN_RELAY1    D1
-#define PIN_RELAY2    D2
-#define PIN_BUZZ      D3
-#define PIN_RESET_BTN D5
-#define PIN_LED_STRIP D6
-#define LED_COUNT 26
-#define BRIGHTNESS_STEP 25
-
-//DebounceTime
-#define DebounceTime 50
-
-std::unique_ptr<AlarmsApi> api(new AlarmsApi());
-CRGBArray<LED_COUNT> leds;
+//CRGBArray<LED_COUNT> leds;
+CRGB *leds = new CRGB[LED_COUNT];
 
 typedef std::map<uint8_t, RegionInfo*> LedIndexMappedToRegionInfo;
 LedIndexMappedToRegionInfo alarmedLedIdx;
@@ -109,7 +140,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   while (!Serial);   
-
+ 
   pinMode(PIN_RELAY1, INPUT_PULLUP);
   pinMode(PIN_RELAY1, OUTPUT);
   pinMode(PIN_RELAY2, INPUT_PULLUP);
@@ -120,7 +151,7 @@ void setup() {
   digitalWrite(PIN_BUZZ, LOW);
 
   digitalWrite(PIN_RELAY1, RELAY_OFF);
-  digitalWrite(PIN_RELAY2, RELAY_OFF);  
+  digitalWrite(PIN_RELAY2, RELAY_OFF);    
 
   resetBtn.setDebounceTime(DebounceTime);  
 
@@ -128,12 +159,18 @@ void setup() {
   Serial.println(F("!!!! Start UA Map !!!!"));
   Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
-  Serial.print(F("STACK: ")); Serial.println(ESP.getFreeContStack());    
+  Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
   LoadSettings();
+  LoadSettingsExt();
   //_settings.reset();
 
-  FastLED.addLeds<WS2811, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
+  PMonitor::LoadSettings();
+  PMonitor::Init(PIN_PMONITOR_SDA, PIN_PMONITOR_SCL);
+
+  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP, GRB>(leds, LED_COUNT).setCorrection(TypicalLEDStrip);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000);
+  //FastLED.setMaxRefreshRate(10);
 
   FastLED.clear();   
   fill_ua_prapor2();
@@ -143,20 +180,31 @@ void setup() {
   
   WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
+  #ifdef WM_DEBUG_LEVEL
+    INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
+  #else
+    INFO(F("WM_DEBUG_LEVEL: "), F("Off"));
+  #endif
+
   wifiOps
-  .AddParameter("apiToken", "Alarms API Token", "api_token", "YOUR_ALARMS_API_TOKEN", 47)  
+  .AddParameter(F("apiToken"), F("Alarms API Token"), F("api_token"), F("YOUR_ALARMS_API_TOKEN"), 47)  
   #ifdef USE_BOT
-  .AddParameter("telegramToken", "Telegram Bot Token", "telegram_token", "TELEGRAM_TOKEN", 47)
-  .AddParameter("telegramName", "Telegram Bot Name", "telegram_name", "@telegram_bot", 50)
-  .AddParameter("telegramSec", "Telegram Bot Security", "telegram_sec", "SECURE_STRING", 30)
+  .AddParameter(F("telegramToken"), F("Telegram Bot Token"), F("telegram_token"), F("TELEGRAM_TOKEN"), 47)
+  .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
+  .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
   ;    
 
   auto resetButtonState = resetBtn.getState();
-  INFO(F("ResetBtn: "), resetButtonState);
+  INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
+  INFO(F("ResetFlag: "), _settings.resetFlag);
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
-  _settings.resetFlag = 200;
-  api->setApiKey(wifiOps.GetParameterValueById("apiToken")); 
+  if(_settings.resetFlag == 1985)
+  {
+    _settings.resetFlag = 200;
+    SaveSettings();
+  }
+  api->setApiKey(wifiOps.GetParameterValueById(F("apiToken"))); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
  
@@ -164,605 +212,36 @@ void setup() {
   //ledsState[0] = {0 /*Crimea*/, 0, 0, true, false, false, _settings.AlarmedColor};
   //ledsState[4] = {4 /*Luh*/, 0, 0, true, false, false, _settings.AlarmedColor};
   
-  SetAlarmedLED(alarmedLedIdx);
+  SetAlarmedLED();
   CheckAndUpdateRealLeds(millis(), /*effectStarted:*/false);
   SetBrightness(); 
 
-  #ifdef USE_BOT
-  //bot.setChatID(CHAT_ID);
+  #ifdef USE_BOT  
   LoadChannelIDs();
-  bot->setToken(wifiOps.GetParameterValueById("telegramToken"));  
-  _botSettings.SetBotName(wifiOps.GetParameterValueById("telegramName"));  
-  _botSettings.botSecure = wifiOps.GetParameterValueById("telegramSec");
+  bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
+  _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
+  _botSettings.botSecure = wifiOps.GetParameterValueById(F("telegramSec"));
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_TEXT); 
   //bot->setPeriod(_settings.alarmsUpdateTimeout);
   bot->setLimit(1);
   bot->skipUpdates();
   #endif
+
+  #ifdef DEBUG  
+  Buzz::PlayMelody(PIN_BUZZ, F("500, 200"));
+  #endif
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("AP Started Call Back"));
+  INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());
   FastLED.clear(); 
   leds[LED_STATUS_IDX] = _settings.PortalModeColor;
 
   FastLED.setBrightness(_settings.Brightness > 1 ? _settings.Brightness : 2);  
   FastLEDShow(1000);    
 }
-
-#ifdef USE_BOT
-
-// int32_t menuID = 0;
-// byte depth = 0;
-
-/*
-!!!!!!!!!!!!!!!! - Bot Additional Commands for Admin
-register - Register chat
-unregister - Unregister chat
-unregisterall - Unregister all chat(s)
-update - Current period of update in milliseconds
-update10000 - Set period of update to 10secs
-baseuri - Current alerts.api uri
-token - Current Alerts.Api token
-nstat - Network Statistic
-rssi - WiFi Quality rssi db
-test - test by regionId
-ver - Version Info
-changeconfig - change configuration WiFi, tokens...
-chid - Registered ChannelIDs
-relay1menu - Relay1 Menu to choose region
-relay2menu - Relay2 Menu to choose region
-
-!!!!!!!!!!!!!!!! - Bot Commands for Users
-gay - trolololo
-ua - Ukrain Prapor
-menu - Simple menu
-br - Current brightness
-br255 - Max brightness
-br2 - Min brightness
-br1 - Min brightness only alarmed visible
-alarmed - List of currently alarmed regions
-all - List of All regions
-relay1 - Region Id set for Relay1
-relay10 - Switch Off Relay1
-relay2 - Region Id set for Relay2
-relay20 - Switch Off Relay2
-buzztime - Current buzzer time in milliseconds
-buzztime3000 - Set buzzer time to 3secs
-buzztime0 - Switch off buzzer
-schema - Current Color schema
-schema0 - Set Color schema to Dark
-schema1 - Set Color schema to Light
-strobe - Stroboscope with current Br & Schema
-rainbow - Rainbow with current Br
-
-*/
-
-#define BOT_COMMAND_BR F("/br")
-#define BOT_COMMAND_RESET F("/reset")
-#define BOT_COMMAND_TEST F("/test")
-#define BOT_COMMAND_VER F("/ver")
-#define BOT_COMMAND_CHANGE_CONFIG F("/changeconfig")
-#define BOT_COMMAND_RAINBOW F("/rainbow")
-#define BOT_COMMAND_STROBE F("/strobe")
-#define BOT_COMMAND_SCHEMA F("/schema")
-#define BOT_COMMAND_BASEURI F("/baseuri")
-#define BOT_COMMAND_ALARMED F("/alarmed")
-#define BOT_COMMAND_ALL F("/all")
-#define BOT_COMMAND_MENU F("/menu")
-#define BOT_COMMAND_RELAY1 F("/relay1")
-#define BOT_COMMAND_RELAY2 F("/relay2")
-#define BOT_COMMAND_UPDATE F("/update")
-#define BOT_COMMAND_BUZZTIME F("/buzztime")
-#define BOT_COMMAND_TOKEN F("/token")
-#define BOT_COMMAND_NSTAT F("/nstat")
-#define BOT_COMMAND_RSSI F("/rssi")
-#define BOT_COMMAND_GAY F("/gay")
-#define BOT_COMMAND_UA F("/ua")
-#define BOT_COMMAND_CHID F("/chid")
-#define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
-#define BOT_COMMAND_PLAY F("/play")
-#define BOT_COMMAND_SAVEMELODY F("/savemelody")
-
-//Main Menu Main
-#define BOT_MENU_UA_PRAPOR F("UA Prapor")
-#define BOT_MENU_ALARMED F("Alarmed")
-#define BOT_MENU_ALL F("All")
-#define BOT_MENU_MIN_BR F("Min Br")
-#define BOT_MENU_MID_BR F("Mid Br")
-#define BOT_MENU_MAX_BR F("Max Br")
-#define BOT_MENU_NIGHT_BR F("Night Br")
-
-const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
-{  
-  std::vector<String> messages;
-
-  if(msg.OTA && msg.text == BOT_COMMAND_FRMW_UPDATE)
-  { 
-    INFO(F("Update check..."));
-    String fileName = msg.fileName;
-    fileName.replace(F(".bin"), F(""));
-    auto uidx = fileName.lastIndexOf(F("_"));
-
-    if(uidx >= 0 && uidx < fileName.length() - 1)
-    {    
-      bot->OTAVersion = fileName.substring(uidx + 1);
-      String currentVersion = String(VER);
-      if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
-      {
-        messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
-        INFO(messages[0]);
-        bot->update();
-      }
-      else
-      {        
-        messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
-        bot->OTAVersion.clear();
-        INFO(messages[0]);
-      }
-    }
-    else
-    {      
-      messages.push_back(String(F("Unknown version")) + F(". NO Updates..."));
-      INFO(messages[0]);      
-    }    
-    return std::move(messages);
-  }
-  
-  String value;
-  bool answerCurrentAlarms = false;
-  bool answerAll = false;
-
-  bool noAnswerIfFromMenu = msg.data.length() > 0;// && filtered.startsWith(_botSettings.botNameForMenu);
-  BOT_TRACE(F("Filtered: "), filtered);
-  filtered = noAnswerIfFromMenu ? msg.data : filtered;
-  BOT_TRACE(F("Filtered: "), filtered);
-
-  if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    INFO(F("Main Menu"));
-    #ifdef USE_BUZZER
-    static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
-    #else
-    static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-    static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
-    #endif
-
-    ESP.resetHeap();
-    ESP.resetFreeContStack();
-
-    INFO(F(" HEAP: "), ESP.getFreeHeap());
-    INFO(F("STACK: "), ESP.getFreeContStack());
-    
-    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);
-
-    //delay(100);
-    #ifdef USE_BOT_MAIN_MENU    
-    static const String BotFastMenu = String(BOT_MENU_UA_PRAPOR)    
-      + F(" \n ") + BOT_MENU_MIN_BR + F(" \t ") + BOT_MENU_MID_BR + F(" \t ") + BOT_MENU_MAX_BR + F(" \t ") + BOT_MENU_NIGHT_BR
-      + F(" \n ") + BOT_MENU_ALARMED + F(" \t ") + BOT_MENU_ALL
-    ;
-    bot->showMenuText(_botSettings.botNameForMenu, BotFastMenu, msg.chatID, true);
-    #endif
-    
-    //delay(500);
-  } else
-  #ifdef USE_BOT_MAIN_MENU 
-  if(GetCommandValue(BOT_MENU_ALARMED, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    
-    answerCurrentAlarms = true;
-  } else
-  if(GetCommandValue(BOT_MENU_ALL, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    
-    answerAll = true;
-  } else
-  if(GetCommandValue(BOT_MENU_MIN_BR, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    _settings.Brightness = 2;
-    SetBrightness();    
-    value = String(F("Brightness: ")) + String(_settings.Brightness);
-  } else
-  if(GetCommandValue(BOT_MENU_MID_BR, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    _settings.Brightness = 30;
-    SetBrightness();    
-    value = String(F("Brightness: ")) + String(_settings.Brightness);
-  } else  
-  if(GetCommandValue(BOT_MENU_MAX_BR, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    _settings.Brightness = 255;
-    SetBrightness();    
-    value = String(F("Brightness: ")) + String(_settings.Brightness);
-  } else
-  if(GetCommandValue(BOT_MENU_NIGHT_BR, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    _settings.Brightness = 1;
-    SetBrightness();    
-    value = String(F("Brightness: ")) + String(_settings.Brightness);
-  } else
-  #endif
-  if(GetCommandValue(BOT_COMMAND_UPDATE, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    if(value.length() > 0)
-    {
-      auto update = value.toInt();
-      if(update >= 2000 && update <= 120000 )
-      {
-        _settings.alarmsUpdateTimeout = update;
-        SaveSettings();
-      }
-    }
-    value = String(F("Update Timeout: ")) + String(_settings.alarmsUpdateTimeout) + F("ms...");
-  } else
-  if(GetCommandValue(BOT_COMMAND_BUZZTIME, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-    if(value.length() > 0)
-    {
-      auto update = value.toInt();
-      if(update == 0 || (update >= 2000 && update <= 120000))
-      {
-        _settings.BuzzTime = update;
-        SaveSettings();
-      }
-    }
-    value = String(F("Buzz Time: ")) + String(_settings.BuzzTime) + F("ms...");
-    noAnswerIfFromMenu = false;
-  } else
-  if(GetCommandValue(BOT_COMMAND_BR, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    auto br = value.toInt();
-    if(value.length() > 0)
-    {
-      br = br <= 0 ? 1 : (br > 255 ? 255 : br);
-      //if(br > 0 && br <= 255)
-      _settings.Brightness = br;
-
-      SetBrightness();      
-    }
-    value = String(F("Brightness: ")) + String(_settings.Brightness);
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    bot->sendMessage(F("Wait for restart..."), msg.chatID);
-    ESP.restart();
-  }else
-  if(GetCommandValue(BOT_COMMAND_CHANGE_CONFIG, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    _settings.resetFlag = 1985;
-    SaveSettings();
-    bot->sendMessage(F("Wait for restart..."), msg.chatID);
-    ESP.restart();
-  }else
-  if(GetCommandValue(BOT_COMMAND_TEST, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);    
-
-    auto regionId = value.toInt();
-    String answer = F(" Region: ") + String(regionId);
-    if(value.length() > 0 && regionId > 2 && regionId < 31)
-    {      
-      LedState state;
-      state.Color = CRGB::Yellow;    
-      state.BlinkPeriod = 50;
-      state.BlinkTotalTime = 5000;
-      state.IsAlarmed = true;
-      state.IsPartialAlarmed = false;
-      SetRegionState((UARegion)regionId, state);
-
-      RegionInfo *const regionPtr = api->GetRegionById((UARegion)regionId);
-      if(regionPtr != nullptr)
-      {
-        regionPtr->AlarmStatus = ApiAlarmStatus::Alarmed;
-        alarmedLedIdx[(UARegion)regionId] = regionPtr;
-        answer += F(" Test started...");
-        SetRelayStatus(alarmedLedIdx);
-      }      
-    } 
-    value = answer; 
-
-  }else
-  if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    value = F("Flash Date: ") + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
-  }else
-  if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
-  {
-    noAnswerIfFromMenu = !HandleRelay(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, msg.chatID);
-  }else
-  if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
-  {
-    noAnswerIfFromMenu = !HandleRelay(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
-  }else
-  if(GetCommandValue(BOT_COMMAND_TOKEN, filtered, value))
-  {
-    value = String(F("Token: ")) + api->GetApiKey();
-  }else
-  if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
-  {
-    PrintNetworkStatistic(value);
-  }else
-  if(GetCommandValue(BOT_COMMAND_RSSI, filtered, value))
-  {
-    value = F("SSID: ") + WiFi.SSID() + F(" ") /*+ F("EncryptionType: ") + String(WiFi.encryptionType()) + F(" ")*/ 
-          + F("RSSI: ") + String(WiFi.RSSI()) + F("db") + F(" ")
-          + F("Channel: ") + WiFi.channel() + F(" ")
-          + F("IP: ") + WiFi.localIP().toString() + F(" ")
-          + F("GatewayIP: ") + WiFi.gatewayIP().toString() + F(" ")
-          + F("MAC: ") + WiFi.macAddress()          
-    ;
-  }else
-  if(GetCommandValue(BOT_COMMAND_CHID, filtered, value))
-  {
-    INFO(F("BOT Channels:"));
-    value.clear();
-    value = String(F("BOT Channels:")) + F(" ") + String(_botSettings.toStore.registeredChannelIDs.size()) + F(" -> ");
-    for(const auto &channel : _botSettings.toStore.registeredChannelIDs)  
-    {
-      INFO(F("\t"), channel.first);
-      value += F("[") + channel.first + F("]") + F("; ");
-    }
-  }else
-  if(GetCommandValue(BOT_COMMAND_RAINBOW, filtered, value))
-  {    
-    bot->sendTyping(msg.chatID);
-    //value = F("Rainbow started...");
-    value.clear();
-    _effect = Effect::Rainbow;   
-    effectStartTicks = millis();
-    effectStarted = false;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_STROBE, filtered, value))
-  {   
-    bot->sendTyping(msg.chatID);
-    //value = F("Strobe started...");
-    value.clear();
-    _effect = Effect::Strobe;   
-    effectStartTicks = millis();
-    effectStarted = false;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_GAY, filtered, value))
-  {   
-    bot->sendTyping(msg.chatID);
-    //value = F("Gay started...");
-    value.clear();
-    _effect = Effect::Gay;   
-    effectStartTicks = millis();
-    effectStarted = false;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_UA, filtered, value) || GetCommandValue(BOT_MENU_UA_PRAPOR, filtered, value))
-  {   
-    bot->sendTyping(msg.chatID);
-    //value = F("UA started...");
-    value.clear();
-    _effect = Effect::UA;   
-    effectStartTicks = millis();
-    effectStarted = false;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_BASEURI, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    if(value.startsWith(F("https://")) && value.length() < MAX_BASE_URI_LENGTH)
-    {
-      strcpy(_settings.BaseUri, value.c_str());
-      api->setBaseUri(value);
-      SaveSettings();
-    }
-    value = _settings.BaseUri;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_ALARMED, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    answerCurrentAlarms = true;
-    answerAll = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_ALL, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    answerCurrentAlarms = true;
-    answerAll = true;
-  }else
-  if(GetCommandValue(BOT_COMMAND_SCHEMA, filtered, value))
-  {    
-    bot->sendTyping(msg.chatID);
-    
-    uint8_t schema = value.toInt();
-    switch(schema)
-    {
-      case ColorSchema::Light:
-        _settings.AlarmedColor = CRGB::Red;
-        _settings.NotAlarmedColor = CRGB::White;
-        _settings.PartialAlarmedColor = CRGB::Yellow;
-        value = String(F("Light"));
-      break;
-      case ColorSchema::Dark: 
-      default:
-        _settings.AlarmedColor = LED_ALARMED_COLOR;
-        _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
-        _settings.PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
-        value = String(F("Dark"));
-      break;
-    }
-
-    SetAlarmedLED(alarmedLedIdx);
-    SetBrightness();
-
-    value = String(F("Color Schema: ")) + value;
-    answerCurrentAlarms = false;
-  }else
-  if(GetCommandValue(BOT_COMMAND_PLAY, filtered, value))
-  {
-    bot->sendTyping(msg.chatID);
-    auto melodySizeMs = Buzz::PlayMelody(PIN_BUZZ, value);
-    value = String(melodySizeMs) + F("ms...");
-  }
-
-  if(value.length() > 0 && !noAnswerIfFromMenu)
-      messages.push_back(value);
-
-  if(answerCurrentAlarms || answerAll)
-  {
-    if(answerCurrentAlarms)
-    {
-      String answerAlarmed = String(F("Alarmed regions count: ")) + String(alarmedLedIdx.size());     
-      messages.push_back(answerAlarmed);
-    }
-
-    if(answerAll)  
-    {  
-      String answerAllMsg = String(F("All regions count: ")) + String(MAX_REGIONS_COUNT);
-      messages.push_back(answerAllMsg);
-    }    
-    
-    for(const auto &region : api->iotApiRegions)
-    {      
-      if(region.AlarmStatus == ApiAlarmStatus::Alarmed || answerAll)
-      {
-        if(USE_BOT_SIMPLE_ANSWER)
-        {
-          messages[0] += F("\n") + region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
-        }
-        else
-        {
-          String regionMsg = region.Name + F(": [") + String((uint8_t)region.Id) + F("]");
-          messages.push_back(regionMsg);
-        }
-      }
-    } 
-  }
-
-  if(messages.size() == 0)
-  {
-    //bot->answer("Use menu", FB_NOTIF); 
-  }
-
-  return std::move(messages);
-}
-
-const bool HandleRelay(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID)
-{
-  if(value == F("menu"))
-    {
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack()); 
-
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
-
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
-
-      SendInlineRelayMenu(relayName, relayCommand, chatID);   
-
-      value.clear();   
-      return false;   
-    }
-    else
-    {
-      if(value.length() > 0)
-      {
-        auto regionId = value.toInt();    
-        if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
-        {
-          relaySetting = regionId;
-          SaveSettings();
-        }
-      }
-      value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting));
-      BOT_TRACE(F("Bot answer: "), value);
-      return true;
-    }
-}
-
-/*String BotRelayMenu1("Odeska \n Kharkivska \t Mykolaivska \t Vinnytska \t Kyivska \n Kirovohradska \t Poltavska \t Sumska \t Ternopilska");
-String BotRelayMenuCall1("{0} 18, {0} 22, {0} 17, {0} 4, {0} 14, {0} 15, {0} 19, {0} 20, {0} 21");*/
-void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID)
-{
-  // String call1 = BotRelayMenuCall1;
-  // call1.replace("{0}", relayCommand);
-  // bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, BotRelayMenu1, call1, chatID);
-
-  String menu;
-  String call;
-
-  bool sendWholeMenu = false;
-  static const uint8_t RegionsInLine = 2;
-  static const uint8_t RegionsInGroup = 6;
-
-  uint8_t regionsCount = MAX_REGIONS_COUNT;
-  uint8_t regionPlace = 1;
-  bool isEndOfGoup = false;
-  for(uint8_t regionIdx = 0; regionIdx < regionsCount; regionIdx++)
-  {
-    const auto &region = api->iotApiRegions[regionIdx];
-    if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
-
-    menu += region.Name + (regionPlace != 0 && regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));
-    call += relayCommand + region.Id + F(", ");//(isEndOfGoup ? F("") : F(", "));  
-
-    regionPlace++;
-    isEndOfGoup = (regionPlace == RegionsInGroup || regionIdx == regionsCount - 1);
-
-    if(!sendWholeMenu && isEndOfGoup)      
-    {
-      menu += String(F(" \n ")) + relayName + F(" ") + F("Off");
-      call += String(F(", ")) + relayCommand + F(" 0");
-
-      regionPlace = 1;      
-
-      ESP.resetHeap();
-      ESP.resetFreeContStack();
-
-      INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());  
-
-      INFO(menu);
-      INFO(call);    
-
-      bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
-
-      delay(100);
-
-      menu.clear();
-      call.clear();
-    }
-  }
-
-  if(sendWholeMenu)
-  {
-    menu += String(F(" \n ")) + F("Disable");
-    call += String(F(", ")) + relayCommand + F(" 0");
-
-    INFO(menu);
-    INFO(call);   
-
-    bot->inlineMenuCallback(_botSettings.botNameForMenu + relayName, menu, call, chatID);
-  }
-}
-#endif
 
 void loop() 
 {
@@ -785,6 +264,14 @@ void loop()
       nextBr = 1;
       brBtnChangeDirectionUp = true;
     }else
+    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
+    {
+      nextBr = 2;
+    }else
+    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
+    {
+      nextBr = BRIGHTNESS_STEP;
+    }else
     if(nextBr > 255)
     {
       nextBr = 255;
@@ -798,26 +285,94 @@ void loop()
   }  
 
   HandleEffects(currentTicks);
- 
+
+  if(_settingsExt.Mode == ExtMode::Souvenir && _effect == Effect::Normal)
+  {
+    yield(); // watchdog
+    if(!effectStarted)
+    {   
+      INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode); 
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::UAPrapor)
+      {        
+        fill_ua_prapor2();
+        SetStateFromRealLeds();        
+      }else
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::BGPrapor)
+      {        
+        fill_bg_prapor();
+        SetStateFromRealLeds();        
+      }else
+      if(_settingsExt.SouvenirMode == ExtSouvenirMode::MDPrapor)
+      {        
+        fill_md_prapor();
+        SetStateFromRealLeds();        
+      }
+      effectStarted = true;
+    }
+  }
+  else
+  if(_settingsExt.Mode == ExtMode::Alarms)
+  {  
+    yield(); // watchdog 
+  int httpCode;
+  String statusMsg;
   if(_effect == Effect::Normal)
   { 
-    if(CheckAndUpdateAlarms(currentTicks))
+    effectStarted = false;
+    #ifdef USE_STOPWATCH
+    uint32_t sw = millis();
+    #endif
+    if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
+      INFO(F("\t\t"), F("MODE: "), F("ALARMS"));
+      //when updated
       //FastLEDShow(true);
-    }
+
+      #ifdef USE_STOPWATCH
+      sw = millis() - sw;
+      #endif
+
+      #ifdef USE_BOT
+        #ifdef USE_NOTIFY
+          if(_settings.notifyHttpCode == 1 || //All http codes
+              (_settings.notifyHttpCode != 0  // Notify is ON
+                &&(
+                      (_settings.notifyHttpCode < 0 && httpCode != abs(_settings.notifyHttpCode)) //-200 means - All except 200
+                    || (_settings.notifyHttpCode == httpCode)
+                  )
+              )
+           )
+          {
+            String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode)
+            #ifdef USE_STOPWATCH
+            + F(" (") + String(sw) + F("ms") + F(")")
+            #endif
+            ;
+            TRACE(notifyMessage);
+            bot->sendMessage(notifyMessage, notifyChatId);
+          }
+        #endif
+      #endif
+
+      #ifdef USE_STOPWATCH
+       TRACE(F("API Stop watch: "), sw, F("ms..."));
+      #endif
+    }   
 
     if(CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/false))
     {
       //FastLEDShow(false);
     }        
   }  
+  }
   
   FastLEDShow(false); 
 
-  HandleDebugSerialCommands();   
+  HandleDebugSerialCommands();     
 
   #ifdef USE_BOT
-  uint8_t botStatus = bot->tick();
+  uint8_t botStatus = bot->tick();  
+  yield(); // watchdog
   if(botStatus == 0)
   {
     // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
@@ -828,8 +383,42 @@ void loop()
     BOT_INFO(F("Bot overloaded!"));
     bot->skipUpdates();
     //bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
-  }
+  }  
   #endif   
+
+  #ifdef USE_POWER_MONITOR
+  #ifdef PM_UPDATE_PERIOD    
+  if(pmUpdatePeriod > 0 && pmUpdateTicks > 0 && millis() - pmUpdateTicks >= pmUpdatePeriod)
+  {
+    PM_TRACE(F("PM Update period: "), pmUpdatePeriod);
+    pmUpdateTicks = millis();
+    //EVERY_N_MILLISECONDS_I(PM, pmUpdatePeriod)
+    {    
+      const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
+      const auto &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);      
+
+      for(auto &chatIDkv : pmChatIds)
+      {
+        const auto &chatID = chatIDkv.first;
+        auto &chatIDInfo = chatIDkv.second;
+        chatIDInfo.CurrentValue = voltage;
+        SetPMMenu(chatID, chatIDInfo.MsgID, voltage, led_consumption_voltage_factor);
+
+        if(chatIDInfo.AlarmValue > 0)
+        {
+          if(voltage <= chatIDInfo.AlarmValue)
+          {
+            String alarmMessage = String(PM_MENU_ALARM_NAME) + F(": ") + String(voltage, 2) + PM_MENU_VOLTAGE_UNIT;
+            PM_TRACE(alarmMessage);
+            bot->sendMessage(alarmMessage, chatID);
+          }
+        }
+      }
+    }
+  }
+  yield(); // watchdog
+  #endif
+  #endif
 
   firstRun = false;
 }
@@ -891,7 +480,7 @@ const bool CheckAndUpdateRealLeds(const unsigned long &currentTicks, const bool 
 }
 
 //uint32_t alarmsTicks = 0;
-const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
+const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {  
   //INFO("CheckAndUpdateAlarms");  
   static uint32_t alarmsTicks = 0;
@@ -901,37 +490,37 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
     alarmsTicks = currentTicks;
 
     // wait for WiFi connection
-    int status = ApiStatusCode::NO_WIFI;
-    String statusMsg = F("No WiFi");
+    httpCode = ApiStatusCode::NO_WIFI;
+    statusMsg = F("No WiFi");
    
     if ((WiFi.status() == WL_CONNECTED)) 
     {     
-      status = ApiStatusCode::UNKNOWN;
+      httpCode = ApiStatusCode::UNKNOWN;
       statusMsg.clear();
       //INFO("WiFi - CONNECTED");
       //ESP.resetHeap();
       //ESP.resetFreeContStack();
       INFO(F(" HEAP: "), ESP.getFreeHeap());
-      INFO(F("STACK: "), ESP.getFreeContStack());
+      INFO(F("STACK: "), ESPgetFreeContStack);
 
-      bool statusChanged = api->IsStatusChanged(status, statusMsg);
-      if(status == ApiStatusCode::API_OK || status == HTTP_CODE_METHOD_NOT_ALLOWED)
+      bool statusChanged = api->IsStatusChanged(httpCode, statusMsg);
+      if(httpCode == ApiStatusCode::API_OK || httpCode == HTTP_CODE_METHOD_NOT_ALLOWED)
       {        
         INFO(F("IsStatusChanged: "), statusChanged ? F("true") : F("false"));
         TRACE(F("alarmsCheckWithoutStatus: "), _settings.alarmsCheckWithoutStatus ? F("true") : F("false"));
 
         if(statusChanged || _settings.alarmsCheckWithoutStatus || ALARMS_CHECK_WITHOUT_STATUS)
         {              
-          auto alarmedRegions = api->getAlarmedRegions2(status, statusMsg);    
+          auto alarmedRegions = api->getAlarmedRegions2(httpCode, statusMsg);    
           TRACE(F("HTTP "), F("Alarmed regions count: "), alarmedRegions.size());
-          if(status == ApiStatusCode::API_OK)
+          if(httpCode == ApiStatusCode::API_OK)
           { 
             _settings.alarmsCheckWithoutStatus = false;           
             alarmedLedIdx.clear();
             for(uint8_t idx = 0; idx < alarmedRegions.size(); idx++)
             {
               RegionInfo * const alarmedRegion = alarmedRegions[idx];
-              const auto &ledRange = AlarmsApi::getLedIndexesByRegion(alarmedRegion->Id);
+              const auto &ledRange = getLedIndexesByRegion(alarmedRegion->Id);
               for(auto &ledIdx : ledRange)
               {
                 TRACE(F(" Region: "), alarmedRegion->Id, F("\t"), F("Led idx: "), ledIdx, F("\tName: "), alarmedRegion->Name);
@@ -939,34 +528,47 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks)
               }
             }
 
-            SetAlarmedLED(alarmedLedIdx);            
+            SetAlarmedLED();            
             changed = true;
           } 
 
-          if(status == ApiStatusCode::JSON_ERROR)
+          if(httpCode == ApiStatusCode::JSON_ERROR)
           {
             _settings.alarmsCheckWithoutStatus = true;
-            ESP.resetHeap();
-            ESP.resetFreeContStack();
+            ESPresetHeap;
+            ESPresetFreeContStack;
           }         
         } 
 
-        SetRelayStatus(alarmedLedIdx);           
+        SetRelayStatus();           
       }                       
     }   
     
-    bool statusChanged = SetStatusLED(status, statusMsg);
+    bool statusChanged = SetStatusLED(httpCode, statusMsg);
     changed = (changed || statusChanged);
 
     INFO(F(""));
     INFO(F("Alarmed regions count: "), alarmedLedIdx.size());
     INFO(F("Waiting "), _settings.alarmsUpdateTimeout, F("ms..."));
     PrintNetworkStatToSerial();
+
+    return true;    
   }
-  return changed;
+  //return changed;
+  return false;
 }
 
-void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
+const int GetAlarmedLedIdxSize()
+{
+  return alarmedLedIdx.size();
+}
+
+void SetAlarmedLedRegionInfo(const int &regionId, RegionInfo *const regionPtr)
+{
+  alarmedLedIdx[(UARegion)regionId] = regionPtr;
+}
+
+void SetAlarmedLED()
 {
   TRACE(F("SetAlarmedLED: "), alarmedLedIdx.size());
   FastLED.setBrightness(_settings.Brightness);
@@ -997,7 +599,7 @@ void SetAlarmedLED(LedIndexMappedToRegionInfo &alarmedLedIdx)
   }  
 }
 
-void SetRelayStatus(const LedIndexMappedToRegionInfo &alarmedLedIdx)
+void SetRelayStatus()
 {
   INFO(F("SetRelayStatus: "), F("Relay1"), F(": "), _settings.Relay1Region, F(" "), F("Relay2"), F(": "), _settings.Relay2Region); 
   if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
@@ -1167,35 +769,46 @@ void PrintNetworkStatToSerial()
 {
   #ifdef NETWORK_STATISTIC
   Serial.print(F("Network Statistic: "));
-  if(networkStat.count(ApiStatusCode::API_OK) > 0)
-    PrintNetworkStatInfoToSerial(networkStat[ApiStatusCode::API_OK]);
-  for(const auto &de : networkStat)
+  if(networkStat.size() > 0)
   {
-    const auto &info = de.second;
-    if(info.code != ApiStatusCode::API_OK)
-      PrintNetworkStatInfoToSerial(info);
+    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+      PrintNetworkStatInfoToSerial(networkStat[ApiStatusCode::API_OK]);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != ApiStatusCode::API_OK)
+        PrintNetworkStatInfoToSerial(info);
+    }
   }
+  Serial.print(F(" ")); Serial.print(millis() / 1000); Serial.print(F("sec"));
   Serial.println();
   #endif
 }
 
 void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
 {  
-  str += F("[\"") + info.description + F("\": ") + String(info.count) + F("]; ");
+  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
 }
 
 void PrintNetworkStatistic(String &str)
 {
   str = F("Network Statistic: ");
   #ifdef NETWORK_STATISTIC  
-  if(networkStat.count(ApiStatusCode::API_OK) > 0)
-    PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
-  for(const auto &de : networkStat)
+  if(networkStat.size() > 0)
   {
-    const auto &info = de.second;
-    if(info.code != ApiStatusCode::API_OK)
-      PrintNetworkStatInfo(info, str);
+    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+      PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != ApiStatusCode::API_OK)
+        PrintNetworkStatInfo(info, str);
+    }
   }
+  const auto &millisec = millis();
+  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
+      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
+      
   //str.replace("(", "");
   //str.replace(")", "");
   #else
@@ -1236,22 +849,28 @@ void HandleEffects(const unsigned long &currentTicks)
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
-  }  else
+  }else
   if(_effect == Effect::Gay)
   {     
     if(!effectStarted)
     {
       FastLED.setBrightness(255);
       fill_rainbow_circular(leds, LED_COUNT, 0, 1);
-      for(auto &ledKvp : ledsState)
-      {
-        auto &led = ledKvp.second;
-        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
-
-        led.Color = leds[led.Idx];
-      }
+      SetStateFromRealLeds();
 
       DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::FillRGB)
+  {     
+    if(!effectStarted)
+    {
+      //FastLED.setBrightness(255);      
+      fill_solid(leds, LED_COUNT, _settings.NotAlarmedColor);
+      SetStateFromRealLeds();      
+      //DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
     }  
     CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
@@ -1262,14 +881,52 @@ void HandleEffects(const unsigned long &currentTicks)
     {
       FastLED.setBrightness(255);
       fill_ua_prapor2();
-      for(auto &ledKvp : ledsState)
-      {
-        auto &led = ledKvp.second;
-        if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+      SetStateFromRealLeds();
 
-        led.Color = leds[led.Idx];
-      }
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::UAWithAnthem)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_ua_prapor2();
+      SetStateFromRealLeds();
 
+      #ifdef USE_BUZZER
+      TRACE(F("\t\t\tUA Prapor with Anthem playing!!!!"));
+      FastLEDShow(500);
+      UAAnthem::play(PIN_BUZZ, 0);
+      #endif
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::BG)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_bg_prapor();
+      SetStateFromRealLeds();
+      
+      //DoStrobe(/*alarmedColorSchema:*/false);
+      effectStarted = true;
+    }  
+    CheckAndUpdateRealLeds(currentTicks, /*effectStarted:*/true);  
+  }else
+  if(_effect == Effect::MD)
+  {     
+    if(!effectStarted)
+    {
+      FastLED.setBrightness(255);
+      fill_md_prapor();
+      SetStateFromRealLeds();
+      
       //DoStrobe(/*alarmedColorSchema:*/false);
       effectStarted = true;
     }  
@@ -1277,27 +934,89 @@ void HandleEffects(const unsigned long &currentTicks)
   }
 }
 
+#ifdef USE_POWER_MONITOR
+#define PM_SUPPLIER_VOTAGE 5.30 //Volts
+#define PM_LEDS_RESIST 0.17 //Ohms
+const float GetLEDVoltageFactor()
+{
+  if(_settings.Brightness > 2)
+  {
+    //https://www.reddit.com/r/FastLED/comments/gowuga/fastled_power_consumption_functions/
+    const auto& power_mW_unscaled =  calculate_unscaled_power_mW(leds, LED_COUNT);
+    // Adjust power consumption for brightness
+    float power_mW_actual = (power_mW_unscaled * _settings.Brightness) / 255;
+
+    float ledsA = (power_mW_actual / PM_SUPPLIER_VOTAGE) / 1000;
+    float Vdrop = ledsA * PM_LEDS_RESIST;
+    float VEffective = PM_SUPPLIER_VOTAGE - Vdrop;
+
+    float factor = PM_SUPPLIER_VOTAGE / VEffective;
+    
+    PM_TRACE(F("\tLEDS cons: BR: "), _settings.Brightness);
+    PM_TRACE(F("\tLEDS cons: "), power_mW_unscaled, F(" mW unscaled"));
+    PM_TRACE(F("\tLEDS cons: "), power_mW_actual, F(" mW actual"));
+    PM_TRACE(F("\tLEDS cons: "), ledsA, F(" A")); 
+    PM_TRACE(F("\tLEDS cons: "), Vdrop, F(" V drop")); 
+    PM_TRACE(F("\tLEDS cons: "), VEffective, F(" V effective"));
+
+    PM_TRACE(F("\tLEDS cons: "), factor, F("%"));  
+    
+    return factor;
+  }
+  return 1.0;
+}
+#endif
+
+void PrintFSInfo(String &fsInfo)
+{
+  #ifdef ESP8266
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);   
+  const auto &total = fs_info.totalBytes;
+  const auto &used = fs_info.usedBytes;
+  #else //ESP32
+  const auto &total = SPIFFS.totalBytes();
+  const auto &used = SPIFFS.usedBytes();
+  #endif
+  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+}
+
 uint8_t debugButtonFromSerial = 0;
 void HandleDebugSerialCommands()
 {
-  if(debugButtonFromSerial == 2) // Reset Settings
-  {
-    _settings.init();
-    SaveSettings();
-    api->setBaseUri(_settings.BaseUri);
-  }
-
   if(debugButtonFromSerial == 1) // Reset WiFi
-  {    
+  { 
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();
   }
 
+  if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
+  { 
+    INFO(F("\t\t\tFormat..."));   
+    SPIFFS.format();
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
+  }
+
+  if(debugButtonFromSerial == 140)
+  {
+    LoadSettings();
+    PMonitor::LoadSettings();
+  }
+
+  if(debugButtonFromSerial == 2) // Reset Settings
+  {
+    _settings.init();
+    SaveSettings();
+    api->setBaseUri(_settings.BaseUri);
+  }  
+
   if(debugButtonFromSerial == 100) // Show Network Statistic
   {
     INFO(F(" HEAP: "), ESP.getFreeHeap());
-    INFO(F("STACK: "), ESP.getFreeContStack());
+    INFO(F("STACK: "), ESPgetFreeContStack);
     INFO(F(" BR: "), _settings.Brightness);
     INFO(F("Alarmed regions count: "), alarmedLedIdx.size());
     INFO(F("alarmsCheckWithoutStatus: "), _settings.alarmsCheckWithoutStatus);  
@@ -1306,6 +1025,9 @@ void HandleDebugSerialCommands()
     {
       INFO(F("\t"), channel.first);
     }
+    String fsInfo;
+    PrintFSInfo(fsInfo);
+    INFO(fsInfo);
     PrintNetworkStatToSerial();
   }
 
@@ -1375,9 +1097,10 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 109)
   {  
-    BUZZ_INFO(F("Pacman"));
-    //Buzz::PlayMelody(PIN_BUZZ, Buzz::pacmanMelody); 
-    //BUZZ_TRACE(Buzz::GetMelodyString(Buzz::pacmanMelody));
+    BUZZ_INFO(F("UAAnthemMelody"));
+    /*Buzz::PlayMelody(PIN_BUZZ, Buzz::UAAnthemMelody); 
+    BUZZ_TRACE(Buzz::GetMelodyString(Buzz::UAAnthemMelody));*/
+    BUZZ_TRACE(UAAnthem::play(PIN_BUZZ, 2));
   }
 
   if(debugButtonFromSerial == 110)
@@ -1461,88 +1184,29 @@ void FastLEDShow(const int &retryCount)
   }
 }
 
-void fill_ua_prapor()
-{
-  leds[0] = CRGB::Yellow;
-  leds[1] = CRGB::Yellow;
-  leds[2] = CRGB::Yellow;  
-  leds[3] = CRGB::Yellow;
-
-  leds[4] = CRGB::Blue;
-  leds[5] = CRGB::Blue;
-
-  leds[6] = CRGB::Yellow;
-  leds[7] = CRGB::Yellow;
-  leds[8] = CRGB::Yellow;
-  leds[9] = CRGB::Yellow;
-  leds[10] = CRGB::Yellow;
-
-  leds[11] = CRGB::Blue;
-  leds[12] = CRGB::Blue;
-  leds[13] = CRGB::Blue;
-  leds[14] = CRGB::Blue;
-  leds[15] = CRGB::Blue;
-
-  leds[16] = CRGB::Yellow;
-
-  leds[17] = CRGB::Blue;
-  leds[18] = CRGB::Blue;
-
-  leds[19] = CRGB::Yellow;
-  leds[20] = CRGB::Yellow;
-  leds[21] = CRGB::Yellow;
-  leds[22] = CRGB::Yellow;
-
-  leds[23] = CRGB::Blue;
-
-  leds[24] = CRGB::Yellow;
-  leds[25] = CRGB::Yellow;
-}
-
-void fill_ua_prapor2()
-{ 
-  SetRegionColor(UARegion::Crimea,            CRGB::Yellow);
-  SetRegionColor(UARegion::Khersonska,        CRGB::Yellow);
-  SetRegionColor(UARegion::Zaporizka,         CRGB::Yellow);
-  SetRegionColor(UARegion::Donetska,          CRGB::Yellow);
-  SetRegionColor(UARegion::Dnipropetrovska,   CRGB::Yellow);
-  SetRegionColor(UARegion::Mykolaivska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Odeska,            CRGB::Yellow);
-  SetRegionColor(UARegion::Kirovohradska,     CRGB::Yellow);
-  SetRegionColor(UARegion::Vinnytska,         CRGB::Yellow);
-  SetRegionColor(UARegion::Khmelnitska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Chernivetska,      CRGB::Yellow);
-  SetRegionColor(UARegion::Ivano_Frankivska,  CRGB::Yellow);
-  SetRegionColor(UARegion::Ternopilska,       CRGB::Yellow);
-  SetRegionColor(UARegion::Lvivska,           CRGB::Yellow);
-  SetRegionColor(UARegion::Zakarpatska,       CRGB::Yellow);
-
-
-  SetRegionColor(UARegion::Luhanska,          CRGB::Blue);
-  SetRegionColor(UARegion::Kharkivska,        CRGB::Blue);
-  SetRegionColor(UARegion::Poltavska,         CRGB::Blue);
-  SetRegionColor(UARegion::Sumska,            CRGB::Blue);
-  SetRegionColor(UARegion::Chernihivska,      CRGB::Blue);
-  SetRegionColor(UARegion::Kyivska,           CRGB::Blue);
-  SetRegionColor(UARegion::Cherkaska,         CRGB::Blue);
-  SetRegionColor(UARegion::Zhytomyrska,       CRGB::Blue);
-  SetRegionColor(UARegion::Rivnenska,         CRGB::Blue);
-  SetRegionColor(UARegion::Volynska,          CRGB::Blue);
-
-}
-
 void SetRegionColor(const UARegion &region, const CRGB &color)
 {
-  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  for(const auto &idx : getLedIndexesByRegion(region))
   {    
     ledsState[idx].Color = color;
     leds[idx] = color;
   }
 }
 
+void SetStateFromRealLeds()
+{
+  for(auto &ledKvp : ledsState)
+  {
+    auto &led = ledKvp.second;
+    if(led.Idx < 0 && led.Idx >= LED_COUNT) continue;
+
+    led.Color = leds[led.Idx];
+  }
+}
+
 void SetRegionState(const UARegion &region, LedState &state)
 {
-  for(const auto &idx : AlarmsApi::getLedIndexesByRegion(region))
+  for(const auto &idx : getLedIndexesByRegion(region))
   {
     state.Idx = idx;
     // state.IsAlarmed = ledsState[idx].IsAlarmed;

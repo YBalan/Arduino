@@ -84,7 +84,7 @@ class WiFiOps
       _lastPlace++;
       return *this;
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length) 
+    WiFiOps &AddParameter(const String &name, const String &label,const String &json, const String &defaultValue, const uint8_t &length) 
     {
       WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, _lastPlace);
@@ -92,7 +92,7 @@ class WiFiOps
       _lastPlace++;
       return *this;      
     }
-    WiFiOps &AddParameter(const char *const name, const char *const label, const char *const json, const char *const defaultValue, const uint8_t &length, const uint8_t &place)
+    WiFiOps &AddParameter(const String &name, const String &label, const String &json, const String &defaultValue, const uint8_t &length, const uint8_t &place)
     {
       WIFI_TRACE(F("AddParameter..."));
       WiFiParameter p(name, label, json, defaultValue, length, place);
@@ -107,7 +107,7 @@ class WiFiOps
     }
 
   public:
-    void ClearFSSettings()
+    void FormatFS()
     {
       //clean FS, for testing
       SPIFFS.format();
@@ -186,7 +186,9 @@ class WiFiOps
       /*WiFi.enableInsecureWEP();
       WiFi.encryptionType(int networkItem);*/
 
-      if (!wifiManager.autoConnect((_APName + (_addMacToAPName ? "_" + mac : "")).c_str(), _APPass.c_str())) {
+      const String apName = (_APName + (_addMacToAPName ? "_" + mac : ""));
+      WIFI_INFO(F("Autoconnect: "), apName);
+      if (!wifiManager.autoConnect(apName.c_str(), _APPass.c_str())) {
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
@@ -203,8 +205,9 @@ class WiFiOps
       SaveFSSettings(_parameters);
 
       WIFI_TRACE(F("The values in the file are: "));
-      for(const auto &p : _parameters)
+      for(uint8_t pIdx = 0; pIdx < _parameters.Count();  pIdx++)
       {
+        const auto &p = _parameters.GetAt(pIdx);
         WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
       }
 
@@ -219,7 +222,7 @@ class WiFiOps
     //save the custom parameters to FS
     void SaveFSSettings(WiFiParameters &parametersToSave)
     {  
-      WIFI_TRACE(F("Save Settings..."));
+      WIFI_TRACE(F("Save WiFi Settings..."));
       if (WiFiManagerCallBacks::_shouldSaveConfig) {
         WIFI_TRACE(F("saving config"));
     #if defined(ARDUINOJSON_VERSION_MAJOR) && ARDUINOJSON_VERSION_MAJOR >= 6
@@ -258,11 +261,11 @@ class WiFiOps
     //read configuration from FS json
     void LoadFSSettings(WiFiParameters &parametersToLoad)
     { 
-      WIFI_TRACE(F("Load Settings..."));
-      WIFI_TRACE(F("mounting FS..."));
+      WIFI_TRACE(F("Load WiFi Settings..."));
+      WIFI_TRACE(F("Mounting FS..."));
 
       if (SPIFFS.begin()) {
-        WIFI_TRACE(F("mounted file system"));
+        WIFI_TRACE(F("File system mounted"));
         if (SPIFFS.exists("/config.json")) {
           //file exists, reading and loading
           WIFI_TRACE(F("reading config file"));
@@ -310,7 +313,7 @@ class WiFiOps
           }
         }
       } else {
-        WIFI_TRACE(F("failed to mount FS"));
+        WIFI_TRACE(F("Failed to mount FS"));
       }
       //end read
     }

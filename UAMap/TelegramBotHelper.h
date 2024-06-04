@@ -92,7 +92,7 @@ void HangleBotMessages(FB_msg& msg)
   bool isGroup = msg.chatID.startsWith("-");
   if(
     (!isGroup) //In private chat
-    || (msg.text == F("/nstat") || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
+    || (msg.text == F("/nstat") || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || (msg.replyText.indexOf(_botSettings.botName) == 0 && msg.replyText.indexOf(REGISTRATION_MSG, botNameIdx + _botSettings.botName.length()) > 0) //In registration
     || (msg.data.length() > 0 && msg.text.indexOf(_botSettings.botNameForMenu) >= 0) //From BOT inline menu
@@ -151,7 +151,7 @@ void HangleBotMessages(FB_msg& msg)
     
     //REGISTRATION
     {      
-      if(msg.text.indexOf(F("/register")) >= 0)
+      if(msg.text.indexOf(F("/register")) >= 0 || msg.text.indexOf(F("/start")) >= 0 )
       {
         BOT_TRACE(F("Start registration: "), msg.chatID);
         bot->replyMessage(_botSettings.botName + F(" ") + REGISTRATION_MSG, msg.messageID, msg.chatID);      
@@ -164,12 +164,12 @@ void HangleBotMessages(FB_msg& msg)
           _botSettings.toStore.registeredChannelIDs[msg.chatID] = 1;
           SaveChannelIDs();
           BOT_TRACE(F("Registration succeed: "), msg.chatID);
-          bot->replyMessage(F("Registration succeed: ") + msg.username, msg.messageID, msg.chatID);
+          bot->replyMessage(String(F("Registration succeed: ")) + msg.username, msg.messageID, msg.chatID);
         }
         else
         {
           BOT_TRACE(F("Registration failed: "), msg.chatID);
-          bot->replyMessage(F("Registration failed: ") + msg.username, msg.messageID, msg.chatID);
+          bot->replyMessage(String(F("Registration failed: ")) + msg.username, msg.messageID, msg.chatID);
         }
       }
     }    
@@ -196,7 +196,11 @@ void SaveChannelIDs()
     for(const auto &v : _botSettings.toStore.registeredChannelIDs)
       store += v.first + ',';
 
+    #ifdef ESP8266
     configFile.write(store.c_str());
+    #else
+    configFile.write((uint8_t*)store.c_str(), store.length());
+    #endif
     configFile.close();
         //end save
   }

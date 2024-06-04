@@ -1,4 +1,3 @@
-#include <memory>
 #pragma once
 #ifndef ALARMS_API_H
 #define ALARMS_API_H
@@ -11,10 +10,25 @@
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
+#ifdef ESP8266
+#include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#ifndef FB_NO_OTA
+#include <ESP8266httpUpdate.h>
+#endif
+#include <WiFiClientSecure.h>
 #include <WiFiClientSecureBearSSL.h>
+#else   // ESP32
+#include <WiFi.h>
+#include <HTTPClient.h>
+#ifndef FB_NO_OTA
+#include <HTTPUpdate.h>
+#endif
+#include <WiFiClientSecure.h>
+#endif
 
 #include "DEBUGHelper.h"
+#include "Config.h"
 
 #ifdef ENABLE_INFO_ALARMS
 #define ALARMS_INFO(...) SS_TRACE("[ALARMS API INFO] ", __VA_ARGS__)
@@ -34,37 +48,6 @@
 
 #define ALARMS_API_IOT_BASE_URI "https://api.alerts.in.ua/"
 #define ALARMS_API_IOT_ALERTS "v1/iot/active_air_raid_alerts_by_oblast.json"
-
-enum UARegion : uint8_t
-{
-  Khmelnitska = 3,
-  Vinnytska = 4,
-  Rivnenska = 5,
-  Volynska = 8,
-  Dnipropetrovska = 9,
-  Zhytomyrska = 10,
-  Zakarpatska = 11,
-  Zaporizka = 12,
-  Ivano_Frankivska = 13,
-  Kyivska = 14,
-  Kirovohradska = 15,
-  Luhanska = 16,
-  Mykolaivska = 17,
-  Odeska = 18,
-  Poltavska = 19,
-  Sumska = 20,
-  Ternopilska =21,
-  Kharkivska = 22,
-  Khersonska = 23,
-  Cherkaska = 24,
-  Chernihivska = 25,
-  Chernivetska = 26,
-  Lvivska = 27,
-  Donetska = 28,
-  Crimea = 29,
-  Sevastopol = 30,
-  Kyiv = 31,  
-};
 
 enum ApiAlarmStatus : uint8_t
 {
@@ -94,40 +77,6 @@ enum ApiStatusCode
 #define MAX_REGIONS_COUNT 27
 typedef RegionInfo IotApiRegions[MAX_REGIONS_COUNT];
 //typedef std::array<RegionInfo, MAX_REGIONS_COUNT> IotApiRegions;
-
-
-#define MAX_LEDS_FOR_REGION 2
-typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
-typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
-AlarmsLedIndexesMap alarmsLedIndexesMap =
-{
-  { UARegion::Crimea,               {0} },
-  { UARegion::Khersonska,           {1} },
-  { UARegion::Zaporizka,            {2} },
-  { UARegion::Donetska,             {3} },
-  { UARegion::Luhanska,             {4} },
-  { UARegion::Kharkivska,           {5} },
-  { UARegion::Dnipropetrovska,      {6} },
-  { UARegion::Mykolaivska,          {7} },
-  { UARegion::Odeska,               {8, 9} },
-  { UARegion::Kirovohradska,        {10} },  
-  { UARegion::Poltavska,            {11} },
-  { UARegion::Sumska,               {12} },
-  { UARegion::Chernihivska,         {13} },  
-  { UARegion::Kyivska,              {14} },  
-  //{ UARegion::Kyiv,                 {14} },
-  { UARegion::Cherkaska,            {15} },
-  { UARegion::Vinnytska,            {16} },  
-  { UARegion::Zhytomyrska,          {17} },
-  { UARegion::Rivnenska,            {18} },  
-  { UARegion::Khmelnitska,          {19} },  
-  { UARegion::Chernivetska,         {20} },
-  { UARegion::Ivano_Frankivska,     {21} },
-  { UARegion::Ternopilska,          {22} }, 
-  { UARegion::Volynska,             {23} },
-  { UARegion::Lvivska,              {24} },  
-  { UARegion::Zakarpatska,          {25} },
-};
 
 class AlarmsApi
 {  
@@ -196,15 +145,15 @@ IotApiRegions iotApiRegions =
 };
 #endif 
   public: 
-  // Iterator to the beginning of the custom vector
-    const auto &begin() const {
-        return std::begin(iotApiRegions);
-    }
+  // // Iterator to the beginning of the custom vector
+  //   const auto &begin() const {
+  //       return std::begin(iotApiRegions);
+  //   }
 
-    // Iterator to the end of the custom vector
-    const auto &end() const {
-        return std::end(iotApiRegions);
-    }
+  //   // Iterator to the end of the custom vector
+  //   const auto &end() const {
+  //       return std::end(iotApiRegions);
+  //   }
 
     const String GetRegionNameById(const UARegion &id)
     {
@@ -224,11 +173,8 @@ IotApiRegions iotApiRegions =
       }
       return nullptr;
     }
-  private:
-    //std::unique_ptr<BearSSL::WiFiClientSecure> client;    
-    std::unique_ptr<HTTPClient> https2;
-    //create an HTTPClient instance
-    //HTTPClient https;
+  private:    
+    std::unique_ptr<HTTPClient> https2;    
     String lastActionIndex;
     String _apiKey;
     String _uriBase;
@@ -287,16 +233,11 @@ IotApiRegions iotApiRegions =
     const std::vector<RegionInfo *> getAlarmedRegions2(int &status, String &statusMsg, const String &resource = ALARMS_API_IOT_ALERTS)
     {
       std::vector<RegionInfo *> res;
-      status = ApiStatusCode::UNKNOWN;
-      //HTTPClient https2;
-      //BearSSL::WiFiClientSecure client2;    
-      BearSSL::WiFiClientSecure client;  
+      status = ApiStatusCode::UNKNOWN;    
 
-      https2->setTimeout(HTTP_TIMEOUT);
-      client.setTimeout(HTTP_TIMEOUT);
-      //client.setConnectTimeout(HTTP_TIMEOUT);
-      
-      client.setInsecure();
+      #ifdef HTTP_TIMEOUT
+      https2->setTimeout(HTTP_TIMEOUT);            
+      #endif
       // https2->useHTTP10(true);
       https2->setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
       
@@ -304,10 +245,22 @@ IotApiRegions iotApiRegions =
 
       ALARMS_TRACE(F("[HTTPS2] begin: "), uri);   
       ALARMS_TRACE(F("[HTTPS2] apiKey: "), _apiKey); 
+
+      #ifdef ESP8266      
+      BearSSL::WiFiClientSecure client;
+      client.setInsecure();
+      #ifdef HTTP_TIMEOUT
+      client.setTimeout(HTTP_TIMEOUT);    
+      #endif  
       if (https2->begin(client, uri)) 
+      #else
+      if(https2->begin(uri))
+      #endif
       { // HTTPS    
 
+        #ifdef HTTP_TIMEOUT
         https2->setTimeout(HTTP_TIMEOUT);
+        #endif
 
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
@@ -325,7 +278,7 @@ IotApiRegions iotApiRegions =
           { 
             status = ApiStatusCode::API_OK;          
             ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
-            ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());
+            ALARMS_TRACE(F("STACK: "), ESPgetFreeContStack);
 
             if(resource.endsWith(".json"))
             {
@@ -360,7 +313,168 @@ IotApiRegions iotApiRegions =
             }
             else
             {
-              // ALARMS_TRACE("[HTTPS2] Official API");
+              ParseHugeJson();
+            }                 
+          }          
+        }
+
+        ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
+        ALARMS_TRACE(F("STACK: "), ESPgetFreeContStack);     
+
+        HandleErrors(httpCode, status, statusMsg);
+
+        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
+        
+        https2->end();
+           
+        return std::move(res);
+        
+      }
+      else 
+      {
+        status = ApiStatusCode::UNKNOWN;
+        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
+        statusMsg = F("Unknown");
+        return std::move(res);
+      }      
+    }
+
+    void HandleErrors(const int& httpCode, int& status, String &statusMsg)
+    {
+      status = httpCode;
+      switch(httpCode)
+      {
+        case ApiStatusCode::API_OK:
+          //ALARMS_TRACE("[HTTPS2] GET: OK");
+          statusMsg = String(F("OK")) + F("(") + httpCode + F(")");
+          break;
+        // ------------------- CODES
+        case HTTP_CODE_UNAUTHORIZED: //401
+          statusMsg = String(F("Unauthorized")) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::WRONG_API_KEY;
+          break;
+        case HTTP_CODE_TOO_MANY_REQUESTS: //429
+          statusMsg = String(F("To Many Requests")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_NOT_MODIFIED: //304
+          statusMsg = String(F("Not Modified")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_FORBIDDEN: //403
+          statusMsg = String(F("Forbidden. Possible token blocked")) + F("(") + httpCode + F(")");
+          break;
+        case HTTP_CODE_METHOD_NOT_ALLOWED: //405
+          statusMsg = String(F("Method not allowed")) + F("(") + httpCode + F(")");
+          break;          
+        case HTTP_CODE_BAD_GATEWAY: //502
+          statusMsg = String(F("Bad gateway")) + F("(") + httpCode + F(")");
+          break;
+        // ------------------- ERRORS
+        case HTTPC_ERROR_READ_TIMEOUT:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::READ_TIMEOUT;
+          break;  
+        #ifdef ESP8266     
+        case HTTPC_ERROR_CONNECTION_FAILED:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::NO_CONNECTION;
+          break;
+        #else
+        case HTTPC_ERROR_CONNECTION_REFUSED:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          status = ApiStatusCode::NO_CONNECTION;
+          break;        
+        #endif
+        case 521:
+          statusMsg = String(F("Server-side problem")) + F("(") + httpCode + F(")");
+          //status = ApiStatusCode::NO_CONNECTION;
+        break;
+        // ------------------- CUSTOM ERRORS
+        case ApiStatusCode::JSON_ERROR:
+          status = ApiStatusCode::JSON_ERROR;
+          //statusMsg = "Json error";            
+          break;        
+        default:
+          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
+          break;
+      }
+    }
+
+    const String sendRequest(const String& resource, const String &apiKey, int &status, String &statusMsg, const bool &closeHttp = true)
+    {
+      status = ApiStatusCode::UNKNOWN; 
+
+      #ifdef HTTP_TIMEOUT  
+      https2->setTimeout(HTTP_TIMEOUT);
+      #endif
+      //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+
+      const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
+
+      ALARMS_TRACE(F("[HTTPS] begin: "), uri);   
+      ALARMS_TRACE(F("[HTTPS] apiKey: "), apiKey); 
+
+      #ifdef ESP8266     
+      BearSSL::WiFiClientSecure client;
+      client.setInsecure();
+      #ifdef HTTP_TIMEOUT
+      client.setTimeout(HTTP_TIMEOUT);      
+      #endif
+      if (https2->begin(client, uri)) 
+      #else
+      if(https2->begin(uri))
+      #endif
+      {  // HTTPS
+        #ifdef HTTP_TIMEOUT
+        https2->setTimeout(HTTP_TIMEOUT);
+        #endif
+        String payload;
+        https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + apiKey);        
+        https2->addHeader("Accept", "application/json");      
+
+        ALARMS_TRACE("[HTTPS] REQ GET: ", resource);
+        // start connection and send HTTP header
+        int httpCode = https2->GET();
+        // httpCode will be negative on error
+        if (httpCode > 0) 
+        {
+          // HTTP header has been send and Server response header has been handled
+          ALARMS_TRACE(F("[HTTPS] RES GET: "), uri, "... code: ", httpCode);
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
+          {
+            ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
+            ALARMS_TRACE(F("STACK: "), ESPgetFreeContStack);
+            status = ApiStatusCode::API_OK;
+            payload = https2->getString();  
+
+            ALARMS_TRACE(F("[HTTPS] content-length: "), https2->getSize());          
+            //ALARMS_TRACE(F("[HTTPS] content: "), payload);
+           
+            //return "Ok";
+          }          
+        }
+
+        HandleErrors(httpCode, status, statusMsg);
+
+        if(closeHttp)
+          https2->end();
+
+        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
+
+        return std::move(payload);
+
+      } else 
+      {
+        status = ApiStatusCode::UNKNOWN;
+        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
+        statusMsg = "Unknown";
+        return std::move(F("[HTTPS] Unable to connect"));
+      }      
+    }   
+
+    void ParseHugeJson()
+    {
+      // ALARMS_TRACE("[HTTPS2] Official API");
 
               // ALARMS_TRACE("[HTTPS2] Full Json content: "); //https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/
               // ReadLoggingStream loggingStream(https2->getStream(), Serial);        
@@ -406,168 +520,10 @@ IotApiRegions iotApiRegions =
               // }
               // ALARMS_TRACE(F("[HTTPS2] End Parse Json content: "), deserializeError.c_str());   
               // https2->end();           
-            }                 
-          }          
-        }
-
-        ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
-        ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());     
-
-        HandleErrors(httpCode, status, statusMsg);
-
-        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
-        
-        https2->end();
-           
-        return std::move(res);
-        
-      }
-      else 
-      {
-        status = ApiStatusCode::UNKNOWN;
-        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
-        statusMsg = F("Unknown");
-        return std::move(res);
-      }      
-    }
-
-    void HandleErrors(const int& httpCode, int& status, String &statusMsg)
-    {
-      status = httpCode;
-      switch(httpCode)
-      {
-        case ApiStatusCode::API_OK:
-          //ALARMS_TRACE("[HTTPS2] GET: OK");
-          statusMsg = String(F("OK")) + F("(") + httpCode + F(")");
-          break;
-        // ------------------- CODES
-        case HTTP_CODE_UNAUTHORIZED: //401
-          statusMsg = String(F("Unauthorized")) + F("(") + httpCode + F(")");
-          status = ApiStatusCode::WRONG_API_KEY;
-          break;
-        case HTTP_CODE_TOO_MANY_REQUESTS: //429
-          statusMsg = String(F("To Many Requests")) + F("(") + httpCode + F(")");
-          break;
-        case HTTP_CODE_NOT_MODIFIED: //304
-          statusMsg = String(F("Not Modified")) + F("(") + httpCode + F(")");
-          break;
-        case HTTP_CODE_FORBIDDEN: //403
-          statusMsg = String(F("Forbidden. Possible token blocked")) + F("(") + httpCode + F(")");
-          break;
-        case HTTP_CODE_METHOD_NOT_ALLOWED: //405
-          statusMsg = String(F("Method not allowed")) + F("(") + httpCode + F(")");
-          break;
-        // ------------------- ERRORS
-        case HTTPC_ERROR_READ_TIMEOUT:
-          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
-          status = ApiStatusCode::READ_TIMEOUT;
-          break;       
-        case HTTPC_ERROR_CONNECTION_FAILED:
-          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
-          status = ApiStatusCode::NO_CONNECTION;
-          break;
-        // ------------------- CUSTOM ERRORS
-        case ApiStatusCode::JSON_ERROR:
-          status = ApiStatusCode::JSON_ERROR;
-          //statusMsg = "Json error";            
-          break;        
-        default:
-          statusMsg = String(https2->errorToString(httpCode)) + F("(") + httpCode + F(")");
-          break;
-      }
-    }
-
-    const String sendRequest(const String& resource, const String &apiKey, int &status, String &statusMsg, const bool &closeHttp = true)
-    {
-      status = ApiStatusCode::UNKNOWN;
-      BearSSL::WiFiClientSecure client;  
-      // Ignore SSL certificate validation
-      client.setInsecure();
-      
-      //HTTPClient https;
-      https2->setTimeout(HTTP_TIMEOUT);
-      //https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-
-      const auto uri = (_uriBase.endsWith("/") ? _uriBase : _uriBase + '/') + resource;
-
-      ALARMS_TRACE(F("[HTTPS] begin: "), uri);   
-      ALARMS_TRACE(F("[HTTPS] apiKey: "), apiKey); 
-      if (https2->begin(client, uri)) 
-      {  // HTTPS
-
-        https2->setTimeout(HTTP_TIMEOUT);
-        String payload;
-        https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + apiKey);        
-        https2->addHeader("Accept", "application/json");      
-
-        ALARMS_TRACE("[HTTPS] REQ GET: ", resource);
-        // start connection and send HTTP header
-        int httpCode = https2->GET();
-        // httpCode will be negative on error
-        if (httpCode > 0) 
-        {
-          // HTTP header has been send and Server response header has been handled
-          ALARMS_TRACE(F("[HTTPS] RES GET: "), uri, "... code: ", httpCode);
-          // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NOT_MODIFIED) 
-          {
-            ALARMS_TRACE(F(" HEAP: "), ESP.getFreeHeap());
-            ALARMS_TRACE(F("STACK: "), ESP.getFreeContStack());
-            status = ApiStatusCode::API_OK;
-            payload = https2->getString();  
-
-            ALARMS_TRACE(F("[HTTPS] content-length: "), https2->getSize());          
-            //ALARMS_TRACE(F("[HTTPS] content: "), payload);
-           
-            //return "Ok";
-          }          
-        }
-
-        HandleErrors(httpCode, status, statusMsg);
-
-        if(closeHttp)
-          https2->end();
-
-        ALARMS_TRACE(F("[HTTPS2] GET: "), resource, F("... status message: "), statusMsg);
-
-        return std::move(payload);
-
-      } else 
-      {
-        status = ApiStatusCode::UNKNOWN;
-        ALARMS_TRACE(F("[HTTPS] Unable to connect"));
-        statusMsg = "Unknown";
-        return std::move(F("[HTTPS] Unable to connect"));
-      }      
     }   
-
-    public:    
-    static const std::vector<uint8_t> getLedIndexesByRegionId(const uint16_t &regionId)
-    {       
-      auto region = (UARegion)(regionId == 9999 ? (uint16_t)UARegion::Crimea : regionId);
-
-      return getLedIndexesByRegion(region);
-    }   
-
-    static const std::vector<uint8_t> getLedIndexesByRegion(const UARegion &region) 
-    {
-      std::vector<uint8_t> res;
-      ALARMS_INFO(F("LED Map Count: "), alarmsLedIndexesMap.size());
-
-      if(alarmsLedIndexesMap.count(region) > 0)
-      {
-        const auto &ledRange = alarmsLedIndexesMap[region];        
-        for(uint8_t i = 0; i < ledRange.size(); i++)
-        {
-          if(i == 0 || ledRange[i] > 0)
-          {
-            res.push_back(ledRange[i]);
-            ALARMS_INFO(F(" Region: "), (uint8_t)region, F(" mapped to idx: "), ledRange[i]);      
-          }
-        }        
-      }
-      return std::move(res);
-    }
+    
 };
+
+std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 
 #endif //ALARMS_API_H

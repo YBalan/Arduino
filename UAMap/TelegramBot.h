@@ -68,11 +68,16 @@ class TelegramBot : public FastBot
             StreamString sstring;
             if (!ovfFlag && sstring.reserve(size + 1)) {    // не переполнен и хватает памяти
                 _http->writeToStream(&sstring);             // копируем
-                _http->end();                               // завершаем
-                return parseMessages(sstring);              // парсим
+                _http->end();  
+                status = parseMessages(sstring);
+                #ifdef ESP32
+                BOT_TRACE(F("Bot Status: "), status, F(" msg: "), sstring);                             // завершаем
+                #endif
+                return  status;             // парсим
             } else status = 2;                              // переполнение
         } else status = 3;                                  // пустой ответ        
         _http->end();
+        BOT_TRACE(F("Bot Status: "), status);
         return status;
     }
 };
