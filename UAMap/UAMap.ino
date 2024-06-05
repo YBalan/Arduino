@@ -3,15 +3,15 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.28")
+  #define VER F("1.29")
 #else //ESP32
-  #define VER F("1.33")
+  #define VER F("1.34")
 #endif
 
 #define AVOID_FLICKERING
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -96,7 +96,7 @@
 
 #include <map>
 #include <set>
-#include <ezButton.h>
+//#include <ezButton.h>
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -109,6 +109,9 @@
 #include "Prapors.h"
 #include "PMonitor.h"
 #include "TBotMenu.h"
+
+#define LONG_PRESS_VALUE_MS 1000
+#include "Button.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -134,7 +137,7 @@ typedef std::map<uint8_t, RegionInfo*> LedIndexMappedToRegionInfo;
 LedIndexMappedToRegionInfo alarmedLedIdx;
 std::map<uint8_t, LedState> ledsState;
 
-ezButton resetBtn(PIN_RESET_BTN);
+Button resetBtn(PIN_RESET_BTN);
 
 void setup() {
   // put your setup code here, to run once:
@@ -243,46 +246,80 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
   FastLEDShow(1000);    
 }
 
-void loop() 
+void HandleButton(const uint32_t &currentTicks)
 {
-  static bool firstRun = true;
-  static uint32_t currentTicks = millis();
-  currentTicks = millis();
-
   resetBtn.loop();
 
   if(resetBtn.isPressed())
   {
-    INFO(BUTTON_IS_PRESSED_MSG, F(" BR: "), _settings.Brightness);
+    TRACE(BUTTON_IS_PRESSED_MSG, F(" BR: "), _settings.Brightness);
   }
   if(resetBtn.isReleased())
   {    
-    static bool brBtnChangeDirectionUp = false;
-    auto nextBr = _settings.Brightness + (brBtnChangeDirectionUp ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP);
-    if(nextBr < 0)
+    if(resetBtn.isLongPress())
     {
-      nextBr = 1;
-      brBtnChangeDirectionUp = true;
+      TRACE(BUTTON_IS_LONGPRESSED_MSG, F(" BR: "), _settings.Brightness, F("\t"), LONG_PRESS_VALUE_MS, F("ms..."));
+      resetBtn.resetTicks();
+      if(_settings.NotAlarmedColor == CRGB::Blue)
+      {
+        SetYellowColorSchema();
+      }else
+      if(_settings.NotAlarmedColor == CRGB::Yellow)
+      {
+        SetWhiteColorSchema();
+      }
+      else
+      {
+        SetBlueDefaultColorSchema();
+      }
+      SaveSettings();
     }else
-    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
     {
-      nextBr = 2;
-    }else
-    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
-    {
-      nextBr = BRIGHTNESS_STEP;
-    }else
-    if(nextBr > 255)
-    {
-      nextBr = 255;
-      brBtnChangeDirectionUp = false;
-    }
+      static bool brBtnChangeDirectionUp = false;
+      auto nextBr = _settings.Brightness + (brBtnChangeDirectionUp ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP);
+      if(nextBr <= 0)
+      {
+        nextBr = 1;
+        brBtnChangeDirectionUp = true;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
+      {
+        nextBr = 2;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
+      {
+        nextBr = 5;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 5)
+      {
+        nextBr = 10;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 10)
+      {
+        nextBr = BRIGHTNESS_STEP;
+      }else
+      if(nextBr > 255)
+      {
+        nextBr = 255;
+        brBtnChangeDirectionUp = false;
+      }
 
-    _settings.Brightness = nextBr;
+      _settings.Brightness = nextBr;
 
-    INFO(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
-    SetBrightness();    
+      TRACE(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
+      SetBrightness();   
+      SaveSettings();
+    } 
   }  
+}
+
+void loop() 
+{
+  static bool firstRun = true;
+  static uint32_t currentTicks = millis();
+  currentTicks = millis();  
+
+  HandleButton(currentTicks);
 
   HandleEffects(currentTicks);
 
@@ -1213,4 +1250,28 @@ void SetRegionState(const UARegion &region, LedState &state)
     // state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
     ledsState[idx] = state;
   }
+}
+
+void SetWhiteColorSchema()
+{
+  TRACE(F("Color Schema: "), F("White"));
+  _settings.AlarmedColor = CRGB::Red;
+  _settings.NotAlarmedColor = CRGB::White;
+  _settings.PartialAlarmedColor = CRGB::Yellow;
+}
+
+void SetBlueDefaultColorSchema()
+{
+  TRACE(F("Color Schema: "), F("Blue"));
+  _settings.AlarmedColor = LED_ALARMED_COLOR;
+  _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
+  _settings.PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
+}
+
+void SetYellowColorSchema()
+{
+  TRACE(F("Color Schema: "), F("Yellow"));
+  _settings.AlarmedColor = CRGB::Red;
+  _settings.NotAlarmedColor = CRGB::Yellow;
+  _settings.PartialAlarmedColor = CRGB::Orange;
 }

@@ -50,8 +50,9 @@ enum ExtMode : uint8_t
 
 enum ColorSchema : uint8_t
 {
-  Dark,
-  Light,
+  Blue,
+  White,
+  Yellow,
 };
 
 namespace UAMap

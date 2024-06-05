@@ -150,6 +150,9 @@ const String GetPMMenu(const float &voltage, const String &chatId, const float& 
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
+void SetWhiteColorSchema();
+void SetBlueDefaultColorSchema();
+void SetYellowColorSchema();
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -248,11 +251,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     #ifdef USE_BOT_INLINE_MENU
       BOT_MENU_INFO(F("Inline Menu"));
       #ifdef USE_BUZZER
-      static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
+      static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
       #else
-      static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Dark \t Light \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
+      static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
       #endif
 
       ESPresetHeap;
@@ -640,25 +643,26 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     uint8_t schema = value.toInt();
     switch(schema)
     {
-      case ColorSchema::Light:
-        _settings.AlarmedColor = CRGB::Red;
-        _settings.NotAlarmedColor = CRGB::White;
-        _settings.PartialAlarmedColor = CRGB::Yellow;
-        value = String(F("Light"));
+      case ColorSchema::White:
+        SetWhiteColorSchema();
+        //value = String(F("White"));
       break;
-      case ColorSchema::Dark: 
+      case ColorSchema::Yellow:
+        SetYellowColorSchema();
+        //value = String(F("Yellow"));
+      break;
+      case ColorSchema::Blue: 
       default:
-        _settings.AlarmedColor = LED_ALARMED_COLOR;
-        _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
-        _settings.PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
-        value = String(F("Dark"));
+        SetBlueDefaultColorSchema();
+        //value = String(F("Blue"));
       break;
     }
 
     SetAlarmedLED();
     SetBrightness();
 
-    value = String(F("Color Schema: ")) + value;
+    //value = String(F("Color Schema: ")) + value;
+    value.clear();
     answerCurrentAlarms = false;
   }else
   if(GetCommandValue(BOT_COMMAND_PLAY, filtered, value))
