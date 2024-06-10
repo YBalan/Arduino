@@ -42,9 +42,12 @@ modesouvenir - Souvenir Mode
 modesouvenir0 - Souvenir Mode UA Prapor
 modesouvenir2 - Souvenir Mode BG Prapor
 modesouvenir3 - Souvenir Mode MD Prapor
+fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
+palette - Palette of Known RGB backcolors
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
+notify0 - Notifications Off
 notify1 - Notify All http code result
 notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)
@@ -110,6 +113,7 @@ play - Play tones 500,800
 #define BOT_COMMAND_MODESOUVENIR F("/modesouvenir")
 #define BOT_COMMAND_FS F("/fs")
 #define BOT_COMMAND_FILLRGB F("/fillrgb")
+#define BOT_COMMAND_PALETTE F("/palette")
 
 //Fast Menu
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
@@ -134,7 +138,6 @@ const float GetLEDVoltageFactor();
 
 #ifdef USE_NOTIFY
 #define BOT_COMMAND_NOTIFY F("/notify")
-String notifyChatId;
 #endif
 
 void SetBrightness();
@@ -143,7 +146,7 @@ const int GetAlarmedLedIdxSize();
 void SetAlarmedLedRegionInfo(const int &regionId, RegionInfo *const regionPtr);
 void SetRegionState(const UARegion &region, LedState &state);
 void SetRelayStatus();
-void PrintNetworkStatistic(String &str);
+void PrintNetworkStatistic(String &str, const int& codeFilter);
 void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID);
 const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID);
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
@@ -281,7 +284,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_NOTIFY, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
-    notifyChatId = msg.chatID;
+    _settingsExt.setNotifyChatId(msg.chatID);
     if(value.length() > 0)
     {
       bool negate = value.startsWith(F("not"));
@@ -289,9 +292,10 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       int newValue = negate ? -value.toInt() : value.toInt();
       _settings.notifyHttpCode = newValue;
       SaveSettings();
+      SaveSettingsExt();
     }
-    value = String(F("NotifyHttpCode: ")) + String(_settings.notifyHttpCode);
-    BOT_MENU_TRACE(value);
+    value = String(F("NotifyHttpCode: ")) + String(_settings.notifyHttpCode) + F(" ChatId: ") + msg.chatID;
+    BOT_MENU_TRACE(value);    
   }else
   #endif
   #ifdef USE_POWER_MONITOR
@@ -310,7 +314,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     const String &menu = GetPMMenu(voltage, msg.chatID, led_consumption_voltage_factor);
     const String &call = GetPMMenuCall(voltage, msg.chatID);
-    BOT_MENU_TRACE(F("\t"), menu, F(" -> "), msg.chatID);
+    BOT_MENU_TRACE(F("\t"), menu, F(" ChatId: "), msg.chatID);
 
     bot->inlineMenuCallback(_botSettings.botNameForMenu + PM_MENU_NAME, menu, call, msg.chatID);
     pmChatIds[msg.chatID].MsgID = bot->lastBotMsg(); 
@@ -319,15 +323,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_PMALARM, filtered, value))
   { 
     bot->sendTyping(msg.chatID);    
+    auto &chatIdInfo = pmChatIds[msg.chatID];
     if(value.length() > 0)
-    {
-      auto &chatIdInfo = pmChatIds[msg.chatID];
+    {      
       chatIdInfo.AlarmValue = value.toFloat();      
-      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
-      value = String(F("PM Alarm set: <= ")) + String(chatIdInfo.AlarmValue, 2) + PM_MENU_VOLTAGE_UNIT;
-      BOT_MENU_TRACE(value);
-      noAnswerIfFromMenu = true;
+      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);      
+      //noAnswerIfFromMenu = true;
     }    
+    value = String(F("PM Alarm set: <= ")) + String(chatIdInfo.AlarmValue, 2) + PM_MENU_VOLTAGE_UNIT;
+    BOT_MENU_TRACE(value);
   } else    
   if(GetCommandValue(BOT_COMMAND_PMADJ, filtered, value))
   { 
@@ -531,8 +535,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(F("Token: ")) + api->GetApiKey();
   }else
   if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
-  {
-    PrintNetworkStatistic(value);
+  {    
+    PrintNetworkStatistic(value, value.toInt());
   }else
   if(GetCommandValue(BOT_COMMAND_RSSI, filtered, value))
   {
@@ -672,10 +676,9 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(melodySizeMs) + F("ms...");
   }else
   if(GetCommandValue(BOT_COMMAND_FILLRGB, filtered, value))
-  {
-    BOT_MENU_TRACE(value);
+  {    
     bot->sendTyping(msg.chatID);
-    const auto & tokens = CommonHelper::splitToInt(value, ',');
+    const auto &tokens = CommonHelper::splitToInt(value, ',', '_');    
     if(tokens.size() >= 3)
     {
       _settings.NotAlarmedColor = CRGB(tokens[0], tokens[1], tokens[2]);
@@ -683,6 +686,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       effectStartTicks = millis();
       effectStarted = false;
       SaveSettings();
+      BOT_MENU_TRACE(F("RGB: "), tokens[0], F(" "), tokens[1], F(" "), tokens[2]);
     }
     else
     {
@@ -690,6 +694,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       value = String(F("Wrong RGB: ")) + value;
       BOT_MENU_TRACE(value);
     }
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_PALETTE, filtered, value))
+  {    
+    //#ifdef ESP32
+    bot->sendTyping(msg.chatID);
+    static const String PaletteInlineMenu = F("🔴 \t 🟠 \t 🟡 \t 🟢 \t 🔵 \t 🟣 \t ⚪️");
+    static const String PaletteInlineMenuCall = F("/fillrgb255_0_0, /fillrgb255_153_51 , /fillrgb255_255_50 , /fillrgb0_255_0 , /fillrgb0_0_255, /fillrgb153_51_255 , /fillrgb255_255_255");     
+    
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + F("Palette"), PaletteInlineMenu, PaletteInlineMenuCall, msg.chatID);    
+    //#endif
   }
 
   if(value.length() > 0 && !noAnswerIfFromMenu)

@@ -12,6 +12,7 @@ modesouvenir0 - Souvenir Mode UA Prapor
 modesouvenir2 - Souvenir Mode BG Prapor
 modesouvenir3 - Souvenir Mode MD Prapor
 fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
+palette - Palette of Known RGB backcolors
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1
@@ -48,6 +49,7 @@ fs - File System Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
+notify0 - Notifications Off
 notify1 - Notify All http code result
 notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)

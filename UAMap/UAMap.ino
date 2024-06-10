@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.29")
+  #define VER F("1.30")
 #else //ESP32
-  #define VER F("1.34")
+  #define VER F("1.35")
 #endif
 
 #define AVOID_FLICKERING
@@ -385,8 +385,12 @@ void loop()
             + F(" (") + String(sw) + F("ms") + F(")")
             #endif
             ;
-            TRACE(notifyMessage);
-            bot->sendMessage(notifyMessage, notifyChatId);
+
+            if(strlen(_settingsExt.NotifyChatId) > 0)
+            {
+              TRACE(notifyMessage, F(" ChatId: "), _settingsExt.NotifyChatId);
+              bot->sendMessage(notifyMessage, _settingsExt.NotifyChatId);
+            }
           }
         #endif
       #endif
@@ -827,18 +831,18 @@ void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
   str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
 }
 
-void PrintNetworkStatistic(String &str)
+void PrintNetworkStatistic(String &str, const int& codeFilter)
 {
-  str = F("Network Statistic: ");
+  str = F("NSTAT: ");
   #ifdef NETWORK_STATISTIC  
   if(networkStat.size() > 0)
   {
-    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+    if(networkStat.count(ApiStatusCode::API_OK) > 0 && (codeFilter == 0 || codeFilter == ApiStatusCode::API_OK))
       PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
     for(const auto &de : networkStat)
     {
       const auto &info = de.second;
-      if(info.code != ApiStatusCode::API_OK)
+      if(info.code != ApiStatusCode::API_OK && (codeFilter == 0 || codeFilter == info.code))
         PrintNetworkStatInfo(info, str);
     }
   }

@@ -17,6 +17,7 @@
 #endif
 
 #define MAX_BASE_URI_LENGTH 50
+#define MAX_CHAT_ID_LENGTH  20
 
 uint32_t effectStartTicks = 0;
 bool effectStarted = false;
@@ -116,13 +117,16 @@ namespace UAMap
     public:
     ExtMode Mode;
     ExtSouvenirMode SouvenirMode;
+    char NotifyChatId[MAX_CHAT_ID_LENGTH];
     public:
     void init()
     {
       SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));
       Mode = ExtMode::Alarms;
       SouvenirMode = ExtSouvenirMode::UAPrapor;
+      memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
     }
+    void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
   };
 };
 
@@ -234,6 +238,7 @@ const bool LoadSettingsExt()
   
   SETTINGS_INFO(F("EXT MODE: "), _settingsExt.Mode);  
   SETTINGS_INFO(F("EXT Souvenir MODE: "), _settingsExt.SouvenirMode);
+  SETTINGS_INFO(F("EXT NotifyChatId: "), _settingsExt.NotifyChatId);
  
   if(!res)
   {    
