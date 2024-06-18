@@ -152,7 +152,7 @@ void SetRegionState(const UARegion &region, LedState &state);
 void SetRelayStatus();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const String& chatID);
-const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID);
+const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const uint8_t &relayNumber, const String& chatID);
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
@@ -531,11 +531,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY1, filtered, value))
   {
-    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, msg.chatID);
+    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay1"), F("/relay1"), value, _settings.Relay1Region, 1, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_RELAY2, filtered, value))
   {
-    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, msg.chatID);
+    noAnswerIfFromMenu = !HandleRelayMenu(F("Relay2"), F("/relay2"), value, _settings.Relay2Region, 2, msg.chatID);
   }else
   if(GetCommandValue(BOT_COMMAND_TOKEN, filtered, value))
   {
@@ -761,7 +761,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
-const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const String& chatID)
+static const String GetRegionNameById(const uint8_t &id)
+{
+  return api->GetRegionNameById(id);
+}
+
+const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const uint8_t &relayNumber, const String& chatID)
 {
   if(value == F("menu"))
   {
@@ -783,15 +788,27 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
   {
     if(value.length() > 0)
     {
-      auto regionId = value.toInt();    
+      const auto &regionId = value.toInt();    
       if(regionId == 0 || alarmsLedIndexesMap.count((UARegion)regionId) > 0)
       {
         relaySetting = regionId;
+        relayNumber == 1 
+          ? SetRelay1(regionId) 
+          : SetRelay2(regionId);
+        
         SaveSettings();
+        SaveSettingsRelayExt();
       }
     }
-    value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting)) + F(" (") + BOT_COMMAND_TEST + String(relaySetting) + F(")");
-    BOT_MENU_TRACE(F("Bot answer: "), value);
+    #ifndef USE_RELAY_EXT
+      value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : api->GetRegionNameById((UARegion)relaySetting)) + F(" (") + BOT_COMMAND_TEST + String(relaySetting) + F(")");
+    #else
+      value = relayName + F(": ") + (relaySetting == 0 ? F("Off") : (relayNumber == 1 ? GetRelay1Str(GetRegionNameById) : GetRelay2Str(GetRegionNameById))) 
+          + F(" (") + BOT_COMMAND_TEST + String(relaySetting) + F(")");    
+      BOT_MENU_TRACE(GetRelay1Str(nullptr));
+      BOT_MENU_TRACE(GetRelay2Str(nullptr));
+    #endif
+    BOT_MENU_TRACE(value);       
     return true;
   }
 }

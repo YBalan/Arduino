@@ -164,6 +164,12 @@ IotApiRegions iotApiRegions =
       }
       return F("");
     }
+
+    const String GetRegionNameById(const uint8_t &id)
+    {
+      return GetRegionNameById((UARegion)id);
+    }
+
     RegionInfo* const GetRegionById(const UARegion &id)
     {
       for(auto &r : iotApiRegions)
@@ -524,6 +530,6 @@ IotApiRegions iotApiRegions =
     
 };
 
-std::unique_ptr<AlarmsApi> api(new AlarmsApi());
+static std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 
 #endif //ALARMS_API_H
