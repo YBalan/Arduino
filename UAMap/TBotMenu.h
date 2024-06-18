@@ -37,13 +37,6 @@ rssi - WiFi Quality rssi db
 test - test by regionId
 ver - Version Info
 fs - File System Info
-modealarms - Alarms Mode
-modesouvenir - Souvenir Mode
-modesouvenir0 - Souvenir Mode UA Prapor
-modesouvenir2 - Souvenir Mode BG Prapor
-modesouvenir3 - Souvenir Mode MD Prapor
-fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
-palette - Palette of Known RGB backcolors
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
@@ -67,6 +60,16 @@ br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
 br1 - Min brightness only alarmed visible
+modealarms - Current Mode
+modealarms0 - Alarms Mode
+modealarms1 - Souvenir Mode UAPrapor
+modealarms2 - Alarms Only Custom Regions Mode
+modesouvenir - Current Souvenir Mode
+modesouvenir0 - Souvenir Mode UA Prapor
+modesouvenir2 - Souvenir Mode BG Prapor
+modesouvenir3 - Souvenir Mode MD Prapor
+fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
+palette - Palette of Known RGB backcolors
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1
@@ -77,8 +80,9 @@ buzztime - Current buzzer time in milliseconds
 buzztime3000 - Set buzzer time to 3secs
 buzztime0 - Switch off buzzer
 schema - Current Color schema
-schema0 - Set Color schema to Dark
-schema1 - Set Color schema to Light
+schema0 - Set Color schema to Blue
+schema1 - Set Color schema to White
+schema2 - Set Color schema to Yellow
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
 play - Play tones 500,800
@@ -214,36 +218,34 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
   if(GetCommandValue(BOT_COMMAND_MODEALARMS, filtered, value))
   {
-    bot->sendTyping(msg.chatID); 
-    _settingsExt.Mode = ExtMode::Alarms;
-    value = String(F("Ext mode: ")) + String(_settingsExt.Mode);
-    SaveSettingsExt();
+    bot->sendTyping(msg.chatID);    
+    if(value.length() > 0)
+    {
+      const auto &newMode = value.toInt(); 
+      if(newMode >= 0 && newMode < (uint8_t)ExtMode::MAX)  
+      { 
+        _settingsExt.Mode = (ExtMode)newMode;
+        SaveSettingsExt();
+      }
+    }
+    value = String(F("Mode: ")) + GetExtModeStr(_settingsExt.Mode);    
     effectStarted = false;
     _effect = Effect::Normal;
   }else
   if(GetCommandValue(BOT_COMMAND_MODESOUVENIR, filtered, value))
   {
-    bot->sendTyping(msg.chatID); 
-    //if(value.length() > 0)
+    bot->sendTyping(msg.chatID);     
+    if(value.length() > 0)
     {
       const auto &newMode = value.toInt();
-      switch (newMode)
-      {
-        case 2:
-          _settingsExt.SouvenirMode = ExtSouvenirMode::BGPrapor;
-          break;
-        case 3:
-          _settingsExt.SouvenirMode = ExtSouvenirMode::MDPrapor;
-          break;
-        case 0:
-        default:
-          _settingsExt.SouvenirMode = ExtSouvenirMode::UAPrapor;
-          break;
-      }
-    }
-    _settingsExt.Mode = ExtMode::Souvenir;
-    value = String(F("Souvenir mode: ")) + String(_settingsExt.SouvenirMode);
-    SaveSettingsExt();
+      if(newMode >= 0 && newMode < (uint8_t)ExtSouvenirMode::MAX)  
+      { 
+        _settingsExt.Mode = ExtMode::Souvenir;
+        _settingsExt.SouvenirMode = (ExtSouvenirMode)newMode;
+        SaveSettingsExt();
+      }      
+    }    
+    value = String(F("Souvenir mode: ")) + (_settingsExt.Mode == ExtMode::Souvenir ? GetExtSouvenirModeStr(_settingsExt.SouvenirMode) : String(F("Off")));    
     effectStarted = false;
     _effect = Effect::Normal;
   }else
@@ -252,22 +254,27 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);    
 
     #ifdef USE_BOT_INLINE_MENU
-      BOT_MENU_INFO(F("Inline Menu"));
-      #ifdef USE_BUZZER
-      static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
-      #else
-      static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-      static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
+      #ifdef ESP8266    
+        BOT_MENU_INFO(F("Inline Menu"));
+        #ifdef USE_BUZZER
+        static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
+        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
+        #else
+        static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
+        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
+        #endif
+      #else //ESP32
+        BOT_MENU_INFO(F("Inline Menu"));
+        static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec \n Alarms Mode \n Alarms (Only Custom) Mode \n Souvenir UA Mode");
+        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000, /modealarms0, /modealarms2, /modesouvenir0");
       #endif
+    ESPresetHeap;
+    ESPresetFreeContStack;
 
-      ESPresetHeap;
-      ESPresetFreeContStack;
-
-      BOT_MENU_INFO(F(" HEAP: "), ESP.getFreeHeap());
-      BOT_MENU_INFO(F("STACK: "), ESPgetFreeContStack);
+    BOT_MENU_INFO(F(" HEAP: "), ESP.getFreeHeap());
+    BOT_MENU_INFO(F("STACK: "), ESPgetFreeContStack);
       
-      bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID);    
+    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID); 
     #endif
     
     #ifdef USE_BOT_FAST_MENU    
@@ -644,30 +651,30 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {    
     bot->sendTyping(msg.chatID);
     
-    uint8_t schema = value.toInt();
-    switch(schema)
+    if(value.length() > 0)
     {
-      case ColorSchema::White:
-        SetWhiteColorSchema();
-        //value = String(F("White"));
-      break;
-      case ColorSchema::Yellow:
-        SetYellowColorSchema();
-        //value = String(F("Yellow"));
-      break;
-      case ColorSchema::Blue: 
-      default:
-        SetBlueDefaultColorSchema();
-        //value = String(F("Blue"));
-      break;
+      const uint8_t &schema = value.toInt();
+      switch(schema)
+      {
+        case ColorSchema::White:
+          SetWhiteColorSchema();
+          //value = String(F("White"));
+        break;
+        case ColorSchema::Yellow:
+          SetYellowColorSchema();
+          //value = String(F("Yellow"));
+        break;
+        case ColorSchema::Blue: 
+        default:
+          SetBlueDefaultColorSchema();
+          //value = String(F("Blue"));
+        break;
+      }
     }
-
     SetAlarmedLED();
     SetBrightness();
 
-    //value = String(F("Color Schema: ")) + value;
-    value.clear();
-    answerCurrentAlarms = false;
+    value = String(F("Color Schema: ")) + String(_settings.NotAlarmedColor.red) + F(".") + String(_settings.NotAlarmedColor.green) + F(".") + String(_settings.NotAlarmedColor.blue);        
   }else
   if(GetCommandValue(BOT_COMMAND_PLAY, filtered, value))
   {
@@ -703,7 +710,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     static const String PaletteInlineMenu = F("🔴 \t 🟠 \t 🟡 \t 🟢 \t 🔵 \t 🟣 \t ⚪️");
     static const String PaletteInlineMenuCall = F("/fillrgb255_0_0, /fillrgb255_153_51 , /fillrgb255_255_50 , /fillrgb0_255_0 , /fillrgb0_0_255, /fillrgb153_51_255 , /fillrgb255_255_255");     
     
-    bot->inlineMenuCallback(_botSettings.botNameForMenu + F("Palette"), PaletteInlineMenu, PaletteInlineMenuCall, msg.chatID);    
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + F("Palette"), PaletteInlineMenu, PaletteInlineMenuCall, msg.chatID);  
+    value.clear();  
     //#endif
   }
 
@@ -872,12 +880,15 @@ const String GetPMMenu(const float &voltage, const String &chatId, const float &
   #ifdef SHOW_PM_FACTOR
     + (led_consumption_voltage_factor > 0.0 && !isnan(led_consumption_voltage_factor) ? String(F(" (")) + String(led_consumption_voltage_factor, 3) + F(")") : String(F("")))
   #endif
+  #ifdef SHOW_PM_TIME
+    + String(F(" (")) + bot->getTime(3).timeString() + String(F(")"))
+  #endif
   ;
 
   String voltageMenu = voltageMainMenu 
     + F(" \n ") + F("Set ") + PM_MENU_ALARM_NAME + F(" <= ") + String(voltage - PM_MENU_ALARM_DECREMENT, 2) + PM_MENU_VOLTAGE_UNIT
     + (chatIdInfo.AlarmValue > 0 ? String(F(" \t ")) + PM_MENU_ALARM_NAME + F(" <= ") + String(chatIdInfo.AlarmValue, 2) : String(F("")))
-    + (chatIdInfo.AlarmValue > 0 ? String(F(" \n ")) + PM_MENU_ALARM_NAME + F(" ") + F("Off") : String(F("")))
+    + (chatIdInfo.AlarmValue > 0 ? String(F(" \n ")) + PM_MENU_ALARM_NAME + F(" ") + F("Off") : String(F("")))    
     + F(" \n ") + (pmUpdatePeriod == 0 ? String(F("Stoped")) : (pmUpdatePeriod > PM_MIN_UPDATE_PERIOD ? String(F("Timeout: ")) + periodStr : String(F("Stop")) + F(" ") + periodStr))     
   ;
   
@@ -891,7 +902,7 @@ const String GetPMMenuCall(const float &voltage, const String &chatId)
   String call = String(BOT_COMMAND_PM) 
         + F(",") + BOT_COMMAND_PMALARM + String(voltage - PM_MENU_ALARM_DECREMENT, 2)  
         + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM : String(F(""))) //Fake
-        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM + F("0") : String(F(""))) 
+        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM + F("0") : String(F("")))         
         + F(",") + BOT_COMMAND_PMUPDATE + String(newpmPeriod < PM_MIN_UPDATE_PERIOD ? 0 : newpmPeriod)
     ;
   return std::move(call);

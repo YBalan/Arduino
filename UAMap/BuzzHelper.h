@@ -290,7 +290,7 @@ namespace Buzz
 
   const std::vector<NoteToPlay> GetMelody(const String &s)
   {
-    const auto & tokens = CommonHelper::splitToInt(s, ',');
+    const auto & tokens = CommonHelper::splitToInt(s, ',', '_');
     bool isOdd = tokens.size() % 2 != 0;
     int melodySize = (tokens.size() / 2) + (isOdd ? 1 : 0);
 

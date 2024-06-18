@@ -21,7 +21,7 @@
 
 uint32_t effectStartTicks = 0;
 bool effectStarted = false;
-enum Effect : uint8_t
+enum class Effect : uint8_t
 {
   Normal,
   Rainbow,
@@ -32,22 +32,55 @@ enum Effect : uint8_t
   UAWithAnthem,
   BG,
   MD,
+  MAX,
 
 } _effect;
 
-enum ExtSouvenirMode : uint8_t
+enum class ExtSouvenirMode : uint8_t
 {
   UAPrapor,
   Reserved,    //NotUsed
   BGPrapor,    
-  MDPrapor,    
+  MDPrapor,  
+  MAX,  
 };
 
-enum ExtMode : uint8_t
+const String GetExtSouvenirModeStr(const ExtSouvenirMode &mode)
+{
+  String res;
+  switch(mode)
+  {    
+    case ExtSouvenirMode::UAPrapor: res = String(F("UAPrapor")); break;
+    case ExtSouvenirMode::Reserved: res = String(F("Reserved")); break;
+    case ExtSouvenirMode::BGPrapor: res = String(F("BGPrapor")); break;
+    case ExtSouvenirMode::MDPrapor: res = String(F("MDPrapor")); break;
+    default: res = String(F("Unknown: ")) + String((uint8_t)mode); break;
+  }
+
+  return res;
+}
+
+enum class ExtMode : uint8_t
 {
   Alarms,
   Souvenir,
+  AlarmsOnlyCustomRegions,
+  MAX,
 };
+
+const String GetExtModeStr(const ExtMode &mode)
+{
+  String res;
+  switch(mode)
+  {    
+    case ExtMode::Alarms: res = String(F("Alarms")); break;
+    case ExtMode::Souvenir: res = String(F("Souvenir")); break;
+    case ExtMode::AlarmsOnlyCustomRegions: res = String(F("AlarmsOnlyCustomRegions")); break;    
+    default: res = String(F("Unknown: ")) + String((uint8_t)mode); break;
+  }
+
+  return res;
+}
 
 enum ColorSchema : uint8_t
 {
@@ -236,8 +269,8 @@ const bool LoadSettingsExt()
 
   const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt));
   
-  SETTINGS_INFO(F("EXT MODE: "), _settingsExt.Mode);  
-  SETTINGS_INFO(F("EXT Souvenir MODE: "), _settingsExt.SouvenirMode);
+  SETTINGS_INFO(F("EXT MODE: "), (uint8_t)_settingsExt.Mode);  
+  SETTINGS_INFO(F("EXT Souvenir MODE: "), (uint8_t)_settingsExt.SouvenirMode);
   SETTINGS_INFO(F("EXT NotifyChatId: "), _settingsExt.NotifyChatId);
  
   if(!res)

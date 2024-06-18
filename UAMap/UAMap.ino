@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.30")
+  #define VER F("1.31")
 #else //ESP32
-  #define VER F("1.35")
+  #define VER F("1.36")
 #endif
 
 #define AVOID_FLICKERING
@@ -328,7 +328,7 @@ void loop()
     yield(); // watchdog
     if(!effectStarted)
     {   
-      INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode); 
+      INFO(F("\t\t"), F("MODE: "), GetExtModeStr(_settingsExt.Mode), F(": "), GetExtSouvenirModeStr(_settingsExt.SouvenirMode)); 
       if(_settingsExt.SouvenirMode == ExtSouvenirMode::UAPrapor)
       {        
         fill_ua_prapor2();
@@ -348,7 +348,7 @@ void loop()
     }
   }
   else
-  if(_settingsExt.Mode == ExtMode::Alarms)
+  if(_settingsExt.Mode == ExtMode::Alarms || _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions)
   {  
     yield(); // watchdog 
   int httpCode;
@@ -361,7 +361,7 @@ void loop()
     #endif
     if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
-      INFO(F("\t\t"), F("MODE: "), F("ALARMS"));
+      INFO(F("\t\t"), F("MODE: "), GetExtModeStr(_settingsExt.Mode));
       //when updated
       //FastLEDShow(true);
 
@@ -616,19 +616,27 @@ void SetAlarmedLED()
   for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
   {   
     auto &led = ledsState[ledIdx];
-    led.Idx = ledIdx;
+    led.Idx = ledIdx;    
     if(alarmedLedIdx.count(ledIdx) > 0)
     {
-      if(!led.IsAlarmed)
+      const auto regionInfo = alarmedLedIdx[ledIdx];
+      const uint8_t &regionId = (uint8_t)regionInfo->Id;
+      bool ifAlarmedCustomRegion = _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions ? (_settings.Relay1Region == regionId || _settings.Relay2Region == regionId) : true;
+      if(ifAlarmedCustomRegion)
       {
-        led.Color = led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor;
-        led.BlinkPeriod = LED_NEW_ALARMED_PERIOD;
-        led.BlinkTotalTime = LED_NEW_ALARMED_TOTALTIME;
-      }       
-      led.IsAlarmed = true;  
-      led.IsPartialAlarmed = alarmedLedIdx[ledIdx]->AlarmStatus == ApiAlarmStatus::PartialAlarmed;
+        if(!led.IsAlarmed)
+        {
+          led.Color = led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor;
+          led.BlinkPeriod = LED_NEW_ALARMED_PERIOD;
+          led.BlinkTotalTime = LED_NEW_ALARMED_TOTALTIME;
+        }       
+        led.IsAlarmed = true;  
+        led.IsPartialAlarmed = regionInfo->AlarmStatus == ApiAlarmStatus::PartialAlarmed;
+        RecalculateBrightness(led, false);    
+        continue;
+      }
     }
-    else
+    
     {
       led.IsAlarmed = false;
       led.IsPartialAlarmed = false;

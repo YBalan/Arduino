@@ -6,8 +6,11 @@ br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
 br1 - Min brightness only alarmed visible
-modealarms - Alarms Mode
-modesouvenir - Souvenir Mode
+modealarms - Current Mode
+modealarms0 - Alarms Mode
+modealarms1 - Souvenir Mode UAPrapor
+modealarms2 - Alarms Only Custom Regions Mode
+modesouvenir - Current Souvenir Mode
 modesouvenir0 - Souvenir Mode UA Prapor
 modesouvenir2 - Souvenir Mode BG Prapor
 modesouvenir3 - Souvenir Mode MD Prapor
@@ -23,8 +26,9 @@ buzztime - Current buzzer time in milliseconds
 buzztime3000 - Set buzzer time to 3secs
 buzztime0 - Switch off buzzer
 schema - Current Color schema
-schema0 - Set Color schema to Dark
-schema1 - Set Color schema to Light
+schema0 - Set Color schema to Blue
+schema1 - Set Color schema to White
+schema2 - Set Color schema to Yellow
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
 play - Play tones 500,800

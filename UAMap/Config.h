@@ -13,6 +13,7 @@
   #ifdef USE_BOT
     #define USE_POWER_MONITOR
     #define SHOW_PM_FACTOR
+    #define SHOW_PM_TIME
     #define USE_NOTIFY
   #endif
   //#define HTTP_TIMEOUT 3000
