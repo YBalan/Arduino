@@ -179,13 +179,13 @@ namespace UAMap
       const String GetRelay2Str(std::function<const String(const uint8_t&)> toStr) const;
       const bool ClearRelay1();
       const bool ClearRelay2();
-      const bool SetRelay1(const uint8_t &regionId, const bool &removeIfExist = false);
-      const bool SetRelay2(const uint8_t &regionId, const bool &removeIfExist = false);
+      const bool SetRelay1(const uint8_t &regionId, const bool &removeIfExist);
+      const bool SetRelay2(const uint8_t &regionId, const bool &removeIfExist);
       void Init();
     private:
       const bool ClearRelaySet(uint8_t *const relaySet);
       const bool IsRelaySetContains(const uint8_t *const relaySet, const uint8_t &regionId, const bool &forAll = false) const;
-      const bool AddRelay(uint8_t *const relaySet, const uint8_t &regionId, const bool &removeIfExist = false);
+      const bool AddRelay(uint8_t *const relaySet, const uint8_t &regionId, const bool &removeIfExist);
       const String GetRelayStr(const uint8_t *const relaySet, std::function<const String(const uint8_t&)> toStr) const;
   };
 };
@@ -210,7 +210,7 @@ const bool IsRelay1Contains(const uint8_t &regionId)
   return !useRelayExt ? _settings.Relay1Region == regionId : _settingsRelayExt.IsRelay1Contains(regionId);    
 }
 
-const bool SetRelay1(const uint8_t &regionId, const bool &removeIfExist = false)
+const bool SetRelay1(const uint8_t &regionId, const bool &removeIfExist)
 {
   bool res = _settings.Relay1Region == regionId;
   _settings.Relay1Region = regionId;
@@ -234,7 +234,7 @@ const bool IsRelay2Contains(const uint8_t &regionId)
   return !useRelayExt ? _settings.Relay2Region == regionId : _settingsRelayExt.IsRelay2Contains(regionId);    
 }
 
-const bool SetRelay2(const uint8_t &regionId, const bool &removeIfExist = false)
+const bool SetRelay2(const uint8_t &regionId, const bool &removeIfExist)
 {
   bool res = _settings.Relay2Region == regionId;
   _settings.Relay2Region = regionId;
@@ -377,7 +377,7 @@ const bool UAMap::SettingsRelayExt::AddRelay(uint8_t *const relaySet, const uint
     {
       exists = true;
       if(removeIfExist) relaySet[i] = 0;
-      break;
+      //break;
     }    
   }
   if(!exists)

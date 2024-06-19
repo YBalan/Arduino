@@ -651,7 +651,7 @@ void SetAlarmedLED()
 
 void SetRelayStatus()
 {
-  INFO(F("SetRelayStatus: "), F("Relay1"), F(": "), GetRelay1Str(nullptr), F(" "), F("Relay2"), F(": "), GetRelay2Str(nullptr)); 
+  TRACE(F("SetRelayStatus: ")); TRACE(F("Relay1"), F(": "), GetRelay1Str(nullptr)); TRACE(F("Relay2"), F(": "), GetRelay2Str(nullptr)); 
   //if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
   if(IsRelay1Off() && IsRelay2Off()) return;
   
