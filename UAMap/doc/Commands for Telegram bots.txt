@@ -2,6 +2,7 @@ gay - trolololo
 ua - Ukraine Prapor
 ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
+learn - Learn Regions of Ukraine
 br - Current brightness
 br255 - Max brightness
 br2 - Min brightness

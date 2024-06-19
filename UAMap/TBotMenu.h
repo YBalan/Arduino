@@ -56,6 +56,7 @@ gay - trolololo
 ua - Ukraine Prapor
 ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
+learn - Learn Regions of Ukraine
 br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
@@ -144,6 +145,10 @@ const float GetLEDVoltageFactor();
 #define BOT_COMMAND_NOTIFY F("/notify")
 #endif
 
+#ifdef USE_LEARN
+#define BOT_COMMAND_LEARN F("/learn")
+#endif 
+
 #ifdef USE_RELAY_EXT
 static int32_t relay1MenuMessageId = 0;
 static int32_t relay2MenuMessageId = 0;
@@ -161,7 +166,7 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
 #else
 const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const uint8_t &relayNumber, const String& chatID);
 #endif
-void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const uint8_t &relayNumber, const String& chatID, const int32_t &messageId);
+void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const uint8_t &relayNumber, const String& chatID, const int32_t &messageId, const bool &learn = false);
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
@@ -731,6 +736,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value.clear();  
     //#endif
   }
+  #ifdef USE_LEARN
+  else if(GetCommandValue(BOT_COMMAND_LEARN, filtered, value))
+  {
+    SendInlineRelayMenu(F("Learn"), BOT_COMMAND_TEST, 1, msg.chatID, /*messageId:*/0, /*learn:*/true); 
+    //relay1MenuMessageId = bot->lastBotMsg();
+    value.clear();
+  }
+  #endif
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
       messages.push_back(value);
@@ -858,7 +871,7 @@ const bool HandleRelayMenu(const String &relayName, const String &relayCommand, 
   }
 }
 
-void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const uint8_t &relayNumber, const String& chatID, const int32_t &messageId)
+void SendInlineRelayMenu(const String &relayName, const String &relayCommand, const uint8_t &relayNumber, const String& chatID, const int32_t &messageId, const bool &learn)
 {
   #ifdef USE_RELAY_EXT
   static const String checkSymbol = "✅";
@@ -882,7 +895,7 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
     const auto &region = api->iotApiRegions[regionIdx];
     if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
 
-    String addCheck = (relayNumber == 1 ? IsRelay1Contains(region.Id) : IsRelay2Contains(region.Id)) ? checkSymbol : F("");
+    String addCheck = learn ? String(F("")) : ((relayNumber == 1 ? IsRelay1Contains(region.Id) : IsRelay2Contains(region.Id)) ? checkSymbol : F(""));
     menu += addCheck + region.Name + (regionPlace != 0 && regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));
     call += relayCommand + region.Id + F(", ");//(isEndOfGoup ? F("") : F(", "));  
 
@@ -915,9 +928,9 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
   }
 
   if(sendWholeMenu)
-  {
+  {    
     menu += String(F(" \n ")) + relayName + F(" ") + F("Off");
-    call += String(F(", ")) + relayCommand + F("0");
+    call += String(F(", ")) + relayCommand + F("0");    
 
     BOT_MENU_INFO(menu);
     BOT_MENU_INFO(call);   

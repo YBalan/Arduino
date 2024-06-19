@@ -5,13 +5,13 @@
 #ifdef ESP8266
   #define VER F("1.32")
 #else //ESP32
-  #define VER F("1.37")
+  #define VER F("1.38")
 #endif
 
 #define AVOID_FLICKERING
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
