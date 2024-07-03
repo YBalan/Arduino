@@ -3,23 +3,23 @@
 
 #include "PumpState.h"
 
-#define NO_WATER_CODE               "NW"
-#define TIMEOUT_CODE                "T"
-#define CALIBRATING_REQUIRED_CODE   "CL"
+#define NO_WATER_CODE               ("NW")
+#define TIMEOUT_CODE                ("T")
+#define CALIBRATING_REQUIRED_CODE   ("CL")
 
-#define SENSOR_LOST_CODE            "L"
-#define SENSOR_NOT_USED_CODE        "NS"
-#define SENSOR_MAX_VALUE_CODE       "D"
-#define SENSOR_MIN_VALUE_CODE       "W"
+#define SENSOR_LOST_CODE            ("L")
+#define SENSOR_NOT_USED_CODE        ("NS")
+#define SENSOR_MAX_VALUE_CODE       ("D")
+#define SENSOR_MIN_VALUE_CODE       ("W")
 
-#define NO_WATER_LCODE               "NoW"
-#define TIMEOUT_LCODE                "ToT"
-#define CALIBRATING_REQUIRED_LCODE   "Cal"
+#define NO_WATER_LCODE               ("NoW")
+#define TIMEOUT_LCODE                ("ToT")
+#define CALIBRATING_REQUIRED_LCODE   ("Cal")
 
-#define SENSOR_LOST_LCODE            "LOST"
-#define SENSOR_NOT_USED_LCODE        "NoS"
-#define SENSOR_MAX_VALUE_LCODE       "Dry"
-#define SENSOR_MIN_VALUE_LCODE       "Wet"
+#define SENSOR_LOST_LCODE            ("LOST")
+#define SENSOR_NOT_USED_LCODE        ("NoS")
+#define SENSOR_MAX_VALUE_LCODE       ("Dry")
+#define SENSOR_MIN_VALUE_LCODE       ("Wet")
 
 
 #define DO_NOT_USE_ENOUGH_LOW_LEVEL true
@@ -233,19 +233,19 @@ public:
   }
   
 public:  
-  const char * const PrintStatus(const bool &showDebugInfo, const unsigned long &currentTicks, char *buff) const
-  { 
-    const auto &ticks = currentTicks == 0 ? millis() : currentTicks;
-    if(showDebugInfo)
-    { 
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} (start:%lu, ticks:%lu sub:%lu) timeout:{%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, _startTiks, ticks, (ticks - _startTiks), Settings.WatchDog);      
-    }
-    else
-    {      
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} {timeout:%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, Settings.WatchDog);      
-    }
-    return buff;
-  }
+  // const char * const PrintStatus(const bool &showDebugInfo, const unsigned long &currentTicks, char *buff) const
+  // { 
+  //   const auto &ticks = currentTicks == 0 ? millis() : currentTicks;
+  //   if(showDebugInfo)
+  //   { 
+  //     sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} (start:%lu, ticks:%lu sub:%lu) timeout:{%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, _startTiks, ticks, (ticks - _startTiks), Settings.WatchDog);      
+  //   }
+  //   else
+  //   {      
+  //     sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} {timeout:%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, Settings.WatchDog);      
+  //   }
+  //   return buff;
+  // }
 
   const char * const GetFullStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, false, buff); }
   const char * const GetShortStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, true, buff); }
@@ -253,19 +253,19 @@ public:
   {
     char sensorValueBuff[6];
     char statusBuff[6]; 
-    strcpy(sensorValueBuff, shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE);
-    strcpy(statusBuff, shortStatus ? TIMEOUT_CODE : TIMEOUT_LCODE);
+    strcpy(sensorValueBuff, (shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE));
+    strcpy(statusBuff, (shortStatus ? TIMEOUT_CODE : TIMEOUT_LCODE));
     bool showCount = true;
     
     if(_sensorValue < SENSOR_VALUE_MAX && _sensorValue >= 0)
     {
       if(_sensorValue >= (SENSOR_VALUE_MAX - SENSOR_CHANGES_LEVEL))
       {
-        sprintf(sensorValueBuff, shortStatus ? SENSOR_MAX_VALUE_CODE : SENSOR_MAX_VALUE_LCODE);
+        sprintf(sensorValueBuff, (shortStatus ? SENSOR_MAX_VALUE_CODE : SENSOR_MAX_VALUE_LCODE));
       }
       else if(_sensorValue <= (0 + SENSOR_CHANGES_LEVEL))
       {
-        sprintf(sensorValueBuff, shortStatus ? SENSOR_MIN_VALUE_CODE : SENSOR_MIN_VALUE_LCODE);
+        sprintf(sensorValueBuff, (shortStatus ? SENSOR_MIN_VALUE_CODE : SENSOR_MIN_VALUE_LCODE));
       }
       else
       {
@@ -277,7 +277,7 @@ public:
     {
       if(Settings.WatchDog == DEFAULT_PUMP_TIMEOUT_SEC)
       {
-        sprintf(statusBuff, shortStatus ? CALIBRATING_REQUIRED_CODE : CALIBRATING_REQUIRED_LCODE);
+        sprintf(statusBuff, (shortStatus ? CALIBRATING_REQUIRED_CODE : CALIBRATING_REQUIRED_LCODE));
         showCount = false;
       }
       else
@@ -285,14 +285,14 @@ public:
         showCount = isSensorUsed();
         if(!hasWater)
         {
-          sprintf(statusBuff, shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
+          sprintf(statusBuff, (shortStatus ? NO_WATER_CODE : NO_WATER_LCODE));
         }
         else
         {            
           showCount 
             ? sprintf(statusBuff, "%d", ToPct(Settings.WateringRequired, shortStatus)) 
             //: sprintf(statusBuff, shortStatus ? SENSOR_NOT_USED_CODE : SENSOR_NOT_USED_LCODE);
-            : sprintf(statusBuff, shortStatus ? (isOn() ? "On" : "Of") : SENSOR_NOT_USED_LCODE);          
+            : sprintf(statusBuff, shortStatus ? (isOn() ? ("On") : ("Of")) : SENSOR_NOT_USED_LCODE);          
         }
       }
     }
