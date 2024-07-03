@@ -2,9 +2,9 @@
 #ifndef DEBUG_HELPER_H
 #define DEBUG_HELPER_H
 
-#define BUTTON_IS_RELEASED_MSG "Btn rel..."
-#define BUTTON_IS_PRESSED_MSG "Btn press..."
-#define BUTTON_IS_LONGPRESSED_MSG "Btn LONG press..."
+#define BUTTON_IS_RELEASED_MSG F("Btn rel...")
+#define BUTTON_IS_PRESSED_MSG F("Btn press...")
+#define BUTTON_IS_LONGPRESSED_MSG F("Btn LONG press...")
 
 #ifdef ENABLE_TRACE
   #define SS_TRACE(...) { PrintArguments(__VA_ARGS__); }
