@@ -6,15 +6,24 @@
 
 #define LCD_PROGRESS_BAR_TRACE_NAME "PBar: "
 
+//#define ENABLE_TRACE_LCD_PROGRESS
+
+#ifdef ENABLE_TRACE_LCD_PROGRESS
+#define LCD_TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define LCD_TRACE(...) {}
+#endif
+
+
 namespace Helpers
 {
-  enum LcdProgressCommands : short
+  enum LcdProgressCommands : uint8_t
   {
     Init = 4,
     Clear = 5,
   };
 
-  enum class LcdProgressSettings : short
+  enum class LcdProgressSettings : uint8_t
   {
     NUMBERS_OFF,
     NUMBERS_RIGHT,
@@ -26,9 +35,9 @@ namespace Helpers
   {
     LiquidCrystal_I2C * const _lcd = 0;
     
-    short _row;
-    short _startPos;
-    short _maxSymbolsCount;
+    uint8_t _row;
+    uint8_t _startPos;
+    uint8_t _maxSymbolsCount;
 
     LcdProgressSettings _settings;
 
@@ -40,7 +49,7 @@ namespace Helpers
     uint8_t bar5[8] = { 0x1F,0x1F,0x1F,0x1F,0x1F,0x1F,0x1F,0x1F };    
 
   public:
-    LcdProgressBar(const LiquidCrystal_I2C &lcd, const short &row = 1, const short &startPos = 0, const short &maxSymbolsCount = 16, const LcdProgressSettings &settings = LcdProgressSettings::NUMBERS_CENTER) 
+    LcdProgressBar(const LiquidCrystal_I2C &lcd, const uint8_t &row = 1, const uint8_t &startPos = 0, const uint8_t &maxSymbolsCount = 16, const LcdProgressSettings &settings = LcdProgressSettings::NUMBERS_CENTER) 
       : _lcd(&lcd)
       , _row(row)
       , _startPos(startPos)
@@ -48,12 +57,12 @@ namespace Helpers
       , _settings(settings)      
     { }
 
-    void ShowProgress(const short &value)
+    void ShowProgress(const uint8_t &value)
     {
       ShowProgress(_lcd, value, _row, _startPos, _maxSymbolsCount, _settings);
     }
     
-    void ShowProgress(const short &value, const short &row, const short &startPos, const short &maxSymbolsCount, const LcdProgressSettings &settings)
+    void ShowProgress(const uint8_t &value, const uint8_t &row, const uint8_t &startPos, const uint8_t &maxSymbolsCount, const LcdProgressSettings &settings)
     {
       ShowProgress(_lcd, value, row, startPos, maxSymbolsCount, settings);
     }  
@@ -71,7 +80,7 @@ namespace Helpers
       {
         if(size == LcdProgressCommands::Init)
         {
-          S_INFO2(LCD_PROGRESS_BAR_TRACE_NAME, "Init");
+          LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, "Init");
 
           _lcd->createChar(0, bar0);
           _lcd->createChar(1, bar1);
@@ -82,10 +91,10 @@ namespace Helpers
         }else
         if(size == LcdProgressCommands::Clear)
         {
-          S_INFO2(LCD_PROGRESS_BAR_TRACE_NAME, "Clear");
+          LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, "Clear");
 
           _lcd->setCursor(_startPos, _row);
-          for(short ch = _startPos; ch < _maxSymbolsCount; ch++) 
+          for(uint8_t ch = _startPos; ch < _maxSymbolsCount; ch++) 
           {
             _lcd->setCursor(ch, _row);
             _lcd->write(0);
@@ -96,18 +105,18 @@ namespace Helpers
     }
 
   private:
-    static void ShowProgress(LiquidCrystal_I2C * const lcd, const short &value, const short &row, const short &startPos, const short &maxSymbolsCount, const LcdProgressSettings &settings)
+    static void ShowProgress(LiquidCrystal_I2C * const lcd, const uint8_t &value, const uint8_t &row, const uint8_t &startPos, const uint8_t &maxSymbolsCount, const LcdProgressSettings &settings)
     {
-      S_TRACE3(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
+      LCD_TRACE(LCD_PROGRESS_BAR_TRACE_NAME, value, "%");
 
       if(lcd != 0)
       {
-        short segment = map(value, 0, 100, 0, (6 * maxSymbolsCount) - 1);
-        short symbol = segment / 6;
+        uint16_t segment = map(value, 0, 100, 0, (6 * maxSymbolsCount) - 1);
+        uint8_t symbol = segment / 6;
         lcd->setCursor(symbol, row);
         lcd->write(segment % 6);
         
-        short prevSymbolToFill = symbol - 1;
+        uint8_t prevSymbolToFill = symbol - 1;
         if(prevSymbolToFill >= 0 && prevSymbolToFill < maxSymbolsCount)
         {
           lcd->setCursor(prevSymbolToFill, row);

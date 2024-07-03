@@ -2,6 +2,7 @@
  * Created by Yurii Balan
  *
  * This example code is in the private domain
+ * YouTube: https://youtube.com/shorts/Uko7_9OD-78
  *
  * Tutorial page: https://arduinogetstarted.com/tutorials/arduino-button-servo-motor https://arduinogetstarted.com/tutorials/arduino-servo-motor
  */
@@ -13,11 +14,29 @@
 
 #include "Constants.h"
 
+#define VER 1.1
+#define ENABLE_TRACE
+#define ENABLE_INFO_MAIN
+#define ENABLE_TRACE_MAIN
+
+#ifdef ENABLE_INFO_MAIN
+#define INFO(...) SS_TRACE(__VA_ARGS__)
+#else
+#define INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_MAIN
+#define TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define TRACE(...) {}
+#endif
+#include "DEBUGHelper.h"
+
 //EEPROM
 #define EEPROM_SETTINGS_ADDR 10
 
 //DebounceTime
-#define DebounceTime 50
+#define DEBOUNCE_TIME 50
 
 // variables will change:
 Servo servo;                        // create servo object to control a servo
@@ -40,36 +59,41 @@ int debugButtonFromSerial = 0;
 void setup() 
 {  
     Serial.begin(9600);                // initialize serial
+    while (!Serial);
      
     Serial.println();
     Serial.println();
-    Serial.println("!!!! START fuck 2 !!!!");
+    Serial.println("!!!! START Generator Off !!!!");
+    Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
 
-    generatorOffBtn.setDebounceTime(DebounceTime);
-    generatorOffRemoteBtn.setDebounceTime(DebounceTime);
-    initialPosBtn.setDebounceTime(DebounceTime);
-    rotateRightBtn.setDebounceTime(DebounceTime);
-    rotateLeftBtn.setDebounceTime(DebounceTime);
+    generatorOffBtn.setDebounceTime(DEBOUNCE_TIME);
+    generatorOffRemoteBtn.setDebounceTime(DEBOUNCE_TIME);
+    initialPosBtn.setDebounceTime(DEBOUNCE_TIME);
+    rotateRightBtn.setDebounceTime(DEBOUNCE_TIME);
+    rotateLeftBtn.setDebounceTime(DEBOUNCE_TIME);
 
-    LoadSettings();
+    generatorOffRemoteBtn.setCountMode(COUNT_RISING);
 
-    Serial.print("EEPROM: ");
-    PrintServosStatus();
+    //EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
 
-    if(CorrectAngles())
-    {
-      Serial.print("Corrected: ");
-      PrintServosStatus();
-    }
+    // INFO("EEPROM: ");
+    // PrintServosStatus();
 
-    AttachServos();
+    // if(CorrectAngles())
+    // {
+    //   INFO("Corrected: ");
+    //   PrintServosStatus();
+    // }
 
-    servo.write(settings.angle);
-    servo2.write(settings.angle2);
+    // AttachServos();
 
-    PrintServosStatus();
-    DetachServos();
-    SaveSettings();
+    // servo.write(settings.angle);
+    // servo2.write(settings.angle2);
+
+    // PrintServosStatus();
+    // DetachServos();
+
+    // SaveSettings();
 }
 
 void loop() 
@@ -78,39 +102,54 @@ void loop()
     generatorOffRemoteBtn.loop();   // MUST call the loop() function first
     initialPosBtn.loop();           // MUST call the loop() function first
     rotateRightBtn.loop();          // MUST call the loop() function first
-    rotateLeftBtn.loop();           // MUST call the loop() function first    
+    rotateLeftBtn.loop();           // MUST call the loop() function first
     
-    if(generatorOffRemoteBtn.isReleased() || debugButtonFromSerial == 5) 
-    {
-      Serial.println("The ""generatorOffRemoteBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);
-    }
-
     if(generatorOffBtn.isReleased() || debugButtonFromSerial == 4) 
     {
-      Serial.println("The ""generatorOffBtn"" is pressed");
-      GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);
+      INFO("OFF ", BUTTON_IS_PRESSED_MSG);
+      GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);      
+      debugButtonFromSerial = 0;
+    }
+
+    if(generatorOffRemoteBtn.isReleased() || debugButtonFromSerial == 5) 
+    {
+      const auto count = generatorOffRemoteBtn.getCount();
+      INFO("REMOTE ", "OFF ", BUTTON_IS_PRESSED_MSG, " Count: ", count);
+
+      if(count == 1)
+      {
+        GeneratorOff(ROTATE_DELAY, /*returnToPrevState: */false);      
+      }
+      if(count == 2)
+      {
+        InitialPosition();
+        generatorOffRemoteBtn.resetCount();
+      }
+
+      debugButtonFromSerial = 0;
     }
 
     if(initialPosBtn.isPressed() || debugButtonFromSerial == 3) 
     {
-      Serial.println("The ""initialPosfBtn"" is pressed");
-      InitialPosition();
+      INFO("Initial Position ", BUTTON_IS_PRESSED_MSG);
+      InitialPosition();      
+      debugButtonFromSerial = 0;
     }
 
     if(rotateLeftBtn.isPressed() || debugButtonFromSerial == 2) 
     {
-      Serial.println("The ""rotateLeftBtn"" is pressed");
-      RotateLeft();     
+      INFO("ROTATE LEFT ", BUTTON_IS_PRESSED_MSG);
+      RotateLeft();      
+      debugButtonFromSerial = 0;
     }
 
     if(rotateRightBtn.isPressed() || debugButtonFromSerial == 1) 
     {
-      Serial.println("The ""rotateRightBtn"" is pressed");
-      RotateRight();
+      INFO("ROTATE RIGHT ", BUTTON_IS_PRESSED_MSG);
+      RotateRight();      
+      debugButtonFromSerial = 0;
     }   
 
-    debugButtonFromSerial = 0;
     if(Serial.available() > 0)
     {
       debugButtonFromSerial = Serial.readString().toInt();
@@ -134,28 +173,28 @@ const bool CorrectAngles()
   return res;
 }
 
-void GeneratorOff(const short &rotateDelay, const bool &returnToPrevState)
+void GeneratorOff(const uint8_t &rotateDelay, const bool &returnToPrevState)
 {
     AttachServos();
 
     Settings prevState = settings;
-    
-    if(rotateDelay > 0)
+
+    //Serial.print("Servo started "); Serial.println(angle);
+    if(rotateDelay > 0)    
     {      
+      settings.angle = servo.read();
+      settings.angle2 = servo2.read();
+      
       short rotateAngle = settings.angle <= GENERATOR_OFF_ANGLE ? ROTATE_WITH_DELAY_ANGLE : -ROTATE_WITH_DELAY_ANGLE;
-      short rotateCount = abs((settings.angle - GENERATOR_OFF_ANGLE) / ROTATE_WITH_DELAY_ANGLE);
+      short rotateCount = abs((settings.angle - GENERATOR_OFF_ANGLE) / ROTATE_WITH_DELAY_ANGLE);      
 
-      #ifdef DEBUG
-      char buffer[256];
-      sprintf(buffer, "Servos started at: %d & %d; Destination: %d & %d; Moved by: %d; %d Times. (with delay: %d)", settings.angle, settings.angle2, GENERATOR_OFF_ANGLE, GENERATOR_OFF_2_ANGLE, rotateAngle, rotateCount, rotateDelay);
-      Serial.println(buffer);
-      #endif
+      TRACE("Servos started at: ", settings.angle, " & ", settings.angle2, " Destination: ", GENERATOR_OFF_ANGLE, " & ", GENERATOR_OFF_2_ANGLE, " Moved by: ", rotateAngle, " Count: ", rotateCount, " (with delay: ", rotateDelay, ")");
 
-      for(int i = 0; i < rotateCount; i++)
+      for(uint8_t i = 0; i < rotateCount; i++)
       {        
         servo.write(settings.angle += rotateAngle);
         servo2.write(settings.angle2 -= rotateAngle);
-        PrintServosStatus();
+        //PrintServosStatus();
         delay(rotateDelay);
       }      
     }
@@ -165,26 +204,30 @@ void GeneratorOff(const short &rotateDelay, const bool &returnToPrevState)
 
     PrintServosStatus();
     SaveSettings();
+    DetachServos();
 
     if(returnToPrevState)
     {      
       delay(10000);
-      Serial.println("Return to previous state...");
+      INFO("Return to previous state...");
+
+      AttachServos();
+
       servo.write(prevState.angle);
       servo2.write(prevState.angle2);
 
       settings = prevState;
-    }    
 
-    PrintServosStatus();
-    DetachServos();
-    SaveSettings();
+      PrintServosStatus();
+      DetachServos();
+      SaveSettings();
+    }
 }
 
 void InitialPosition()
 {
     AttachServos();
-    
+    //Serial.print("Servo started "); Serial.println(angle);
     servo.write(settings.angle = INITIAL_ANGLE);
     servo2.write(settings.angle2 = INITIAL_2_ANGLE);
 
@@ -196,15 +239,15 @@ void InitialPosition()
 void RotateLeft()
 {
     AttachServos();
-    
+    //Serial.print("Servo started "); Serial.println(angle);
     {
-      short rotate = settings.angle + ROTATE_ANGLE;
+      int rotate = settings.angle + ROTATE_ANGLE;
       settings.angle = rotate >= END_ANGLE ? END_ANGLE : rotate;
       servo.write(settings.angle);
     }
 
     {
-      short rotate2 = settings.angle2 - ROTATE_ANGLE;      
+      int rotate2 = settings.angle2 - ROTATE_ANGLE;      
       settings.angle2 = rotate2 <= END_2_ANGLE ? END_2_ANGLE : rotate2;
       servo2.write(settings.angle2);      
     }
@@ -217,15 +260,15 @@ void RotateLeft()
 void RotateRight()
 {   
     AttachServos();
-    
+    //Serial.print("Servo started "); Serial.println(angle);
     {
-      short rotate = settings.angle - ROTATE_ANGLE;
+      int rotate = settings.angle - ROTATE_ANGLE;
       settings.angle = rotate <= START_ANGLE ? START_ANGLE : rotate;
       servo.write(settings.angle);
     }
 
     {
-      short rotate2 = settings.angle2 + ROTATE_ANGLE;      
+      int rotate2 = settings.angle2 + ROTATE_ANGLE;      
       settings.angle2 = rotate2 >= START_2_ANGLE ? START_2_ANGLE : rotate2;
       servo2.write(settings.angle2);
     }
@@ -239,46 +282,33 @@ void AttachServos()
 {
   if(!servo.attached())
   {
-    Serial.println("Servo1 Attached");
+    INFO("Servo1 Attached");
     servo.attach(SERVO_PIN);
   }
 
   if(!servo2.attached())
   {
-    Serial.println("Servo2 Attached");
+    INFO("Servo2 Attached");
     servo2.attach(SERVO2_PIN);
   }  
 }
 
 void DetachServos()
 {  
-    Serial.println("Servos Detached");
+    INFO("Servos Detached");
     servo.detach();
     servo2.detach();
 }
 
 void PrintServosStatus()
-{
-  char angle1Buff[4];
-  char angle2Buff[4];
-
-  sprintf(angle1Buff, "%3d", settings.angle);
-  sprintf(angle2Buff, "%3d", settings.angle2);
-
-  Serial.print("Status: "); Serial.print("Angle1: ["); Serial.print(angle1Buff); Serial.print("] Angle2: ["); Serial.print(angle2Buff); Serial.print("]");
-  Serial.println();
+{ 
+  INFO("Status: angle1:[", settings.angle, "] angle2:[", settings.angle2, "]");
 }
 
 void SaveSettings()
 {
-  Serial.println("Save Settings...");
-  EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
-}
-
-void LoadSettings()
-{
-  Serial.println("Load Settings...");
-  EEPROM.get(EEPROM_SETTINGS_ADDR, settings);
+  INFO("Save Settings...");
+  //EEPROM.put(EEPROM_SETTINGS_ADDR, settings);
 }
 
 

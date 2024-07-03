@@ -10,12 +10,12 @@
   #define SS_TRACE(...) { PrintArguments(__VA_ARGS__); }
 
   template<typename T>
-  void PrintArguments(T arg) {
+  void PrintArguments(const T &arg) {
     Serial.println(arg);
   }
 
   template<typename T, typename... Args>
-  void PrintArguments(T arg, Args... args) {
+  void PrintArguments(const T &arg, Args... args) {
     Serial.print(arg);
     //Serial.print(" ");
     PrintArguments(args...);
