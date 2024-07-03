@@ -197,7 +197,9 @@ class WiFiOps
       }
 
       WiFi.setAutoReconnect(true);
+      #ifdef ESP8266
       WiFi.setAutoConnect(true); 
+      #endif
 
       //if you get here you have connected to the WiFi
       WIFI_INFO(F("connected...yeey :)"));

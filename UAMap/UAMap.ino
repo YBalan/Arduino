@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.28")
+  #define VER F("1.32")
 #else //ESP32
-  #define VER F("1.33")
+  #define VER F("1.38")
 #endif
 
 #define AVOID_FLICKERING
@@ -96,7 +96,7 @@
 
 #include <map>
 #include <set>
-#include <ezButton.h>
+//#include <ezButton.h>
 
 #include "DEBUGHelper.h"
 #include "AlarmsApi.h"
@@ -109,6 +109,9 @@
 #include "Prapors.h"
 #include "PMonitor.h"
 #include "TBotMenu.h"
+
+#define LONG_PRESS_VALUE_MS 1000
+#include "Button.h"
 
 #ifdef ENABLE_INFO_MAIN
 #define INFO(...) SS_TRACE(__VA_ARGS__)
@@ -134,7 +137,7 @@ typedef std::map<uint8_t, RegionInfo*> LedIndexMappedToRegionInfo;
 LedIndexMappedToRegionInfo alarmedLedIdx;
 std::map<uint8_t, LedState> ledsState;
 
-ezButton resetBtn(PIN_RESET_BTN);
+Button resetBtn(PIN_RESET_BTN);
 
 void setup() {
   // put your setup code here, to run once:
@@ -163,6 +166,7 @@ void setup() {
 
   LoadSettings();
   LoadSettingsExt();
+  LoadSettingsRelayExt();
   //_settings.reset();
 
   PMonitor::LoadSettings();
@@ -243,46 +247,80 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
   FastLEDShow(1000);    
 }
 
-void loop() 
+void HandleButton(const uint32_t &currentTicks)
 {
-  static bool firstRun = true;
-  static uint32_t currentTicks = millis();
-  currentTicks = millis();
-
   resetBtn.loop();
 
   if(resetBtn.isPressed())
   {
-    INFO(BUTTON_IS_PRESSED_MSG, F(" BR: "), _settings.Brightness);
+    TRACE(BUTTON_IS_PRESSED_MSG, F(" BR: "), _settings.Brightness);
   }
   if(resetBtn.isReleased())
   {    
-    static bool brBtnChangeDirectionUp = false;
-    auto nextBr = _settings.Brightness + (brBtnChangeDirectionUp ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP);
-    if(nextBr < 0)
+    if(resetBtn.isLongPress())
     {
-      nextBr = 1;
-      brBtnChangeDirectionUp = true;
+      TRACE(BUTTON_IS_LONGPRESSED_MSG, F(" BR: "), _settings.Brightness, F("\t"), LONG_PRESS_VALUE_MS, F("ms..."));
+      resetBtn.resetTicks();
+      if(_settings.NotAlarmedColor == CRGB::Blue)
+      {
+        SetYellowColorSchema();
+      }else
+      if(_settings.NotAlarmedColor == CRGB::Yellow)
+      {
+        SetWhiteColorSchema();
+      }
+      else
+      {
+        SetBlueDefaultColorSchema();
+      }
+      SaveSettings();
     }else
-    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
     {
-      nextBr = 2;
-    }else
-    if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
-    {
-      nextBr = BRIGHTNESS_STEP;
-    }else
-    if(nextBr > 255)
-    {
-      nextBr = 255;
-      brBtnChangeDirectionUp = false;
-    }
+      static bool brBtnChangeDirectionUp = false;
+      auto nextBr = _settings.Brightness + (brBtnChangeDirectionUp ? BRIGHTNESS_STEP : -BRIGHTNESS_STEP);
+      if(nextBr <= 0)
+      {
+        nextBr = 1;
+        brBtnChangeDirectionUp = true;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 1)
+      {
+        nextBr = 2;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 2)
+      {
+        nextBr = 5;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 5)
+      {
+        nextBr = 10;
+      }else
+      if(brBtnChangeDirectionUp && nextBr == BRIGHTNESS_STEP + 10)
+      {
+        nextBr = BRIGHTNESS_STEP;
+      }else
+      if(nextBr > 255)
+      {
+        nextBr = 255;
+        brBtnChangeDirectionUp = false;
+      }
 
-    _settings.Brightness = nextBr;
+      _settings.Brightness = nextBr;
 
-    INFO(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
-    SetBrightness();    
+      TRACE(BUTTON_IS_RELEASED_MSG, F(" BR: "), _settings.Brightness);
+      SetBrightness();   
+      SaveSettings();
+    } 
   }  
+}
+
+void loop() 
+{
+  static bool firstRun = true;
+  static uint32_t currentTicks = millis();
+  currentTicks = millis();  
+
+  HandleButton(currentTicks);
 
   HandleEffects(currentTicks);
 
@@ -291,7 +329,7 @@ void loop()
     yield(); // watchdog
     if(!effectStarted)
     {   
-      INFO(F("\t\t"), F("MODE: "), F("SOUVENIR"), F(": "), _settingsExt.SouvenirMode); 
+      INFO(F("\t\t"), F("MODE: "), GetExtModeStr(_settingsExt.Mode), F(": "), GetExtSouvenirModeStr(_settingsExt.SouvenirMode)); 
       if(_settingsExt.SouvenirMode == ExtSouvenirMode::UAPrapor)
       {        
         fill_ua_prapor2();
@@ -311,7 +349,7 @@ void loop()
     }
   }
   else
-  if(_settingsExt.Mode == ExtMode::Alarms)
+  if(_settingsExt.Mode == ExtMode::Alarms || _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions)
   {  
     yield(); // watchdog 
   int httpCode;
@@ -324,7 +362,7 @@ void loop()
     #endif
     if(CheckAndUpdateAlarms(currentTicks, httpCode, statusMsg))
     {
-      INFO(F("\t\t"), F("MODE: "), F("ALARMS"));
+      INFO(F("\t\t"), F("MODE: "), GetExtModeStr(_settingsExt.Mode));
       //when updated
       //FastLEDShow(true);
 
@@ -348,8 +386,12 @@ void loop()
             + F(" (") + String(sw) + F("ms") + F(")")
             #endif
             ;
-            TRACE(notifyMessage);
-            bot->sendMessage(notifyMessage, notifyChatId);
+
+            if(strlen(_settingsExt.NotifyChatId) > 0)
+            {
+              TRACE(notifyMessage, F(" ChatId: "), _settingsExt.NotifyChatId);
+              bot->sendMessage(notifyMessage, _settingsExt.NotifyChatId);
+            }
           }
         #endif
       #endif
@@ -575,19 +617,27 @@ void SetAlarmedLED()
   for(uint8_t ledIdx = 0; ledIdx < LED_COUNT; ledIdx++)
   {   
     auto &led = ledsState[ledIdx];
-    led.Idx = ledIdx;
+    led.Idx = ledIdx;    
     if(alarmedLedIdx.count(ledIdx) > 0)
     {
-      if(!led.IsAlarmed)
+      const auto regionInfo = alarmedLedIdx[ledIdx];
+      const uint8_t &regionId = (uint8_t)regionInfo->Id;
+      bool ifAlarmedCustomRegion = _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions ? IsRelaysContains(regionId) : true;
+      if(ifAlarmedCustomRegion)
       {
-        led.Color = led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor;
-        led.BlinkPeriod = LED_NEW_ALARMED_PERIOD;
-        led.BlinkTotalTime = LED_NEW_ALARMED_TOTALTIME;
-      }       
-      led.IsAlarmed = true;  
-      led.IsPartialAlarmed = alarmedLedIdx[ledIdx]->AlarmStatus == ApiAlarmStatus::PartialAlarmed;
+        if(!led.IsAlarmed)
+        {
+          led.Color = led.IsPartialAlarmed ? _settings.PartialAlarmedColor : _settings.AlarmedColor;
+          led.BlinkPeriod = LED_NEW_ALARMED_PERIOD;
+          led.BlinkTotalTime = LED_NEW_ALARMED_TOTALTIME;
+        }       
+        led.IsAlarmed = true;  
+        led.IsPartialAlarmed = regionInfo->AlarmStatus == ApiAlarmStatus::PartialAlarmed;
+        RecalculateBrightness(led, false);    
+        continue;
+      }
     }
-    else
+    
     {
       led.IsAlarmed = false;
       led.IsPartialAlarmed = false;
@@ -601,8 +651,9 @@ void SetAlarmedLED()
 
 void SetRelayStatus()
 {
-  INFO(F("SetRelayStatus: "), F("Relay1"), F(": "), _settings.Relay1Region, F(" "), F("Relay2"), F(": "), _settings.Relay2Region); 
-  if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
+  TRACE(F("SetRelayStatus: ")); TRACE(F("Relay1"), F(": "), GetRelay1Str(nullptr)); TRACE(F("Relay2"), F(": "), GetRelay2Str(nullptr)); 
+  //if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
+  if(IsRelay1Off() && IsRelay2Off()) return;
   
   bool found1 = false;
   bool found2 = false;  
@@ -611,12 +662,14 @@ void SetRelayStatus()
   {
     TRACE(F("Led idx: "), idx.first, F(" Region: "), idx.second->Id);
   
-    if(!found1 && idx.second->Id == (UARegion)_settings.Relay1Region)
+    //if(!found1 && idx.second->Id == (UARegion)_settings.Relay1Region)
+    if(!found1 && IsRelay1Contains(idx.second->Id))
     {
       TRACE(F("Found1: "), idx.second->Id, F(" Name: "), idx.second->Name);
       found1 = true;        
     }      
-    if(!found2 && idx.second->Id == (UARegion)_settings.Relay2Region)
+    //if(!found2 && idx.second->Id == (UARegion)_settings.Relay2Region)
+    if(!found2 && IsRelay2Contains(idx.second->Id))
     {
       TRACE(F("Found2: "), idx.second->Id, F(" Name: "), idx.second->Name);
       found2 = true;        
@@ -632,7 +685,7 @@ void SetRelayStatus()
     }
 
     digitalWrite(PIN_RELAY1, RELAY_ON);    
-    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), _settings.Relay1Region);      
+    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), GetRelay1Str(nullptr));      
   }
   else
   {
@@ -640,21 +693,21 @@ void SetRelayStatus()
     { 
       digitalWrite(PIN_RELAY1, RELAY_OFF);
       Buzz::AlarmEnd(PIN_BUZZ, _settings.BuzzTime);
-      TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), _settings.Relay1Region);
+      TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), GetRelay1Str(nullptr));
     }
   }
 
   if(found2)
   {
     digitalWrite(PIN_RELAY2, RELAY_ON);
-    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), _settings.Relay2Region);      
+    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), GetRelay2Str(nullptr));      
   }
   else
   {
     if(digitalRead(PIN_RELAY2) == RELAY_ON)
     {      
       digitalWrite(PIN_RELAY2, RELAY_OFF);
-      TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), _settings.Relay2Region);
+      TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), GetRelay2Str(nullptr));
     }
   }    
   
@@ -790,18 +843,18 @@ void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
   str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
 }
 
-void PrintNetworkStatistic(String &str)
+void PrintNetworkStatistic(String &str, const int& codeFilter)
 {
-  str = F("Network Statistic: ");
+  str = F("NSTAT: ");
   #ifdef NETWORK_STATISTIC  
   if(networkStat.size() > 0)
   {
-    if(networkStat.count(ApiStatusCode::API_OK) > 0)
+    if(networkStat.count(ApiStatusCode::API_OK) > 0 && (codeFilter == 0 || codeFilter == ApiStatusCode::API_OK))
       PrintNetworkStatInfo(networkStat[ApiStatusCode::API_OK], str);
     for(const auto &de : networkStat)
     {
       const auto &info = de.second;
-      if(info.code != ApiStatusCode::API_OK)
+      if(info.code != ApiStatusCode::API_OK && (codeFilter == 0 || codeFilter == info.code))
         PrintNetworkStatInfo(info, str);
     }
   }
@@ -1213,4 +1266,28 @@ void SetRegionState(const UARegion &region, LedState &state)
     // state.IsPartialAlarmed = ledsState[idx].IsPartialAlarmed;
     ledsState[idx] = state;
   }
+}
+
+void SetWhiteColorSchema()
+{
+  TRACE(F("Color Schema: "), F("White"));
+  _settings.AlarmedColor = CRGB::Red;
+  _settings.NotAlarmedColor = CRGB::White;
+  _settings.PartialAlarmedColor = CRGB::Yellow;
+}
+
+void SetBlueDefaultColorSchema()
+{
+  TRACE(F("Color Schema: "), F("Blue"));
+  _settings.AlarmedColor = LED_ALARMED_COLOR;
+  _settings.NotAlarmedColor = LED_NOT_ALARMED_COLOR;
+  _settings.PartialAlarmedColor = LED_PARTIAL_ALARMED_COLOR;
+}
+
+void SetYellowColorSchema()
+{
+  TRACE(F("Color Schema: "), F("Yellow"));
+  _settings.AlarmedColor = CRGB::Red;
+  _settings.NotAlarmedColor = CRGB::Yellow;
+  _settings.PartialAlarmedColor = CRGB::Orange;
 }

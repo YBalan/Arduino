@@ -92,7 +92,7 @@ void HangleBotMessages(FB_msg& msg)
   bool isGroup = msg.chatID.startsWith("-");
   if(
     (!isGroup) //In private chat
-    || (msg.text == F("/nstat") || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
+    || (msg.text.startsWith(F("/nstat")) || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || (msg.replyText.indexOf(_botSettings.botName) == 0 && msg.replyText.indexOf(REGISTRATION_MSG, botNameIdx + _botSettings.botName.length()) > 0) //In registration
     || (msg.data.length() > 0 && msg.text.indexOf(_botSettings.botNameForMenu) >= 0) //From BOT inline menu
@@ -132,7 +132,10 @@ void HangleBotMessages(FB_msg& msg)
         {
           if(result.size() == 1)
           {
-            bot->replyMessage(result[0], msg.messageID, msg.chatID);
+            if(isGroup)
+              bot->sendMessage(result[0], msg.chatID);
+            else
+              bot->replyMessage(result[0], msg.messageID, msg.chatID);
           }
           else
           {            

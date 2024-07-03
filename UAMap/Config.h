@@ -13,7 +13,10 @@
   #ifdef USE_BOT
     #define USE_POWER_MONITOR
     #define SHOW_PM_FACTOR
+    #define SHOW_PM_TIME
     #define USE_NOTIFY
+    #define USE_RELAY_EXT
+    #define USE_LEARN
   #endif
   //#define HTTP_TIMEOUT 3000
   #define LANGUAGE_UA

@@ -2,16 +2,21 @@ gay - trolololo
 ua - Ukraine Prapor
 ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
+learn - Learn Regions of Ukraine
 br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
 br1 - Min brightness only alarmed visible
-modealarms - Alarms Mode
-modesouvenir - Souvenir Mode
+modealarms - Current Mode
+modealarms0 - Alarms Mode
+modealarms1 - Souvenir Mode UAPrapor
+modealarms2 - Alarms Only Custom Regions Mode
+modesouvenir - Current Souvenir Mode
 modesouvenir0 - Souvenir Mode UA Prapor
 modesouvenir2 - Souvenir Mode BG Prapor
 modesouvenir3 - Souvenir Mode MD Prapor
 fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
+palette - Palette of Known RGB backcolors
 alarmed - List of currently alarmed regions
 all - List of All regions
 relay1 - Region Id set for Relay1
@@ -22,11 +27,12 @@ buzztime - Current buzzer time in milliseconds
 buzztime3000 - Set buzzer time to 3secs
 buzztime0 - Switch off buzzer
 schema - Current Color schema
-schema0 - Set Color schema to Dark
-schema1 - Set Color schema to Light
+schema0 - Set Color schema to Blue
+schema1 - Set Color schema to White
+schema2 - Set Color schema to Yellow
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
-play - Play tones 500,800
+play500_800 - Play tones 500tone,800duration
 pm - Show Power monitor
 powerupdate - Power Monitor update period in milliseconds
 alarmpm - Alarm - send message when voltage <= value
@@ -48,6 +54,7 @@ fs - File System Info
 changeconfig - change configuration WiFi, tokens...
 chid - List of registered channels
 notify - Notify saved http code result
+notify0 - Notifications Off
 notify1 - Notify All http code result
 notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)
