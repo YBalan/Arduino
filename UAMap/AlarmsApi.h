@@ -84,33 +84,33 @@ public:
   #ifdef LANGUAGE_UA
 IotApiRegions iotApiRegions = 
 {
-  {"Автономна Республіка Крим",  UARegion::Crimea,            ApiAlarmStatus::NotAlarmed},          //0
-  {"Волинська область",          UARegion::Volynska,          ApiAlarmStatus::NotAlarmed},          //1
-  {"Вінницька область",          UARegion::Vinnytska,         ApiAlarmStatus::NotAlarmed},          //2
-  {"Дніпропетровська область",   UARegion::Dnipropetrovska,   ApiAlarmStatus::NotAlarmed},          //3
-  {"Донецька область",           UARegion::Donetska,          ApiAlarmStatus::NotAlarmed},          //4
-  {"Житомирська область",        UARegion::Zhytomyrska,       ApiAlarmStatus::NotAlarmed},          //5
-  {"Закарпатська область",       UARegion::Zakarpatska,       ApiAlarmStatus::NotAlarmed},          //6
-  {"Запорізька область",         UARegion::Zaporizka,         ApiAlarmStatus::NotAlarmed},          //7
-  {"Івано-Франківська область",  UARegion::Ivano_Frankivska,  ApiAlarmStatus::NotAlarmed},          //8
-  {"м. Київ",                    UARegion::Kyiv,              ApiAlarmStatus::NotAlarmed},          //9
-  {"Київська область",           UARegion::Kyivska,           ApiAlarmStatus::NotAlarmed},          //10
-  {"Кіровоградська область",     UARegion::Kirovohradska,     ApiAlarmStatus::NotAlarmed},          //11
-  {"Луганська область",          UARegion::Luhanska,          ApiAlarmStatus::NotAlarmed},          //12
-  {"Львівська область",          UARegion::Lvivska,           ApiAlarmStatus::NotAlarmed},          //13
-  {"Миколаївська область",       UARegion::Mykolaivska,       ApiAlarmStatus::NotAlarmed},          //14
-  {"Одеська область",            UARegion::Odeska,            ApiAlarmStatus::NotAlarmed},          //15
-  {"Полтавська область",         UARegion::Poltavska,         ApiAlarmStatus::NotAlarmed},          //16
-  {"Рівненська область",         UARegion::Rivnenska,         ApiAlarmStatus::NotAlarmed},          //17
-  {"м. Севастополь",             UARegion::Sevastopol,        ApiAlarmStatus::NotAlarmed},          //18
-  {"Сумська область",            UARegion::Sumska,            ApiAlarmStatus::NotAlarmed},          //19
-  {"Тернопільська область",      UARegion::Ternopilska,       ApiAlarmStatus::NotAlarmed},          //20
-  {"Харківська область",         UARegion::Kharkivska,        ApiAlarmStatus::NotAlarmed},          //21
-  {"Херсонська область",         UARegion::Khersonska,        ApiAlarmStatus::NotAlarmed},          //22
-  {"Хмельницька область",        UARegion::Khmelnitska,       ApiAlarmStatus::NotAlarmed},          //23
-  {"Черкаська область",          UARegion::Cherkaska,         ApiAlarmStatus::NotAlarmed},          //24
-  {"Чернівецька область",        UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
-  {"Чернігівська область",       UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
+  {"АРК",                UARegion::Crimea,            ApiAlarmStatus::NotAlarmed},          //0
+  {"Волинська",          UARegion::Volynska,          ApiAlarmStatus::NotAlarmed},          //1
+  {"Вінницька",          UARegion::Vinnytska,         ApiAlarmStatus::NotAlarmed},          //2
+  {"Дніпропетровська",   UARegion::Dnipropetrovska,   ApiAlarmStatus::NotAlarmed},          //3
+  {"Донецька",           UARegion::Donetska,          ApiAlarmStatus::NotAlarmed},          //4
+  {"Житомирська",        UARegion::Zhytomyrska,       ApiAlarmStatus::NotAlarmed},          //5
+  {"Закарпатська",       UARegion::Zakarpatska,       ApiAlarmStatus::NotAlarmed},          //6
+  {"Запорізька",         UARegion::Zaporizka,         ApiAlarmStatus::NotAlarmed},          //7
+  {"Івано-Франківська",  UARegion::Ivano_Frankivska,  ApiAlarmStatus::NotAlarmed},          //8
+  {"м. Київ",            UARegion::Kyiv,              ApiAlarmStatus::NotAlarmed},          //9
+  {"Київська",           UARegion::Kyivska,           ApiAlarmStatus::NotAlarmed},          //10
+  {"Кіровоградська",     UARegion::Kirovohradska,     ApiAlarmStatus::NotAlarmed},          //11
+  {"Луганська",          UARegion::Luhanska,          ApiAlarmStatus::NotAlarmed},          //12
+  {"Львівська",          UARegion::Lvivska,           ApiAlarmStatus::NotAlarmed},          //13
+  {"Миколаївська",       UARegion::Mykolaivska,       ApiAlarmStatus::NotAlarmed},          //14
+  {"Одеська",            UARegion::Odeska,            ApiAlarmStatus::NotAlarmed},          //15
+  {"Полтавська",         UARegion::Poltavska,         ApiAlarmStatus::NotAlarmed},          //16
+  {"Рівненська",         UARegion::Rivnenska,         ApiAlarmStatus::NotAlarmed},          //17
+  {"м. Севастополь",     UARegion::Sevastopol,        ApiAlarmStatus::NotAlarmed},          //18
+  {"Сумська",            UARegion::Sumska,            ApiAlarmStatus::NotAlarmed},          //19
+  {"Тернопільська",      UARegion::Ternopilska,       ApiAlarmStatus::NotAlarmed},          //20
+  {"Харківська",         UARegion::Kharkivska,        ApiAlarmStatus::NotAlarmed},          //21
+  {"Херсонська",         UARegion::Khersonska,        ApiAlarmStatus::NotAlarmed},          //22
+  {"Хмельницька",        UARegion::Khmelnitska,       ApiAlarmStatus::NotAlarmed},          //23
+  {"Черкаська",          UARegion::Cherkaska,         ApiAlarmStatus::NotAlarmed},          //24
+  {"Чернівецька",        UARegion::Chernivetska,      ApiAlarmStatus::NotAlarmed},          //25
+  {"Чернігівська",       UARegion::Chernihivska,      ApiAlarmStatus::NotAlarmed},          //26
 };
 #else
 IotApiRegions iotApiRegions = 
@@ -164,6 +164,12 @@ IotApiRegions iotApiRegions =
       }
       return F("");
     }
+
+    const String GetRegionNameById(const uint8_t &id)
+    {
+      return GetRegionNameById((UARegion)id);
+    }
+
     RegionInfo* const GetRegionById(const UARegion &id)
     {
       for(auto &r : iotApiRegions)
@@ -524,6 +530,6 @@ IotApiRegions iotApiRegions =
     
 };
 
-std::unique_ptr<AlarmsApi> api(new AlarmsApi());
+static std::unique_ptr<AlarmsApi> api(new AlarmsApi());
 
 #endif //ALARMS_API_H

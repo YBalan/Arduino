@@ -2,6 +2,7 @@ gay - trolololo
 ua - Ukraine Prapor
 ua1 - Ukraine Parpor with Anthem
 menu - Simple menu
+learn - Learn Regions of Ukraine
 br - Current brightness
 br255 - Max brightness
 br2 - Min brightness
@@ -31,7 +32,7 @@ schema1 - Set Color schema to White
 schema2 - Set Color schema to Yellow
 strobe - Stroboscope with current Br & Schema
 rainbow - Rainbow with current Br
-play - Play tones 500,800
+play500_800 - Play tones 500tone,800duration
 pm - Show Power monitor
 powerupdate - Power Monitor update period in milliseconds
 alarmpm - Alarm - send message when voltage <= value

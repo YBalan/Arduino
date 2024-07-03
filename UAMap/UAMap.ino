@@ -3,15 +3,15 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.31")
+  #define VER F("1.32")
 #else //ESP32
-  #define VER F("1.36")
+  #define VER F("1.38")
 #endif
 
 #define AVOID_FLICKERING
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -166,6 +166,7 @@ void setup() {
 
   LoadSettings();
   LoadSettingsExt();
+  LoadSettingsRelayExt();
   //_settings.reset();
 
   PMonitor::LoadSettings();
@@ -621,7 +622,7 @@ void SetAlarmedLED()
     {
       const auto regionInfo = alarmedLedIdx[ledIdx];
       const uint8_t &regionId = (uint8_t)regionInfo->Id;
-      bool ifAlarmedCustomRegion = _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions ? (_settings.Relay1Region == regionId || _settings.Relay2Region == regionId) : true;
+      bool ifAlarmedCustomRegion = _settingsExt.Mode == ExtMode::AlarmsOnlyCustomRegions ? IsRelaysContains(regionId) : true;
       if(ifAlarmedCustomRegion)
       {
         if(!led.IsAlarmed)
@@ -650,8 +651,9 @@ void SetAlarmedLED()
 
 void SetRelayStatus()
 {
-  INFO(F("SetRelayStatus: "), F("Relay1"), F(": "), _settings.Relay1Region, F(" "), F("Relay2"), F(": "), _settings.Relay2Region); 
-  if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
+  TRACE(F("SetRelayStatus: ")); TRACE(F("Relay1"), F(": "), GetRelay1Str(nullptr)); TRACE(F("Relay2"), F(": "), GetRelay2Str(nullptr)); 
+  //if(_settings.Relay1Region == 0 && _settings.Relay2Region == 0) return;
+  if(IsRelay1Off() && IsRelay2Off()) return;
   
   bool found1 = false;
   bool found2 = false;  
@@ -660,12 +662,14 @@ void SetRelayStatus()
   {
     TRACE(F("Led idx: "), idx.first, F(" Region: "), idx.second->Id);
   
-    if(!found1 && idx.second->Id == (UARegion)_settings.Relay1Region)
+    //if(!found1 && idx.second->Id == (UARegion)_settings.Relay1Region)
+    if(!found1 && IsRelay1Contains(idx.second->Id))
     {
       TRACE(F("Found1: "), idx.second->Id, F(" Name: "), idx.second->Name);
       found1 = true;        
     }      
-    if(!found2 && idx.second->Id == (UARegion)_settings.Relay2Region)
+    //if(!found2 && idx.second->Id == (UARegion)_settings.Relay2Region)
+    if(!found2 && IsRelay2Contains(idx.second->Id))
     {
       TRACE(F("Found2: "), idx.second->Id, F(" Name: "), idx.second->Name);
       found2 = true;        
@@ -681,7 +685,7 @@ void SetRelayStatus()
     }
 
     digitalWrite(PIN_RELAY1, RELAY_ON);    
-    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), _settings.Relay1Region);      
+    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), GetRelay1Str(nullptr));      
   }
   else
   {
@@ -689,21 +693,21 @@ void SetRelayStatus()
     { 
       digitalWrite(PIN_RELAY1, RELAY_OFF);
       Buzz::AlarmEnd(PIN_BUZZ, _settings.BuzzTime);
-      TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), _settings.Relay1Region);
+      TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), GetRelay1Str(nullptr));
     }
   }
 
   if(found2)
   {
     digitalWrite(PIN_RELAY2, RELAY_ON);
-    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), _settings.Relay2Region);      
+    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), GetRelay2Str(nullptr));      
   }
   else
   {
     if(digitalRead(PIN_RELAY2) == RELAY_ON)
     {      
       digitalWrite(PIN_RELAY2, RELAY_OFF);
-      TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), _settings.Relay2Region);
+      TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), GetRelay2Str(nullptr));
     }
   }    
   
