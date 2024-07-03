@@ -2,12 +2,33 @@
 #include <avr/wdt.h>
 #include <LiquidCrystal_I2C.h>
 
-#define RELEASE
-//#define INFO
+#define VER F("1.0")
+
+//#define RELEASE
+//#define DEBUG
+
+#define ENABLE_TRACE
+#define ENABLE_INFO_MAIN
+
+#ifdef DEBUG
+#define ENABLE_TRACE_MAIN
+#endif
 
 #include "../../Shares/Button.h"
 #include "../../Shares/DEBUGHelper.h"
 #include "Pump.h"
+
+#ifdef ENABLE_INFO_MAIN
+#define INFO(...) SS_TRACE(__VA_ARGS__)
+#else
+#define INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_MAIN
+#define TRACE(...) SS_TRACE(__VA_ARGS__)
+#else
+#define TRACE(...) {}
+#endif
 
 #define USE_WATER_SENSOR true
 bool HasWater = !USE_WATER_SENSOR;
@@ -67,15 +88,14 @@ void setup()
 
   BacklightOn();
   lcd.setCursor(0, 0);
-  lcd.print("Hello!");  
+  lcd.print(F("Hello!"));  
 
   Serial.begin(9600);
   while(!Serial);
 
   Serial.println();
-  Serial.println();
-  Serial.println("Auto Watering started");
-  Serial.println();
+  Serial.println(F("!!!! Start Auto Watering !!!!"));
+  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
 
   InitializePumps();
   InitializeButtons();
@@ -130,7 +150,7 @@ const bool CheckPrintSensorStatusDelay(const unsigned long &currentTicks)
 void EnableWatchDog()
 {
   wdt_enable(WDTO_8S); 
-  S_INFO("Watchdog enabled");
+  INFO(F("Watchdog enabled"));
 }
 
 void loop()
@@ -149,7 +169,7 @@ void loop()
   { 
     if(HasWater)
     {
-      S_INFO("NO Water");
+      INFO(F("NO Water"));
       SetAllPumps(PumpState::OFF);
       currentPumpToShowFullStatus = -1;
     }
@@ -162,7 +182,7 @@ void loop()
   {
     if(!HasWater)
     {
-      S_INFO("Has Water");
+      INFO(F("Has Water"));
       ResetPumpStates(PumpState::TIMEOUT_OFF);
       
       DebugSerialPrintPumpsStatus(current);
@@ -177,7 +197,7 @@ void loop()
     if(waterSensor.getTicks() <= 1000)
     {
       waterSensorShortClickCount++;      
-      S_INFO3(3 - waterSensorShortClickCount, " ", "Hard reset");
+      INFO(3 - waterSensorShortClickCount, F(" "), F("Hard reset"));
       waterSensor.resetTicks();
     }
     else
@@ -188,7 +208,7 @@ void loop()
     if(waterSensorShortClickCount >= 3)
     {
       waterSensorShortClickCount = 0;
-      S_INFO("Hard reset");
+      INFO(F("Hard reset"));
       ResetSettings();
       
       DebugSerialPrintPumpsStatus(current);      
@@ -197,14 +217,14 @@ void loop()
 
   if(scheduleWatering.isReleased() || debugButtonFromSerial == 9)
   {
-    S_INFO2("Schedule ", BUTTON_IS_PRESSED_MSG);
+    INFO(F("Schedule "), BUTTON_IS_PRESSED_MSG);
     ResetPumpStates();
   }
 
   if(backLightBtn.isReleased() || debugButtonFromSerial == 10)
   {
     auto count = backLightBtn.getCount();    
-    S_INFO4("Backlight ", BUTTON_IS_PRESSED_MSG, " ", count);
+    INFO(F("Backlight "), BUTTON_IS_PRESSED_MSG, F(" "), count);
     BacklightOn();
     if(count > 1)
     {
@@ -221,8 +241,8 @@ void loop()
   {
     if(pumps[pumpIdx].IsWatchDogTriggered(current))
     {
-      //Serial.print(pumpIdx + 1); Serial.print("  TIMEOUT: ");
-      S_INFO2(pumpIdx + 1, "  TIMEOUT: ");
+      //Serial.print(pumpIdx + 1); Serial.print(F("  TIMEOUT: "));
+      INFO(pumpIdx + 1, F("  TIMEOUT: "));
       pumps[pumpIdx].End(TIMEOUT_OFF);
 
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
@@ -234,8 +254,8 @@ void loop()
     {
       BacklightOn();
 
-      //Serial.print(pumpIdx + 1); Serial.print(" REQUIRED: ");
-      S_INFO2(pumpIdx + 1, " REQUIRED: "); 
+      //Serial.print(pumpIdx + 1); Serial.print(F(" REQUIRED: "));
+      INFO(pumpIdx + 1, F(" REQUIRED: ")); 
       pumps[pumpIdx].Start();      
 
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
@@ -245,8 +265,8 @@ void loop()
 
     if(pumps[pumpIdx].IsWateringEnough() && HasWater)
     {
-      //Serial.print(pumpIdx + 1); Serial.print("   ENOUGH: ");
-      S_INFO2(pumpIdx + 1, "   ENOUGH: "); 
+      //Serial.print(pumpIdx + 1); Serial.print(F("   ENOUGH: "));
+      INFO(pumpIdx + 1, F("   ENOUGH: ")); 
       pumps[pumpIdx].End(DO_NOT_USE_ENOUGH_LOW_LEVEL ? SENSOR_OFF : OFF);
       
       DebugSerialPrintPumpStatus(pumpIdx, current, /*showDebugInfo:*/false);
@@ -259,8 +279,8 @@ void loop()
     {
       BacklightOn();
 
-      //Serial.print(pumpIdx + 1); Serial.print(" Pressed: ");
-      S_INFO2(pumpIdx + 1, " Pressed: "); 
+      //Serial.print(pumpIdx + 1); Serial.print(F(" Pressed: "));
+      INFO(pumpIdx + 1, F(" Pressed: ")); 
 
       currentPumpToShowFullStatus = pumpIdx;
       
@@ -277,8 +297,8 @@ void loop()
     if(buttons[pumpIdx].isReleased()
         || debugButtonFromSerial == -(pumpIdx + 1))
     {      
-      //Serial.print(pumpIdx + 1); Serial.print(" Released: "); Serial.print(buttons[pumpIdx].getTicks()); Serial.print("ms. => ");
-      S_INFO4(pumpIdx + 1, " Released: ", buttons[pumpIdx].getTicks(), "ms. => ");
+      //Serial.print(pumpIdx + 1); Serial.print(F(" Released: ")); Serial.print(buttons[pumpIdx].getTicks()); Serial.print(F("ms. => "));
+      INFO(pumpIdx + 1, F(" Released: "), buttons[pumpIdx].getTicks(), F("ms. => "));
 
       if(buttons[pumpIdx].isLongPress())
       {
@@ -305,14 +325,14 @@ void HandleDebugSerialCommands()
 {
   if(debugButtonFromSerial == 5)
   {
-    //Serial.println("Reset settings...");
+    //Serial.println(F("Reset settings..."));
     ResetSettings();    
     SerialPrintPumpsStatus(millis());
   }
 
   if(debugButtonFromSerial == 6)
   {
-    //Serial.println("Print status...");    
+    //Serial.println(F("Print status..."));    
     SerialPrintPumpsStatus(millis());
     SerialPrintSensorsStatus();
   }
@@ -343,7 +363,7 @@ void HandleDebugSerialCommands()
   //Reset after 8 secs see watch dog timer
   if(debugButtonFromSerial == 11)
   {
-    S_INFO("Reset in 8s...");
+    INFO(F("Reset in 8s..."));
     delay(10 * 1000);
   }
 
@@ -352,7 +372,7 @@ void HandleDebugSerialCommands()
   {
     //Serial.println(Serial.readString().toInt());
     debugButtonFromSerial = Serial.readString().toInt();
-    S_INFO(debugButtonFromSerial);
+    INFO(debugButtonFromSerial);
   }  
 
   //delay(50);
@@ -365,8 +385,8 @@ void DebugSerialPrintPumpStatus(const unsigned short &pumpIdx, const unsigned lo
   // char serialBuff[200];
   // Serial.println(pumps[pumpIdx].PrintStatus(/*showDebugInfo:*/showDebugInfo, currentTicks, serialBuff));
   //#else
-  //Serial.print(GetState(pumps[pumpIdx].getState())); Serial.print(" (wd:"); Serial.print(pumps[pumpIdx].Settings.WatchDog / 1000); Serial.println("s.)");
-  S_INFO3(GetState(pumps[pumpIdx].getState()), " wd:", pumps[pumpIdx].Settings.WatchDog / 1000);
+  //Serial.print(GetState(pumps[pumpIdx].getState())); Serial.print(F(" (wd:")); Serial.print(pumps[pumpIdx].Settings.WatchDog / 1000); Serial.println(F("s.)"));
+  INFO(GetState(pumps[pumpIdx].getState()), F(" wd:"), pumps[pumpIdx].Settings.WatchDog / 1000);
   //#endif
 }
 
@@ -397,16 +417,16 @@ void InitializePumps()
   {
     if(!pumps[i].Initialize())
     {
-      //Serial.print(i + 1); Serial.print(" Wrong pump initialization: "); Serial.println(i);
-      //S_INFO()
+      //Serial.print(i + 1); Serial.print(F(" Wrong pump initialization: ")); Serial.println(i);
+      //INFO()
     }
   }
 }
 
 void SetAllPumps(const PumpState &state)
 {
-  //Serial.print("Set All Pumps: "); Serial.println(GetState(state));
-  S_INFO2("Set All Pumps: ", GetState(state));
+  //Serial.print(F("Set All Pumps: ")); Serial.println(GetState(state));
+  INFO(F("Set All Pumps: "), GetState(state));
   for (short i = 0; i < PUMPS_COUNT; i++) 
   {
     state == ON || state == MANUAL_ON ? pumps[i].Start(state) : pumps[i].End(state);    
@@ -442,17 +462,17 @@ void DebugSerialPrintPumpsStatus(const unsigned long &currentTicks)
 {   
   // for (short i = 0; i < PUMPS_COUNT; i++)
   // {
-  //   Serial.print(i + 1); Serial.print(" "); DebugSerialPrintPumpStatus(i, currentTicks, /*showDebugInfo:*/false);
+  //   Serial.print(i + 1); Serial.print(F(" ")); DebugSerialPrintPumpStatus(i, currentTicks, /*showDebugInfo:*/false);
   // }  
 }
 
 void SerialPrintSensorsStatus()
 { 
-  // Serial.print("                              ");
+  // Serial.print(F("                              "));
   // for (short i = 0; i < PUMPS_COUNT; i++)
   // {
   //   char buff[40];    
-  //   sprintf(buff, "[%d: %d/%d] ", i + 1, pumps[i].GetSensorValue(), pumps[i].Settings.WateringRequired);
+  //   sprintf(buff, F("[%d: %d/%d] "), i + 1, pumps[i].GetSensorValue(), pumps[i].Settings.WateringRequired);
   //   Serial.print(buff);    
   // }
   // Serial.println();  
@@ -466,28 +486,26 @@ const char * const LcdPrintSensorStatus(const bool hasWater, const short current
 
   lcd.clear();
 
-  //Serial.println("lcd");
+  //Serial.println(F("lcd"));
 
   if(!hasWater)
   {
     lcd.setCursor(0, 0);
-    lcd.print("NO Water");
+    lcd.print(F("NO Water"));
   }   
   
   if(currentPump < 0 || currentPump >= PUMPS_COUNT) //ShortStatus
   { 
-    sprintf(pumpBuff1, "%s|%s", pumps[0].GetShortStatus(hasWater, pumpBuff12), pumps[1].GetShortStatus(hasWater, pumpBuff13));    
+    sprintf(pumpBuff1, "%s|%s", pumps[0].GetShortStatus(hasWater, pumpBuff12), pumps[1].GetShortStatus(hasWater, pumpBuff13));        
     
-    //Serial.print("1|2 => "); Serial.println(pumpBuff1);
-    S_INFO2("1|2 => ", pumpBuff1);    
+    TRACE(F("1|2 => "), pumpBuff1);    
     
     lcd.setCursor(0, 0);
     lcd.print(pumpBuff1);
     
-    sprintf(pumpBuff1, "%s|%s", pumps[2].GetShortStatus(hasWater, pumpBuff12), pumps[3].GetShortStatus(hasWater, pumpBuff13));
+    sprintf(pumpBuff1, "%s|%s", pumps[2].GetShortStatus(hasWater, pumpBuff12), pumps[3].GetShortStatus(hasWater, pumpBuff13));    
     
-    //Serial.print("3|4 => "); Serial.println(pumpBuff1);
-    S_INFO2("3|4 => ", pumpBuff1);     
+    TRACE(F("3|4 => "), pumpBuff1);     
 
     lcd.setCursor(0, 1);
     lcd.print(pumpBuff1);    
@@ -495,7 +513,7 @@ const char * const LcdPrintSensorStatus(const bool hasWater, const short current
   else
   {    
     sprintf(pumpBuff1, "%d:%s", currentPump + 1, pumps[currentPump].GetFullStatus(hasWater, pumpBuff12));
-    S_INFO2("Pump: ", pumpBuff1);
+    INFO(F("Pump: "), pumpBuff1);
     
     lcd.setCursor(0, 0);
     lcd.print(pumpBuff1);
@@ -511,7 +529,7 @@ const char * const LcdPrintSensorStatus(const bool hasWater, const short current
       sprintf(pumpBuff1, "%d:OFF|WD:%02ds", currentPump + 1, wdSecs);
     }    
     //Serial.println(pumpBuff1);
-    S_INFO2("Pump: ", pumpBuff1);
+    INFO(F("Pump: "), pumpBuff1);
 
     lcd.setCursor(0, 1);
     lcd.print(pumpBuff1);
@@ -522,7 +540,7 @@ const char * const LcdPrintSensorStatus(const bool hasWater, const short current
 
 void SaveSettings()
 {
-  S_INFO("Save Settings");
+  INFO(F("Save Settings"));
   auto addr = EEPROM_SETTINGS_ADDR;
   for (short i = 0; i < PUMPS_COUNT; i++)
   {
@@ -534,7 +552,7 @@ void SaveSettings()
 
 void LoadSettings()
 {
-  S_INFO("Load Settings");
+  INFO(F("Load Settings"));
   auto addr = EEPROM_SETTINGS_ADDR;
   for (short i = 0; i < PUMPS_COUNT; i++)
   {
@@ -543,7 +561,7 @@ void LoadSettings()
 
     if(pumps[i].Settings.WatchDog == ULONG_MAX || pumps[i].Settings.WatchDog == 0 || pumps[i].Settings.PumpState >= UNKNOWN)
     {
-      Serial.print(i + 1); Serial.println(" Storage is empty or corrupted. Return to default values...");
+      Serial.print(i + 1); Serial.println(F(" Storage is empty or corrupted. Return to default values..."));
       pumps[i].Reset();
     }
 
@@ -553,7 +571,7 @@ void LoadSettings()
 
 void ResetSettings()
 {
-  S_INFO("Reset Settings");
+  INFO(F("Reset Settings"));
   auto addr = EEPROM_SETTINGS_ADDR;
   for (short i = 0; i < PUMPS_COUNT; i++)
   {    
@@ -567,7 +585,7 @@ void ResetSettings()
 
 void ResetCounts()
 {
-  S_INFO("Reset Counts");
+  INFO(F("Reset Counts"));
   for (short i = 0; i < PUMPS_COUNT; i++)
   {    
     pumps[i].Settings.Count = 0;
@@ -598,7 +616,7 @@ void WaitUntilWaterSensorReleased()
     waterSensor.loop();
     if(waterSensor.isReleased())
     { 
-      //Serial.println("Has Water");
+      //Serial.println(F("Has Water"));
       ResetPumpStates();
       break;
     }
@@ -608,7 +626,7 @@ void WaitUntilWaterSensorReleased()
     {
       if(buttons[i].isPressed())
       {
-        //Serial.print(i + 1); Serial.println(" !!!! NO Water !!!!");
+        //Serial.print(i + 1); Serial.println(F(" !!!! NO Water !!!!"));
       }
     }
 
