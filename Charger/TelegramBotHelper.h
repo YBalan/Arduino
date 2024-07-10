@@ -21,6 +21,8 @@
 #define BOT_MENU_NAME F("Menu")
 #define BOT_CONNECTION_ISSUES_MSG F(" faced with connection issues")
 
+#define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
+
 #include "TelegramBot.h"
 #include "CommonHelper.h"
 
@@ -56,6 +58,7 @@ struct BotSettings
 
 extern const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup);
 extern void SaveChannelIDs();
+const bool HandleFrmwUpdate(FB_msg& msg, std::vector<String> &messages);
 
 const bool GetCommandValue(const String &command, const String &filteredMsg, String &value)
 {
@@ -92,7 +95,7 @@ void HangleBotMessages(FB_msg& msg)
   bool isGroup = msg.chatID.startsWith("-");
   if(
     (!isGroup) //In private chat
-    || (msg.text.startsWith(F("/nstat")) || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == F("frmwupdate")) //Only /nstat or /rssi or /ver command for all bots in group
+    || (msg.text.startsWith(F("/nstat")) || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == BOT_COMMAND_FRMW_UPDATE) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || (msg.replyText.indexOf(_botSettings.botName) == 0 && msg.replyText.indexOf(REGISTRATION_MSG, botNameIdx + _botSettings.botName.length()) > 0) //In registration
     || (msg.data.length() > 0 && msg.text.indexOf(_botSettings.botNameForMenu) >= 0) //From BOT inline menu
@@ -127,7 +130,13 @@ void HangleBotMessages(FB_msg& msg)
         //auto filtered = msg.text.substring(botNameIdx, msg.text.length());
         auto filtered = msg.text;
         filtered.replace(_botSettings.botName, F(""));
-        auto result = HandleBotMenu(msg, filtered, isGroup);
+
+        std::vector<String> result;
+        if(!HandleFrmwUpdate(msg, result))
+        {
+          result = HandleBotMenu(msg, filtered, isGroup);
+        }
+
         if(result.size() > 0)
         {
           if(result.size() == 1)
@@ -177,6 +186,52 @@ void HangleBotMessages(FB_msg& msg)
       }
     }    
   }
+}
+
+const bool HandleFrmwUpdate(FB_msg& msg, std::vector<String> &messages)
+{ 
+  if(msg.OTA && msg.text == BOT_COMMAND_FRMW_UPDATE)
+  { 
+    BOT_INFO(F("Update check..."));
+    String fileName = msg.fileName;
+    fileName.replace(F(".bin"), F(""));
+    fileName.replace(F(".gz"), F(""));
+    auto uidx = fileName.lastIndexOf(F("_"));
+    bool isEsp32Frmw = fileName.lastIndexOf(F("esp32")) >= 0;
+
+    if(uidx >= 0 && uidx < fileName.length() - 1)
+    {    
+      if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw))
+      {
+        bot->OTAVersion = fileName.substring(uidx + 1);
+        String currentVersion = String(VER);
+        if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
+        {
+          messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+          BOT_INFO(messages[0]);
+          bot->update();
+        }
+        else
+        {        
+          messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
+          bot->OTAVersion.clear();   
+          BOT_INFO(messages[0]);     
+        }
+      }
+      else
+      {
+        messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
+        BOT_INFO(messages[0]);
+      }
+    }
+    else
+    {      
+      messages.push_back(String(F("Unknown version")) + F(". NO Updates..."));
+      BOT_INFO(messages[0]);
+    }    
+    return true;
+  }
+  return false;
 }
 
 void SendMessageToAllRegisteredChannels(const String &msg, const bool &useBotName = true)

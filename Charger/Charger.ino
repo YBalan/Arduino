@@ -9,7 +9,7 @@
 #define AVOID_FLICKERING
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -124,11 +124,10 @@ void setup()
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
   LoadSettings();
-  LoadSettingsExt();
-  LoadSettingsRelayExt();
+  LoadSettingsExt();  
   //_settings.reset();
 
-  WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
+  WiFiOps::WiFiOps wifiOps(F("Charger WiFi Manager"), F("ChargerAP"), F("password"));
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -167,6 +166,12 @@ void setup()
   #endif 
 }
 
+void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
+{
+  INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());
+  
+}
+
 void loop()
 {
 
@@ -188,3 +193,78 @@ void loop()
   #endif   
 
 }
+
+void PrintFSInfo(String &fsInfo)
+{
+  #ifdef ESP8266
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);   
+  const auto &total = fs_info.totalBytes;
+  const auto &used = fs_info.usedBytes;
+  #else //ESP32
+  const auto &total = SPIFFS.totalBytes();
+  const auto &used = SPIFFS.usedBytes();
+  #endif
+  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+}
+
+
+#ifdef NETWORK_STATISTIC  
+void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
+{  
+  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
+}
+#endif
+
+void PrintNetworkStatToSerial()
+{
+  #ifdef NETWORK_STATISTIC
+  Serial.print(F("Network Statistic: "));
+  if(networkStat.size() > 0)
+  {
+    if(networkStat.count(200) > 0)
+      PrintNetworkStatInfoToSerial(networkStat[200]);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != 200)
+        PrintNetworkStatInfoToSerial(info);
+    }
+  }
+  Serial.print(F(" ")); Serial.print(millis() / 1000); Serial.print(F("sec"));
+  Serial.println();
+  #endif
+}
+
+void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
+{  
+  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
+}
+
+void PrintNetworkStatistic(String &str, const int& codeFilter)
+{
+  str = F("NSTAT: ");
+  #ifdef NETWORK_STATISTIC  
+  if(networkStat.size() > 0)
+  {
+    if(networkStat.count(200) > 0 && (codeFilter == 0 || codeFilter == 200))
+      PrintNetworkStatInfo(networkStat[200], str);
+    for(const auto &de : networkStat)
+    {
+      const auto &info = de.second;
+      if(info.code != 200 && (codeFilter == 0 || codeFilter == info.code))
+        PrintNetworkStatInfo(info, str);
+    }
+  }
+  const auto &millisec = millis();
+  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
+      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
+      
+  //str.replace("(", "");
+  //str.replace(")", "");
+  #else
+  str += F("Off");
+  #endif
+}
+
+
