@@ -10,6 +10,8 @@ enum PumpState
   MANUAL_OFF = 4,
   TIMEOUT_OFF = 5,
   SENSOR_OFF = 6,
+  AERATION_ON = 7,
+  AERATION_OFF = 8,
   UNKNOWN,
 };
 
@@ -31,6 +33,10 @@ static const __FlashStringHelper* const GetState(const PumpState & state)
         return F("TIMEOUT OFF");
       case SENSOR_OFF:
         return F("SENSOR OFF");
+      case AERATION_ON:
+        return F("AERATION ON");
+      case AERATION_OFF:
+        return F("AERATION OFF");
       default:
         return F("UNKNOWN");
     }
