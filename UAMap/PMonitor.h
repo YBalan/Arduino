@@ -130,7 +130,7 @@ namespace PMonitor
       ina226.startSingleMeasurement();
       ina226.readAndClearFlags();
       busVoltage_V = ina226.getBusVoltage_V();
-      PM_TRACE(F("Bus Voltage [V]: "), busVoltage_V);
+      PM_TRACE(F("Bus [V]: "), busVoltage_V);
 
       #ifdef DEBUG
       float shuntVoltage_mV = 0.0;
@@ -144,15 +144,15 @@ namespace PMonitor
       power_mW = ina226.getBusPower();
       loadVoltage_V  = busVoltage_V + (shuntVoltage_mV/1000);        
 
-      PM_TRACE(F("Shunt Voltage [mV]: "), shuntVoltage_mV);      
-      PM_TRACE(F("Load Voltage [V]: "), loadVoltage_V);
-      PM_TRACE(F("Current[mA]: "), current_mA);
+      PM_TRACE(F("Shunt [mV]: "), shuntVoltage_mV);      
+      PM_TRACE(F("Load [V]: "), loadVoltage_V);
+      PM_TRACE(F("Current [mA]: "), current_mA);
       PM_TRACE(F("Bus Power [mW]: "), power_mW);
       if(!ina226.overflow){
-        PM_TRACE(F("Values OK - no overflow"));
+        PM_TRACE(F("Values OK"));
       }
       else{
-        PM_TRACE(F("Overflow! Choose higher current range"));
+        PM_TRACE(F("Overflow"));
       }
       #endif
 

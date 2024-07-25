@@ -37,14 +37,14 @@ namespace UAAnthem
       switch(type)
       {
         #ifdef ESP32
-          case 1:
-            return Buzz::PlayMelody(pin, UA_ANTHEM_HALF);
+          case 1: //Half
+            //return Buzz::PlayMelody(pin, UA_ANTHEM_HALF);
           break;
-          case 2:
-            return Buzz::PlayMelody(pin, UA_ANTHEM_FULL);
+          case 2: //Full
+            //return Buzz::PlayMelody(pin, UA_ANTHEM_FULL);
           break;
         #endif
-        case 0:
+        case 0: //Small
         default:
           return Buzz::PlayMelody(pin, UA_ANTHEM_SMALL);
         break;

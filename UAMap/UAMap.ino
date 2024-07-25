@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.32")
+  #define VER F("1.33")
 #else //ESP32
-  #define VER F("1.38")
+  #define VER F("1.39")
 #endif
 
 #define AVOID_FLICKERING
@@ -21,7 +21,7 @@
 
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
-#define USE_BUZZER_MELODIES 
+//#define USE_BUZZER_MELODIES 
 
 #define ENABLE_TRACE_MAIN
 
@@ -40,8 +40,8 @@
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 
-#define ENABLE_INFO_PMONITOR
-#define ENABLE_TRACE_PMONITOR
+// #define ENABLE_INFO_PMONITOR
+// #define ENABLE_TRACE_PMONITOR
 
 #define ENABLE_INFO_BUZZ
 #define ENABLE_TRACE_BUZZ

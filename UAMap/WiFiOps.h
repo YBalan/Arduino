@@ -4,6 +4,7 @@
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include <ArduinoJson.h>
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -177,8 +178,10 @@ class WiFiOps
       //in seconds
       //wifiManager.setTimeout(120);
 
-      auto mac = WiFi.macAddress();
-      mac = mac.substring(mac.length() - 5, mac.length());
+      WiFi.begin();
+      const auto &mac = WiFi.macAddress();
+      WIFI_TRACE(F("MAC: "), mac);
+      String apmac = mac.substring(mac.length() - 5, mac.length());
       //fetches ssid and pass and tries to connect
       //if it does not connect it starts an access point with the specified name
       //here  "AutoConnectAP"
@@ -186,7 +189,7 @@ class WiFiOps
       /*WiFi.enableInsecureWEP();
       WiFi.encryptionType(int networkItem);*/
 
-      const String apName = (_APName + (_addMacToAPName ? "_" + mac : ""));
+      const String apName = (_APName + (_addMacToAPName ? "_" + apmac : ""));
       WIFI_INFO(F("Autoconnect: "), apName);
       if (!wifiManager.autoConnect(apName.c_str(), _APPass.c_str())) {
         WIFI_INFO(F("failed to connect and hit timeout"));
