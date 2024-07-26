@@ -139,7 +139,7 @@ public:
     auto newState = state;
     if(state == MANUAL_ON) 
     {
-      if(Settings.WatchDog >= AERATION_TIMEOUT) 
+      if(IsAeration()) 
       {
         newState = AERATION_ON; 
       }
@@ -310,7 +310,7 @@ public:
         statusBuff = (shortStatus ? CALIBRATING_REQUIRED_CODE : CALIBRATING_REQUIRED_LCODE);
         showCount = false;
       }else
-      // if(Settings.WatchDog >= AERATION_TIMEOUT)
+      // if(IsAeration())
       // {
       //   statusBuff = String(shortStatus ? AERATING_CODE : AERATING_LCODE) + String(isOn() ? F("On") : F("Off"));
       // }
@@ -331,9 +331,12 @@ public:
       }
     }
 
-    if(Settings.WatchDog >= AERATION_TIMEOUT)
+    if(IsAeration())
     {
-      statusBuff = String(shortStatus ? AERATING_CODE : AERATING_LCODE) + String(isOn() ? F("On") : F("Off"));
+      sensorValueBuff = (shortStatus ? AERATING_CODE : AERATING_LCODE);
+      statusBuff = hasWater 
+                    ? (isOn() ? F("On") : F("Off"))
+                    : (shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
       showCount = true;
     }
     
@@ -342,6 +345,8 @@ public:
     
     return sensorValueBuff + F("/") + statusBuff + (showCount ? (String(F(":")) + String(Settings.Count)) : String(F("")));
   }
+
+  const bool IsAeration() const { return Settings.WatchDog >= AERATION_TIMEOUT; }
 
 private:
   const PumpState HandleSensorState(const PumpState &state)

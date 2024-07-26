@@ -2,7 +2,7 @@
 #include <avr/wdt.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VER F("1.3")
+#define VER F("1.4")
 
 //#define RELEASE
 //#define DEBUG
