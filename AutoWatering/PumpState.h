@@ -1,7 +1,7 @@
 #ifndef PumpState_h
 #define PumpState_h
 
-enum PumpState
+enum PumpState : uint8_t
 {
   ON = 0,
   OFF = 1,  
