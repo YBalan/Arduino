@@ -43,7 +43,7 @@
 #define SENSOR_CHANGES_LEVEL 10
 
 #ifdef DEBUG
-#define AERATION_TIMEOUT 2000
+#define AERATION_TIMEOUT 5000
 #else
 #define AERATION_TIMEOUT 60000
 #endif
@@ -98,9 +98,9 @@ public:
 
 private:
   unsigned long _startTiks = 0;  
-  uint8_t _place = -1;
-  uint8_t _pumpPin = -1;
-  uint8_t _sensorPin = -1;  
+  uint8_t _place = 0;
+  uint8_t _pumpPin = 0;
+  uint8_t _sensorPin = 0;  
 
 private:
   short _sensorValue = -1;
@@ -128,8 +128,10 @@ public:
   const PumpState getState() const { return Settings.PumpState; }
   const bool isOff() const { return Settings.PumpState == OFF || Settings.PumpState == MANUAL_OFF || Settings.PumpState == TIMEOUT_OFF || Settings.PumpState == CALIBRATING || Settings.PumpState == SENSOR_OFF || Settings.PumpState == AERATION_OFF; }
   const bool isOn() const { return Settings.PumpState == ON || Settings.PumpState == MANUAL_ON || Settings.PumpState == AERATION_ON; }
+  const bool IsAeration() const { return Settings.WatchDog >= AERATION_TIMEOUT; }
+  const bool IsAerationInProgress() const { return Settings.PumpState == AERATION_ON || Settings.PumpState == AERATION_OFF; }
   const bool IsCalibratingRequired(){ return Settings.WatchDog == DEFAULT_PUMP_TIMEOUT; }  
-  const unsigned long &getTicks() const {return _startTiks;}
+  const unsigned long &getTicks() const { return _startTiks; }
 
   const bool Start(){ return Start(PumpState::ON); }
 
@@ -171,14 +173,17 @@ public:
       Settings.WateringEnough = DO_NOT_USE_ENOUGH_LOW_LEVEL ? DEFAULT_WATERING_ENOUGH_LEVEL : _sensorValueEnd;
       Settings.Count = 0;
       Settings.SensorNotChangedCount = 0;
-    }
-
-    if(state == AERATION_OFF)
+    }else
+    // if(state == AERATION_OFF)
+    // {
+    //    _startTiks = millis();
+    //   Settings.PumpState = AERATION_OFF;
+    // }else
+    if(IsAeration() && state != MANUAL_OFF)
     {
        _startTiks = millis();
       Settings.PumpState = AERATION_OFF;
-    }    
-    else
+    }else
     {
       _startTiks = 0; 
       Settings.PumpState = HandleSensorState(state);           
@@ -268,7 +273,8 @@ public:
 
   void ResetState()
   {
-    Settings.resetState();    
+    if(!IsAeration())    
+      Settings.resetState();     
   }
 
   void ResetState(const PumpState &state)
@@ -283,7 +289,7 @@ public:
   const String GetShortStatus(const bool &hasWater) const  { return GetStatus(hasWater, true); }
   const String GetStatus(const bool &hasWater, const bool &shortStatus) const
   {   
-    sensorValueBuff = (shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE);
+    sensorValueBuff = F(""); //(shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE);
     statusBuff = (shortStatus ? TIMEOUT_CODE : TIMEOUT_LCODE);
     bool showCount = true;
     
@@ -324,8 +330,7 @@ public:
         else
         {            
           showCount 
-            ? statusBuff = String(ToPct(Settings.WateringRequired, shortStatus)) 
-            //: sprintf(statusBuff, shortStatus ? SENSOR_NOT_USED_CODE : SENSOR_NOT_USED_LCODE);
+            ? statusBuff = String(ToPct(Settings.WateringRequired, shortStatus))             
             : (statusBuff = shortStatus ? (isOn() ? F("On") : F("Off")) : SENSOR_NOT_USED_LCODE);          
         }
       }
@@ -335,18 +340,15 @@ public:
     {
       sensorValueBuff = (shortStatus ? AERATING_CODE : AERATING_LCODE);
       statusBuff = hasWater 
-                    ? (isOn() ? F("On") : F("Off"))
+                    ? (IsAerationInProgress() ? F("On") : F("Off"))
                     : (shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
       showCount = true;
     }
     
-    showCount = showCount || !shortStatus;
-    //sprintf(buff, showCount ? "%s/%s:%02d" : "%s/%s", sensorValueBuff, statusBuff, Settings.Count);      
+    showCount = showCount || !shortStatus;    
     
-    return sensorValueBuff + F("/") + statusBuff + (showCount ? (String(F(":")) + String(Settings.Count)) : String(F("")));
-  }
-
-  const bool IsAeration() const { return Settings.WatchDog >= AERATION_TIMEOUT; }
+    return (sensorValueBuff.length() > 0 ? (sensorValueBuff + F("/")) : String(F(""))) + statusBuff + (showCount ? (String(F(":")) + String(Settings.Count)) : String(F("")));
+  }  
 
 private:
   const PumpState HandleSensorState(const PumpState &state)
