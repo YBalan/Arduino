@@ -63,7 +63,8 @@
 #include <map>
 #include <set>
 //#include <ezButton.h>
-
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
 #include "DEBUGHelper.h"
 #include "Settings.h"
 #include "WiFiOps.h"
@@ -90,7 +91,20 @@ struct NetworkStatInfo{ int code; int count; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 
-Button resetBtn(PIN_RESET_BTN);
+#define LCD_COLS 16
+#define LCD_ROWS 2
+#define BACKLIGHT_DELAY 50000
+unsigned long backlightStartTicks = 0;
+LiquidCrystal_I2C lcd(0x27, LCD_COLS, LCD_ROWS);
+
+//DebounceTime
+#define DEBOUNCE_TIME 50
+Button btnOK(OK_PIN);
+Button btnUp(UP_PIN);
+Button btnDw(DW_PIN);
+Button btnRt(RT_PIN);
+
+Servo servo;
 
 void setup() 
 {
@@ -98,10 +112,24 @@ void setup()
   Serial.begin(115200);
   while (!Serial);   
 
-  resetBtn.setDebounceTime(DebounceTime);  
+  btnOK.setDebounceTime(DEBOUNCE_TIME);
+  btnUp.setDebounceTime(DEBOUNCE_TIME);
+  btnDw.setDebounceTime(DEBOUNCE_TIME);
+  btnRt.setDebounceTime(DEBOUNCE_TIME); 
+
+  Wire.begin();   // Заумочанням викорстивуються GPIO_22 (SCL) та GPIO_21 (SDA).
+  // Wire.begin(SDA, SCL); // Довіліні GPIO.
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(1, 0);
+  lcd.print(VER);
+  lcd.setCursor(4, 1);
+  lcd.print(F("Mouse Monitor"));
+  delay(2000);
+  lcd.clear();
 
   Serial.println();
-  Serial.println(F("!!!! Start Mouse Mover !!!!"));
+  Serial.print(F("!!!! Start ")); Serial.println(F("Mouse Monitor"));
   Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
@@ -129,7 +157,7 @@ void setup()
   #endif
   ;    
 
-  auto resetButtonState = resetBtn.getState();
+  auto resetButtonState = HIGH;//resetBtn.getState();
   INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
   INFO(F("ResetFlag: "), _settings.resetFlag);
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
@@ -159,7 +187,20 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 
 void loop()
 {
-  resetBtn.loop();
+  static uint32_t current = millis();
+  current = millis();  
+
+  btnOK.loop();
+  btnUp.loop();
+  btnDw.loop();
+  btnRt.loop();
+
+  if(btnOK.isPressed())
+  {
+    INFO("Ok ", BUTTON_IS_PRESSED_MSG);
+    BacklightOn();
+  }
+
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
   yield(); // watchdog
@@ -176,6 +217,26 @@ void loop()
   }  
   #endif   
 
+  CheckBacklightDelayAndReturnToMainMenu(current); 
+}
+
+void BacklightOn()
+{
+  lcd.backlight();
+  backlightStartTicks = millis();
+}
+
+const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentTicks)
+{
+  if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
+  {      
+    backlightStartTicks = 0;
+    //currentMenu = Menu::Main;
+    lcd.noBacklight();
+    btnOK.resetTicks();    
+    return true;
+  }
+  return false;
 }
 
 void PrintFSInfo(String &fsInfo)

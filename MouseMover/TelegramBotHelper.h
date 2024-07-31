@@ -68,7 +68,7 @@ const bool GetCommandValue(const String &command, const String &filteredMsg, Str
     idx = idx + command.length();
     value = filteredMsg.substring(idx, filteredMsg.length());
     value.trim();    
-    BOT_TRACE("\tCommand: '", command, "' Value: '", value, "' valIdx: ", idx);
+    BOT_TRACE(F("\tCommand: '"), command, F("' Value: '"), value, F("' valIdx: "), idx);
     return true;
   }
   return false;

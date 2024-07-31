@@ -20,6 +20,17 @@
 #define MAX_BASE_URI_LENGTH 50
 #define MAX_CHAT_ID_LENGTH  20
 
+#define DEFAULT_START_ANGLE 0
+#define DEFAULT_END_ANGLE 270
+#define DEFAULT_MOVE_ANGLE DEFAULT_END_ANGLE
+#define DEFAULT_MOVE_SPEED 10
+#define DEFAULT_PERIOD_TIMEPUT_SEC 1200
+
+enum MoveStyle : uint8_t
+{
+  Normal,
+};
+
 namespace UAMap
 {
   class Settings
@@ -29,8 +40,15 @@ namespace UAMap
 
 
     int16_t resetFlag = 200;
-    int notifyHttpCode = 0;   
+    int16_t notifyHttpCode = 0; 
+    uint16_t startAngle = DEFAULT_START_ANGLE;
+    uint16_t endAngle = DEFAULT_END_ANGLE; 
+    uint16_t moveAngle = DEFAULT_MOVE_ANGLE;
+    uint8_t moveSpeed = DEFAULT_MOVE_SPEED;
+    uint32_t periodTimeoutSec = DEFAULT_PERIOD_TIMEPUT_SEC;
     
+
+    MoveStyle moveStyle = MoveStyle::Normal;
 
     void init()
     {      
