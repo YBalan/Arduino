@@ -63,7 +63,7 @@ class ESPServo
     const int move(const int &step, const int &delayValue = 0)
     {      
       const auto &current = read();        
-      int newPos = (current > 180 ? abs(step) : current + step);
+      int newPos = (current > 180 ? current - step : current + step);
       SERVO_TRACE(current, current < newPos ? F(" -> ") : F(" <- "), newPos);
       _servo.write(newPos);
       if(delayValue > 0)
