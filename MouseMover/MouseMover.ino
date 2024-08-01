@@ -315,7 +315,7 @@ void HandleMovement(const unsigned long &currentTicks)
       TRACE(F("Start get Randoms"));
       if ((WiFi.status() == WL_CONNECTED)) 
       { 
-        const int &moveAngleR = GetRandomNumber(_settings.startAngle, _settings.endAngle, status, statusMsg);
+        const int &moveAngleR = GetRandomNumber(_settings.endAngle - 20, _settings.endAngle, status, statusMsg);
         if(status == ApiStatusCode::API_OK && moveAngleR > -1)      
           _settings.moveAngleR = moveAngleR;
 
