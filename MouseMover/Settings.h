@@ -20,11 +20,20 @@
 #define MAX_BASE_URI_LENGTH 50
 #define MAX_CHAT_ID_LENGTH  20
 
-#define DEFAULT_START_ANGLE 0
-#define DEFAULT_END_ANGLE 270
-#define DEFAULT_MOVE_ANGLE DEFAULT_END_ANGLE
-#define DEFAULT_MOVE_SPEED 10
-#define DEFAULT_PERIOD_TIMEPUT_SEC 1200
+#define DEFAULT_START_ANGLE 120
+#define DEFAULT_END_ANGLE 155
+
+#define DEFAULT_MOVE_ANGLE 140
+
+#define DEFAULT_MOVE_SPEED_DELAY_MIN 50
+#define DEFAULT_MOVE_SPEED_DELAY_MAX 500
+#define DEFAULT_MOVE_SPEED_DELAY 200
+
+#define DEFAULT_MOVE_STEP_MIN 1
+#define DEFAULT_MOVE_STEP_MAX 10
+#define DEFAULT_MOVE_STEP 1
+
+#define DEFAULT_PERIOD_TIMEPUT_SEC 120
 
 enum MoveStyle : uint8_t
 {
@@ -41,19 +50,32 @@ namespace UAMap
 
     int16_t resetFlag = 200;
     int16_t notifyHttpCode = 0; 
-    uint16_t startAngle = DEFAULT_START_ANGLE;
-    uint16_t endAngle = DEFAULT_END_ANGLE; 
-    uint16_t moveAngle = DEFAULT_MOVE_ANGLE;
-    uint8_t moveSpeed = DEFAULT_MOVE_SPEED;
-    uint32_t periodTimeoutSec = DEFAULT_PERIOD_TIMEPUT_SEC;
-    
+    uint8_t startAngle = DEFAULT_START_ANGLE;
+    uint8_t endAngle = DEFAULT_END_ANGLE; 
+
+    uint8_t moveAngleR = DEFAULT_MOVE_ANGLE;
+    uint16_t moveSpeedDelayR = DEFAULT_MOVE_SPEED_DELAY;
+    uint8_t moveStepR = DEFAULT_MOVE_STEP;
+    uint32_t periodTimeoutSecR = DEFAULT_PERIOD_TIMEPUT_SEC;    
+    uint32_t periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC;
+    uint32_t periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC;
 
     MoveStyle moveStyle = MoveStyle::Normal;
 
     void init()
     {      
+      SETTINGS_INFO(F("Reset Settings..."));
       resetFlag = 200;
-      notifyHttpCode = 0;      
+      notifyHttpCode = 0;     
+
+      startAngle = DEFAULT_START_ANGLE;
+      endAngle = DEFAULT_END_ANGLE; 
+      moveAngleR = DEFAULT_MOVE_ANGLE;
+      moveSpeedDelayR = DEFAULT_MOVE_SPEED_DELAY;
+      moveStepR = DEFAULT_MOVE_STEP;
+      periodTimeoutSecR = DEFAULT_PERIOD_TIMEPUT_SEC; 
+      periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC;
+      periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC;
     }
   };
 
@@ -185,6 +207,20 @@ const bool LoadSettingsExt()
   }
  
   return res;
+}
+
+void PrintFSInfo(String &fsInfo)
+{
+  #ifdef ESP8266
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);   
+  const auto &total = fs_info.totalBytes;
+  const auto &used = fs_info.usedBytes;
+  #else //ESP32
+  const auto &total = SPIFFS.totalBytes();
+  const auto &used = SPIFFS.usedBytes();
+  #endif
+  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
 }
 
 

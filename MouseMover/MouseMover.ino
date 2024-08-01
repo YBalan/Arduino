@@ -17,6 +17,8 @@
 
 #ifdef DEBUG
 
+#define VER_POSTFIX F("D")
+
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
 #define ENABLE_TRACE_MAIN
@@ -27,8 +29,14 @@
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 
+#define ENABLE_TRACE_SERVO
+
+#define ENABLE_INFO_API
+#define ENABLE_TRACE_API
+
 #else
 
+#define VER_POSTFIX F("R")
 #define WM_NODEBUG
 //#define WM_DEBUG_LEVEL 0
 
@@ -60,16 +68,18 @@
 
 #include "Config.h"
 
-#include <map>
-#include <set>
 //#include <ezButton.h>
 #include <LiquidCrystal_I2C.h>
-#include <Servo.h>
 #include "DEBUGHelper.h"
+#include "NSTAT.h"
+#include "ESPServo.h"
 #include "Settings.h"
 #include "WiFiOps.h"
+#include "RndApi.h"
+#ifdef USE_BOT
 #include "TelegramBotHelper.h"
 #include "TBotMenu.h"
+#endif
 
 #define LONG_PRESS_VALUE_MS 1000
 #include "Button.h"
@@ -86,11 +96,6 @@
 #define TRACE(...) {}
 #endif
 
-#ifdef NETWORK_STATISTIC
-struct NetworkStatInfo{ int code; int count; String description; };
-std::map<int, NetworkStatInfo> networkStat;
-#endif
-
 #define LCD_COLS 16
 #define LCD_ROWS 2
 #define BACKLIGHT_DELAY 50000
@@ -104,7 +109,23 @@ Button btnUp(UP_PIN);
 Button btnDw(DW_PIN);
 Button btnRt(RT_PIN);
 
-Servo servo;
+ESPServo servo(SERVO_PIN);
+
+unsigned long lastMovementTicks = 0;
+#define CURRENT_STATUS_UPDATE 1000
+unsigned long updateTicks = 0;
+
+enum class Menu : uint8_t
+{
+  Main,
+  Move,
+  BoundMin,
+  BoundMax,
+  PeriodMin,
+  PeriodMax,
+  MoveStyle,
+  Pause,
+} currentMenu;
 
 void setup() 
 {
@@ -117,20 +138,20 @@ void setup()
   btnDw.setDebounceTime(DEBOUNCE_TIME);
   btnRt.setDebounceTime(DEBOUNCE_TIME); 
 
-  Wire.begin();   // Заумочанням викорстивуються GPIO_22 (SCL) та GPIO_21 (SDA).
-  // Wire.begin(SDA, SCL); // Довіліні GPIO.
+  Wire.begin();   // Default GPIO_22 (SCL) & GPIO_21 (SDA).
+  // Wire.begin(PIN_LCD_SDA, PIN_LCD_SCL); // Custom GPIO.
   lcd.init();
-  lcd.backlight();
-  lcd.setCursor(1, 0);
-  lcd.print(VER);
-  lcd.setCursor(4, 1);
-  lcd.print(F("Mouse Monitor"));
-  delay(2000);
+  BacklightOn(0);
+  lcd.setCursor(0, 0);
+  lcd.print(String(F("V")) + VER + VER_POSTFIX + F(" ") + F("MouseMover"));
+  lcd.setCursor(0, 1);
+  lcd.print(__DATE__);
+  delay(3000);
   lcd.clear();
 
   Serial.println();
-  Serial.print(F("!!!! Start ")); Serial.println(F("Mouse Monitor"));
-  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
+  Serial.print(F("!!!! Start ")); Serial.println(F("MouseMover"));
+  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(String(VER) + VER_POSTFIX);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
@@ -147,7 +168,7 @@ void setup()
   #endif
 
   wifiOps  
-  #ifdef USE_API
+  #ifdef USE_API_KEY
   .AddParameter(F("apiToken"), F("API Token"), F("api_token"), F("YOUR_API_TOKEN"), 47)
   #endif
   #ifdef USE_BOT
@@ -157,15 +178,20 @@ void setup()
   #endif
   ;    
 
-  auto resetButtonState = HIGH;//resetBtn.getState();
-  INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
-  INFO(F("ResetFlag: "), _settings.resetFlag);
-  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
-  if(_settings.resetFlag == 1985)
+  const auto &okButtonState = btnOK.getState();
+  INFO(F("Without WiFi Btn: "), okButtonState == HIGH ? F("Off") : F("On"));
+  if(okButtonState == HIGH)
   {
-    _settings.resetFlag = 200;
-    SaveSettings();
-  }
+    const auto &resetButtonState = btnRt.getState();
+    INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
+    INFO(F("ResetFlag: "), _settings.resetFlag);
+    wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+    if(_settings.resetFlag == 1985)
+    {
+      _settings.resetFlag = 200;
+      SaveSettings();
+    }
+  } 
 
   #ifdef USE_BOT  
   LoadChannelIDs();
@@ -178,11 +204,19 @@ void setup()
   bot->setLimit(1);
   bot->skipUpdates();
   #endif 
+
+  servo.attach();
+  //servo.init();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());  
+  INFO(F("WiFi Portal: "), manager->getConfigPortalSSID());  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(F("WiFi Portal: "));
+  lcd.setCursor(0, 1);
+  lcd.print(manager->getConfigPortalSSID());
 }
 
 void loop()
@@ -197,9 +231,54 @@ void loop()
 
   if(btnOK.isPressed())
   {
-    INFO("Ok ", BUTTON_IS_PRESSED_MSG);
-    BacklightOn();
+    INFO(F("Ok "), BUTTON_IS_PRESSED_MSG);
+    BacklightOn(current);    
   }
+
+  if(btnOK.isReleased())
+  {
+    INFO(F("Ok "), BUTTON_IS_RELEASED_MSG);
+    Move(MoveStyle::Normal);
+  }
+
+  if(btnUp.isReleased())
+  {
+    INFO(F("Up "), BUTTON_IS_RELEASED_MSG);
+    if(currentMenu == Menu::Main)
+    {
+      if(servo.attached())
+      {       
+        const auto &current = servo.move(+10, DEFAULT_MOVE_SPEED_DELAY);
+        lcd.clear();
+        lcd.print(current);
+      } 
+    }
+    BacklightOn(current);
+  }
+
+  if(btnDw.isReleased())
+  {
+    INFO(F("Dw "), BUTTON_IS_RELEASED_MSG);
+    BacklightOn(current);
+
+    if(currentMenu == Menu::Main)
+    {
+      if(servo.attached())
+      {       
+        const auto &current = servo.move(-10, DEFAULT_MOVE_SPEED_DELAY);
+        lcd.clear();
+        lcd.print(current);
+      } 
+    }
+  }
+
+  if(btnRt.isPressed())
+  {
+    INFO(F("Rt "), BUTTON_IS_PRESSED_MSG);
+    BacklightOn(current);
+  }
+
+  HandleMovement(current); 
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
@@ -217,13 +296,89 @@ void loop()
   }  
   #endif   
 
-  CheckBacklightDelayAndReturnToMainMenu(current); 
+  CheckBacklightDelayAndReturnToMainMenu(millis()); 
 }
 
-void BacklightOn()
+void HandleMovement(const unsigned long &currentTicks)
+{
+  if(currentMenu == Menu::Main)
+  {    
+    uint16_t currentInSec = (currentTicks - lastMovementTicks) * 0.001;    
+    if(currentInSec >= _settings.periodTimeoutSecR)
+    {
+      Move(MoveStyle::Normal);      
+      lastMovementTicks = millis();  
+
+      #ifdef USE_API
+      int status =  ApiStatusCode::NO_WIFI; 
+      String statusMsg = F("No WiFi");
+      TRACE(F("Start get Randoms"));
+      if ((WiFi.status() == WL_CONNECTED)) 
+      { 
+        const int &moveAngleR = GetRandomNumber(_settings.startAngle, _settings.endAngle, status, statusMsg);
+        if(status == ApiStatusCode::API_OK && moveAngleR > -1)      
+          _settings.moveAngleR = moveAngleR;
+
+        yield(); // watchdog
+
+        const int &moveSpeedDelayR = GetRandomNumber(DEFAULT_MOVE_SPEED_DELAY_MIN, DEFAULT_MOVE_SPEED_DELAY_MAX, status, statusMsg);
+        if(status == ApiStatusCode::API_OK && moveSpeedDelayR > -1)
+          _settings.moveSpeedDelayR = moveSpeedDelayR;
+
+        yield(); // watchdog
+
+        const int &moveStepR = GetRandomNumber(DEFAULT_MOVE_STEP_MIN, DEFAULT_MOVE_STEP_MAX, status, statusMsg);
+        if(status == ApiStatusCode::API_OK && moveStepR > -1)
+          _settings.moveStepR = moveStepR;
+
+        yield(); // watchdog
+
+        SaveChanges();
+      }
+      TRACE(F("http Status: "), status, F(" "), statusMsg);
+      #endif
+    }
+    if((currentTicks - updateTicks) >= CURRENT_STATUS_UPDATE) 
+    {
+      //TRACE(F("HandleMovement: "), currentInSec);
+      MainMenuStatus(currentInSec);
+      updateTicks = currentTicks;
+    }
+  }  
+}
+
+void Move(const MoveStyle &style)
+{
+  currentMenu = Menu::Move;
+  lcd.clear();
+  lcd.print(F("Move..."));  
+
+  if(style == MoveStyle::Normal)
+  {
+    //servo.pos(_settings.startAngle);
+    delay(_settings.moveSpeedDelayR);
+
+    TRACE(F("Move Forward"));
+    for(int pos = _settings.startAngle; pos <= _settings.moveAngleR; pos += _settings.moveStepR)
+    {
+      servo.pos(pos, _settings.moveSpeedDelayR);
+    }
+
+    delay(_settings.moveSpeedDelayR);
+
+    TRACE(F("Move back"));
+    for(int pos = _settings.moveAngleR; pos >= _settings.startAngle; pos -= _settings.moveStepR)
+    {
+      servo.pos(pos, _settings.moveSpeedDelayR);
+    }
+  }  
+  currentMenu = Menu::Main;
+}
+
+void BacklightOn(const unsigned long &currentTicks)
 {
   lcd.backlight();
-  backlightStartTicks = millis();
+  backlightStartTicks = currentTicks == 0 ? millis() : currentTicks;
 }
 
 const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentTicks)
@@ -231,7 +386,7 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
   if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
   {      
     backlightStartTicks = 0;
-    //currentMenu = Menu::Main;
+    currentMenu = Menu::Main;
     lcd.noBacklight();
     btnOK.resetTicks();    
     return true;
@@ -239,77 +394,65 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
   return false;
 }
 
-void PrintFSInfo(String &fsInfo)
+void SaveChanges()
 {
-  #ifdef ESP8266
-  FSInfo fs_info;
-  SPIFFS.info(fs_info);   
-  const auto &total = fs_info.totalBytes;
-  const auto &used = fs_info.usedBytes;
-  #else //ESP32
-  const auto &total = SPIFFS.totalBytes();
-  const auto &used = SPIFFS.usedBytes();
-  #endif
-  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+  TRACE(F("Save..."));
+  SaveSettings();
+  lcd.clear();
+  lcd.print(F("Save..."));
+  delay(700);
 }
 
-
-#ifdef NETWORK_STATISTIC  
-void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
-{  
-  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
-}
-#endif
-
-void PrintNetworkStatToSerial()
+void MainMenuStatus(const unsigned long &currentInSec)
 {
-  #ifdef NETWORK_STATISTIC
-  Serial.print(F("Network Statistic: "));
-  if(networkStat.size() > 0)
-  {
-    if(networkStat.count(200) > 0)
-      PrintNetworkStatInfoToSerial(networkStat[200]);
-    for(const auto &de : networkStat)
-    {
-      const auto &info = de.second;
-      if(info.code != 200)
-        PrintNetworkStatInfoToSerial(info);
-    }
+  if(currentMenu == Menu::Main)
+  {    
+    uint16_t remainSec = _settings.periodTimeoutSecR - currentInSec;
+    String remain = String(remainSec);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("Next:")); lcd.print(remain); lcd.print(F("s."));
+
+    String W = (WiFi.status() == WL_CONNECTED) ? F("W") : F("");
+    lcd.setCursor(LCD_COLS - W.length(), 0);
+    lcd.print(W);
+
+    lcd.setCursor(0, 1);    
+    lcd.print(F("A:")); lcd.print(_settings.moveAngleR); lcd.print(F(" "));
+    lcd.print(F("D:")); lcd.print(_settings.moveSpeedDelayR); lcd.print(F(" "));
+    lcd.print(F("S:")); lcd.print(_settings.moveStepR); lcd.print(F(" "));
   }
-  Serial.print(F(" ")); Serial.print(millis() / 1000); Serial.print(F("sec"));
-  Serial.println();
-  #endif
 }
 
-void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
-{  
-  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
-}
-
-void PrintNetworkStatistic(String &str, const int& codeFilter)
+uint8_t debugButtonFromSerial = 0;
+void HandleDebugSerialCommands()
 {
-  str = F("NSTAT: ");
-  #ifdef NETWORK_STATISTIC  
-  if(networkStat.size() > 0)
-  {
-    if(networkStat.count(200) > 0 && (codeFilter == 0 || codeFilter == 200))
-      PrintNetworkStatInfo(networkStat[200], str);
-    for(const auto &de : networkStat)
-    {
-      const auto &info = de.second;
-      if(info.code != 200 && (codeFilter == 0 || codeFilter == info.code))
-        PrintNetworkStatInfo(info, str);
-    }
+  if(debugButtonFromSerial == 1) // Reset WiFi
+  { 
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
   }
-  const auto &millisec = millis();
-  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
-      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
-      
-  //str.replace("(", "");
-  //str.replace(")", "");
-  #else
-  str += F("Off");
-  #endif
+
+  if(debugButtonFromSerial == 2) // Reset Settings
+  { 
+    _settings.init();
+    SaveSettings();    
+  }
+
+  if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
+  { 
+    INFO(F("\t\t\tFormat..."));   
+    SPIFFS.format();    
+    ESP.restart();
+  }
+
+  debugButtonFromSerial = 0;
+  if(Serial.available() > 0)
+  {
+    auto readFromSerial = Serial.readString();
+    INFO(F("Input: "), readFromSerial);
+    debugButtonFromSerial = readFromSerial.toInt(); 
+  }
 }
-
-

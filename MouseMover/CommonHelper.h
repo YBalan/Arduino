@@ -2,6 +2,8 @@
 #ifndef COMMON_HELPER_H
 #define COMMON_HELPER_H
 #include <vector>
+#include <map>
+#include <set>
 
 namespace CommonHelper
 {

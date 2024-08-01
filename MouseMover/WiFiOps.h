@@ -178,6 +178,7 @@ class WiFiOps
       //in seconds
       //wifiManager.setTimeout(120);
 
+      WiFi.begin();
       auto mac = WiFi.macAddress();
       mac = mac.substring(mac.length() - 5, mac.length());
       //fetches ssid and pass and tries to connect

@@ -4,6 +4,7 @@
 
 //#define USE_BOT
 #define USE_API
+//#define USE_API_KEY
 #define USE_BUZZER
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
@@ -67,30 +68,32 @@
 
 // PINS
 #ifdef ESP8266
-  #define PIN_CLOCK         D0
-  #define PIN_RELAY1        D1
-  #define PIN_RELAY2        D2
-  #define PIN_BUZZ          D3
-  #define PIN_RESET_BTN     D5
-  #define PIN_LED_STRIP     D6 
-  #define PIN_PMONITOR_SDA  D8
-  #define PIN_PMONITOR_SCL  D9 
+  // #define PIN_CLOCK         D0
+  // #define PIN_RELAY1        D1
+  // #define PIN_RELAY2        D2
+  // #define PIN_BUZZ          D3
+  // #define PIN_RESET_BTN     D5
+  // #define PIN_LED_STRIP     D6 
+  // #define PIN_PMONITOR_SDA  D8
+  // #define PIN_PMONITOR_SCL  D9 
 #else //ESP32
-  #define PIN_CLOCK         13
-  #define PIN_RELAY1        18
-  #define PIN_RELAY2        19
-  #define PIN_BUZZ          21
-  #define PIN_RESET_BTN     22
-  #define PIN_LED_STRIP     23 
-  #define PIN_PMONITOR_SDA  4
-  #define PIN_PMONITOR_SCL  5  
+  // #define PIN_CLOCK         13
+  // #define PIN_RELAY1        18
+  // #define PIN_RELAY2        19
+  // #define PIN_BUZZ          21
+  // #define PIN_RESET_BTN     22
+  // #define PIN_LED_STRIP     23 
+  // #define PIN_PMONITOR_SDA  4
+  // #define PIN_PMONITOR_SCL  5  
 
   
-  #define OK_PIN 10
-  #define UP_PIN 11
+  #define OK_PIN 27
+  #define UP_PIN 14
   #define DW_PIN 12
   #define RT_PIN 13
-  #define SERVO_PIN 14
+  #define SERVO_PIN 23
+  #define PIN_LCD_SDA  21
+  #define PIN_LCD_SCL  22
 #endif
 
 
