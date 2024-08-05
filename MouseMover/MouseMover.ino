@@ -206,7 +206,7 @@ void setup()
   bot->skipUpdates();
   #endif 
 
-  //servo.attach();
+  servo.attach();
   //servo.init();
 }
 
@@ -225,6 +225,9 @@ void loop()
   static uint32_t current = millis();
   current = millis();  
 
+  int status =  ApiStatusCode::NO_WIFI; 
+  String statusMsg = F("No WiFi");
+
   btnOK.loop();
   btnUp.loop();
   btnDw.loop();
@@ -239,7 +242,15 @@ void loop()
   if(btnOK.isReleased())
   {
     INFO(F("Ok "), BUTTON_IS_RELEASED_MSG);
-    Move(MoveStyle::Normal);
+    if(btnOK.isLongPress())
+    {
+      INFO(F("Ok "), BUTTON_IS_LONGPRESSED_MSG);
+      FillRandomValues(status, statusMsg);
+    }
+    else
+    {
+      Move(MoveStyle::Normal);
+    }
   }
 
   if(btnUp.isReleased())
@@ -252,8 +263,7 @@ void loop()
         const auto &current = servo.move(+10, DEFAULT_MOVE_SPEED_DELAY);
         lcd.clear();
         lcd.print(current);
-      } 
-      //servo.detach();
+      }       
     }
     BacklightOn(current);
   }
@@ -270,8 +280,7 @@ void loop()
         const auto &current = servo.move(-10, DEFAULT_MOVE_SPEED_DELAY);
         lcd.clear();
         lcd.print(current);
-      } 
-      //servo.detach();
+      }       
     }
   }
 
@@ -281,7 +290,7 @@ void loop()
     BacklightOn(current);
   }
 
-  HandleMovement(current); 
+  HandleMovement(current, status, statusMsg); 
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
@@ -303,7 +312,7 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-void HandleMovement(const unsigned long &currentTicks)
+void HandleMovement(const unsigned long &currentTicks, int &status, String &statusMsg)
 {
   if(currentMenu == Menu::Main)
   {    
@@ -313,9 +322,7 @@ void HandleMovement(const unsigned long &currentTicks)
       Move(MoveStyle::Normal);      
       lastMovementTicks = millis();  
 
-      #ifdef USE_API
-      int status =  ApiStatusCode::NO_WIFI; 
-      String statusMsg = F("No WiFi");
+      #ifdef USE_API      
       TRACE(F("Start get Randoms"));
       if ((WiFi.status() == WL_CONNECTED)) 
       { 
@@ -337,6 +344,10 @@ void HandleMovement(const unsigned long &currentTicks)
 
 const bool FillRandomValues(int &status, String &statusMsg)
 {
+  TRACE(F("Random..."));
+  lcd.clear();
+  lcd.print(F("Random..."));
+  
   const int &moveAngleR = GetRandomNumber(_settings.startAngle + 10, _settings.endAngle, status, statusMsg);
   if(status != ApiStatusCode::API_OK) return false;
   if(moveAngleR > 0)
@@ -410,9 +421,7 @@ void Move(const MoveStyle &style)
       yield(); // watchdog
     }
   }  
-  currentMenu = Menu::Main;
-
-  //servo.detach();
+  currentMenu = Menu::Main;  
 }
 
 void BacklightOn(const unsigned long &currentTicks)
