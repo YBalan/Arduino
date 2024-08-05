@@ -398,6 +398,7 @@ void Move(const MoveStyle &style)
     for(int pos = _settings.startAngle; pos <= _settings.moveAngleR; pos += _settings.moveStepR)
     {
       servo.pos(pos, _settings.moveSpeedDelayR);
+      yield(); // watchdog
     }
 
     delay(_settings.moveSpeedDelayR);
@@ -406,11 +407,12 @@ void Move(const MoveStyle &style)
     for(int pos = _settings.moveAngleR; pos >= _settings.startAngle; pos -= _settings.moveStepR)
     {
       servo.pos(pos, _settings.moveSpeedDelayR);
+      yield(); // watchdog
     }
   }  
   currentMenu = Menu::Main;
 
-  servo.detach();
+  //servo.detach();
 }
 
 void BacklightOn(const unsigned long &currentTicks)
