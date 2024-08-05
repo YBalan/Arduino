@@ -1,9 +1,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.0")
+  #define VER F("1.1")
 #else //ESP32
-  #define VER F("1.0")
+  #define VER F("1.1")
 #endif
 
 #define AVOID_FLICKERING
@@ -81,7 +81,7 @@
 #include "TBotMenu.h"
 #endif
 
-#define LONG_PRESS_VALUE_MS 1000
+#define LONG_PRESS_VALUE_MS 2000
 #include "Button.h"
 
 #ifdef ENABLE_INFO_MAIN
@@ -158,6 +158,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
+  DebugPrintRandomValues();
 
   WiFiOps::WiFiOps wifiOps(F("MouseMover WiFi Manager"), F("MMAP"), F("password"));
 
@@ -205,7 +206,7 @@ void setup()
   bot->skipUpdates();
   #endif 
 
-  servo.attach();
+  //servo.attach();
   //servo.init();
 }
 
@@ -246,12 +247,13 @@ void loop()
     INFO(F("Up "), BUTTON_IS_RELEASED_MSG);
     if(currentMenu == Menu::Main)
     {
-      if(servo.attached())
+      if(servo.attach())
       {       
         const auto &current = servo.move(+10, DEFAULT_MOVE_SPEED_DELAY);
         lcd.clear();
         lcd.print(current);
       } 
+      //servo.detach();
     }
     BacklightOn(current);
   }
@@ -263,12 +265,13 @@ void loop()
 
     if(currentMenu == Menu::Main)
     {
-      if(servo.attached())
+      if(servo.attach())
       {       
         const auto &current = servo.move(-10, DEFAULT_MOVE_SPEED_DELAY);
         lcd.clear();
         lcd.print(current);
       } 
+      //servo.detach();
     }
   }
 
@@ -316,23 +319,7 @@ void HandleMovement(const unsigned long &currentTicks)
       TRACE(F("Start get Randoms"));
       if ((WiFi.status() == WL_CONNECTED)) 
       { 
-        const int &moveAngleR = GetRandomNumber(_settings.startAngle + 10, _settings.endAngle, status, statusMsg);
-        if(status == ApiStatusCode::API_OK && moveAngleR > -1)      
-          _settings.moveAngleR = moveAngleR;
-
-        yield(); // watchdog
-
-        const int &moveSpeedDelayR = GetRandomNumber(DEFAULT_MOVE_SPEED_DELAY_MIN, DEFAULT_MOVE_SPEED_DELAY_MAX, status, statusMsg);
-        if(status == ApiStatusCode::API_OK && moveSpeedDelayR > -1)
-          _settings.moveSpeedDelayR = moveSpeedDelayR;
-
-        yield(); // watchdog
-
-        const int &moveStepR = GetRandomNumber(DEFAULT_MOVE_STEP_MIN, DEFAULT_MOVE_STEP_MAX, status, statusMsg);
-        if(status == ApiStatusCode::API_OK && moveStepR > -1)
-          _settings.moveStepR = moveStepR;
-
-        yield(); // watchdog
+        FillRandomValues(status, statusMsg);
 
         SaveChanges();
       }
@@ -348,11 +335,59 @@ void HandleMovement(const unsigned long &currentTicks)
   }  
 }
 
+const bool FillRandomValues(int &status, String &statusMsg)
+{
+  const int &moveAngleR = GetRandomNumber(_settings.startAngle + 10, _settings.endAngle, status, statusMsg);
+  if(status != ApiStatusCode::API_OK) return false;
+  if(moveAngleR > 0)
+    _settings.moveAngleR = moveAngleR;  
+
+  yield(); // watchdog
+
+  const int &moveSpeedDelayR = GetRandomNumber(DEFAULT_MOVE_SPEED_DELAY_MIN, DEFAULT_MOVE_SPEED_DELAY_MAX, status, statusMsg);
+  if(status != ApiStatusCode::API_OK) return false;
+  if(moveSpeedDelayR > 0)
+    _settings.moveSpeedDelayR = moveSpeedDelayR;
+
+  yield(); // watchdog
+
+  const int &moveStepR = GetRandomNumber(DEFAULT_MOVE_STEP_MIN, DEFAULT_MOVE_STEP_MAX, status, statusMsg);
+  if(status != ApiStatusCode::API_OK) return false;
+  if(moveStepR > 0)
+    _settings.moveStepR = moveStepR;
+
+  yield(); // watchdog
+
+  const int &periodTimeoutSecR = GetRandomNumber(_settings.periodTimeoutSecMin, _settings.periodTimeoutSecMax, status, statusMsg);
+  if(status != ApiStatusCode::API_OK) return false;
+  if(periodTimeoutSecR > 0)
+    _settings.periodTimeoutSecR = periodTimeoutSecR;
+
+  yield(); // watchdog  
+
+  DebugPrintRandomValues();
+
+  return true;
+}
+
+void DebugPrintRandomValues()
+{
+  TRACE(F("moveAngleR: "), _settings.moveAngleR, F(" "), F("startAngle: "), _settings.startAngle, F(" "), F("endAngle: "), _settings.endAngle);
+  TRACE(F("movmoveSpeedDelayR: "), _settings.moveSpeedDelayR);
+  TRACE(F("moveStepR: "), _settings.moveStepR);
+  TRACE(F("periodTimeoutSecR: "), _settings.periodTimeoutSecR, F(" "), F("Min: "), _settings.periodTimeoutSecMin, F(" "), F("Max: "), _settings.periodTimeoutSecMax);
+}
+
 void Move(const MoveStyle &style)
 {
   currentMenu = Menu::Move;
   lcd.clear();
   lcd.print(F("Move..."));  
+
+  LCDPrintWiFiStatus();
+  LCDPrintRandomValues();
+
+  servo.attach();
 
   if(style == MoveStyle::Normal)
   {
@@ -374,6 +409,8 @@ void Move(const MoveStyle &style)
     }
   }  
   currentMenu = Menu::Main;
+
+  servo.detach();
 }
 
 void BacklightOn(const unsigned long &currentTicks)
@@ -413,17 +450,29 @@ void MainMenuStatus(const unsigned long &currentInSec)
 
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print(F("Next:")); lcd.print(remain); lcd.print(F("s."));
+    lcd.print(F("N:")); lcd.print(remain); lcd.print(F("s."));
+    lcd.print(F("/")); lcd.print(_settings.periodTimeoutSecR); //lcd.print(F("s."));
 
-    String W = (WiFi.status() == WL_CONNECTED) ? F("W") : F("");
-    lcd.setCursor(LCD_COLS - W.length(), 0);
-    lcd.print(W);
+    LCDPrintWiFiStatus();
 
-    lcd.setCursor(0, 1);    
-    lcd.print(F("A:")); lcd.print(_settings.moveAngleR); lcd.print(F(" "));
-    lcd.print(F("D:")); lcd.print(_settings.moveSpeedDelayR); lcd.print(F(" "));
-    lcd.print(F("S:")); lcd.print(_settings.moveStepR); lcd.print(F(" "));
+    LCDPrintRandomValues();
   }
+}
+
+void LCDPrintWiFiStatus()
+{
+  String W = (WiFi.status() == WL_CONNECTED) ? F("W") : F("");
+  lcd.setCursor(LCD_COLS - W.length(), 0);
+  lcd.print(W);
+}
+
+
+void LCDPrintRandomValues()
+{
+  lcd.setCursor(0, 1);    
+  lcd.print(F("A:")); lcd.print(_settings.moveAngleR); lcd.print(F(" "));    
+  lcd.print(F("S:")); lcd.print(_settings.moveStepR); lcd.print(F(" "));
+  lcd.print(F("T:")); lcd.print(_settings.moveSpeedDelayR); lcd.print(F(" "));
 }
 
 uint8_t debugButtonFromSerial = 0;
@@ -439,7 +488,8 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 2) // Reset Settings
   { 
     _settings.init();
-    SaveSettings();    
+    SaveSettings();  
+    DebugPrintRandomValues();  
   }
 
   if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
