@@ -33,6 +33,8 @@
 #define DEFAULT_MOVE_STEP_MAX 5
 #define DEFAULT_MOVE_STEP 1
 
+#define DEFAULT_PERIOD_TIMEPUT_SEC_MIN 120
+#define DEFAULT_PERIOD_TIMEPUT_SEC_MAX 360
 #define DEFAULT_PERIOD_TIMEPUT_SEC 120
 
 enum MoveStyle : uint8_t
@@ -57,8 +59,8 @@ namespace UAMap
     uint16_t moveSpeedDelayR = DEFAULT_MOVE_SPEED_DELAY;
     uint8_t moveStepR = DEFAULT_MOVE_STEP;
     uint32_t periodTimeoutSecR = DEFAULT_PERIOD_TIMEPUT_SEC;    
-    uint32_t periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC;
-    uint32_t periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC;
+    uint32_t periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC_MIN;
+    uint32_t periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC_MAX;
 
     MoveStyle moveStyle = MoveStyle::Normal;
 
@@ -74,8 +76,8 @@ namespace UAMap
       moveSpeedDelayR = DEFAULT_MOVE_SPEED_DELAY;
       moveStepR = DEFAULT_MOVE_STEP;
       periodTimeoutSecR = DEFAULT_PERIOD_TIMEPUT_SEC; 
-      periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC;
-      periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC;
+      periodTimeoutSecMin = DEFAULT_PERIOD_TIMEPUT_SEC_MIN;
+      periodTimeoutSecMax = DEFAULT_PERIOD_TIMEPUT_SEC_MAX;
     }
   };
 
