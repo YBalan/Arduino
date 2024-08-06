@@ -248,6 +248,7 @@ void loop()
       if(currentMenu == Menu::Main)
       {        
         FillRandomValues(status, statusMsg);
+        delay(1000);
       }
     }
     else
@@ -405,7 +406,7 @@ void HandleMenuAndActions(const unsigned long &currentTicks, int &status, String
       if ((WiFi.status() == WL_CONNECTED)) 
       { 
         FillRandomValues(status, statusMsg);
-
+        delay(1000);
         SaveChanges();
       }
       TRACE(F("http Status: "), status, F(" "), statusMsg);
@@ -432,6 +433,7 @@ const bool FillRandomValues(int &status, String &statusMsg)
 {
   TRACE(F("Random..."));
   lcd.clear();
+  lcd.setCursor(0, 0);
   lcd.print(F("Random..."));
   
   const int &moveAngleR = GetRandomNumber(_settings.startAngle + 10, _settings.endAngle, status, statusMsg);
@@ -464,6 +466,8 @@ const bool FillRandomValues(int &status, String &statusMsg)
 
   DebugPrintSettingsValues();
 
+  lcd.setCursor(0, 1);
+  lcd.print(statusMsg);
   return true;
 }
 
