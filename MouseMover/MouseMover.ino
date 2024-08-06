@@ -142,12 +142,7 @@ void setup()
   // Wire.begin(PIN_LCD_SDA, PIN_LCD_SCL); // Custom GPIO.
   lcd.init();
   BacklightOn(0);
-  lcd.setCursor(0, 0);
-  lcd.print(String(F("V")) + VER + VER_POSTFIX + F(" ") + F("MouseMover"));
-  lcd.setCursor(0, 1);
-  lcd.print(__DATE__);
-  delay(3000);
-  lcd.clear();
+  LCDPrintVersion();
 
   Serial.println();
   Serial.print(F("!!!! Start ")); Serial.println(F("MouseMover"));
@@ -158,7 +153,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
-  DebugPrintSettingsValues();
+  DebugPrintSettingsValues(0);
 
   WiFiOps::WiFiOps wifiOps(F("MouseMover WiFi Manager"), F("MMAP"), F("password"));
 
@@ -208,6 +203,16 @@ void setup()
 
   servo.attach();
   //servo.init();
+}
+
+void LCDPrintVersion()
+{
+  lcd.setCursor(0, 0);
+  lcd.print(String(F("V")) + VER + VER_POSTFIX + F(" ") + F("MouseMover"));
+  lcd.setCursor(0, 1);
+  lcd.print(__DATE__);
+  delay(3000);
+  lcd.clear();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -369,6 +374,18 @@ void loop()
     }
   }
 
+  if(btnRt.isReleased())
+  {
+    INFO(F("Rt "), BUTTON_IS_RELEASED_MSG);
+    if(btnRt.isLongPress())
+    {      
+      INFO(F("Rt "), BUTTON_IS_LONGPRESSED_MSG);
+      btnRt.resetTicks();
+      LCDPrintVersion();
+      delay(5000);
+    }
+  }
+
   HandleMenuAndActions(current, status, statusMsg); 
 
   #ifdef USE_BOT
@@ -436,7 +453,8 @@ const bool FillRandomValues(int &status, String &statusMsg)
   lcd.setCursor(0, 0);
   lcd.print(F("Random..."));
   
-  const int &moveAngleR = GetRandomNumber(_settings.startAngle + 10, _settings.endAngle, status, statusMsg);
+  int startAngleOffset = (_settings.endAngle - _settings.startAngle) / 2; 
+  const int &moveAngleR = GetRandomNumber(_settings.startAngle + startAngleOffset, _settings.endAngle, status, statusMsg);
   if(status != ApiStatusCode::API_OK) return false;
   if(moveAngleR > 0)
     _settings.moveAngleR = moveAngleR;  
@@ -464,16 +482,16 @@ const bool FillRandomValues(int &status, String &statusMsg)
 
   yield(); // watchdog  
 
-  DebugPrintSettingsValues();
+  DebugPrintSettingsValues(startAngleOffset);
 
   lcd.setCursor(0, 1);
   lcd.print(statusMsg);
   return true;
 }
 
-void DebugPrintSettingsValues()
-{
-  TRACE(F("moveAngleR: "), _settings.moveAngleR, F(" "), F("startAngle: "), _settings.startAngle, F(" "), F("endAngle: "), _settings.endAngle);
+void DebugPrintSettingsValues(const int& startAngleOffset)
+{  
+  TRACE(F("moveAngleR: "), _settings.moveAngleR, F(" "), F("startAngle: "), _settings.startAngle, F(" "), F("endAngle: "), _settings.endAngle, F(" startAngleOffset: "), startAngleOffset);
   TRACE(F("movmoveSpeedDelayR: "), _settings.moveSpeedDelayR);
   TRACE(F("moveStepR: "), _settings.moveStepR);
   TRACE(F("periodTimeoutSecR: "), _settings.periodTimeoutSecR, F(" "), F("Min: "), _settings.periodTimeoutSecMin, F(" "), F("Max: "), _settings.periodTimeoutSecMax);
@@ -539,7 +557,7 @@ void SaveChanges()
   SaveSettings();
   lcd.clear();
   lcd.print(F("Save..."));
-  DebugPrintSettingsValues();
+  DebugPrintSettingsValues(0);
   delay(700); 
 }
 
@@ -605,12 +623,12 @@ void HandleDebugSerialCommands()
   { 
     _settings.init();
     SaveSettings();  
-    DebugPrintSettingsValues();  
+    DebugPrintSettingsValues(0);  
   }
 
   if(debugButtonFromSerial == 3) // Print Settings
   {     
-    DebugPrintSettingsValues();  
+    DebugPrintSettingsValues(0);  
   }
 
   if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
