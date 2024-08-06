@@ -1,9 +1,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.1")
+  #define VER F("1.2")
 #else //ESP32
-  #define VER F("1.1")
+  #define VER F("1.2")
 #endif
 
 #define AVOID_FLICKERING
@@ -287,13 +287,14 @@ void loop()
         TRACE(F("startAngle: "), startPos);
         if(startPos < _settings.endAngle)
         {
-          //_settings.startAngle = startPos;
+          _settings.startAngle = startPos;
           SaveChanges();
         }else
         {
           lcd.clear();
           lcd.setCursor(0, 1);
           lcd.print("Error:Min>=Max");
+          delay(3000);
         }        
         btnUp.resetTicks();
       }else
@@ -335,13 +336,14 @@ void loop()
         TRACE(F("endAngle: "), endPos);
         if(endPos > _settings.startAngle)
         {
-          //_settings.endAngle = endPos;
+          _settings.endAngle = endPos;
           SaveChanges();
         }else
         {
           lcd.clear();
           lcd.setCursor(0, 1);
           lcd.print("Error:Max>=Min");
+          delay(3000);
         }
         btnDw.resetTicks();
       }else
@@ -599,6 +601,11 @@ void HandleDebugSerialCommands()
   { 
     _settings.init();
     SaveSettings();  
+    DebugPrintSettingsValues();  
+  }
+
+  if(debugButtonFromSerial == 3) // Print Settings
+  {     
     DebugPrintSettingsValues();  
   }
 
