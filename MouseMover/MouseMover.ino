@@ -158,7 +158,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
-  DebugPrintRandomValues();
+  DebugPrintSettingsValues();
 
   WiFiOps::WiFiOps wifiOps(F("MouseMover WiFi Manager"), F("MMAP"), F("password"));
 
@@ -245,26 +245,71 @@ void loop()
     if(btnOK.isLongPress())
     {
       INFO(F("Ok "), BUTTON_IS_LONGPRESSED_MSG);
-      FillRandomValues(status, statusMsg);
+      if(currentMenu == Menu::Main)
+      {        
+        FillRandomValues(status, statusMsg);
+      }
     }
     else
     {
-      Move(MoveStyle::Normal);
+      if(currentMenu == Menu::Main)
+      {
+        Move(MoveStyle::Normal);
+      }
     }
+  }
+
+  if(btnUp.isPressed())
+  {
+    INFO(F("Up "), BUTTON_IS_PRESSED_MSG);
+    BacklightOn(current);
   }
 
   if(btnUp.isReleased())
   {
     INFO(F("Up "), BUTTON_IS_RELEASED_MSG);
+    BacklightOn(current);
+
     if(currentMenu == Menu::Main)
     {
+      currentMenu = Menu::BoundMax;
       if(servo.attach())
-      {       
-        const auto &current = servo.move(+10, DEFAULT_MOVE_SPEED_DELAY);
-        lcd.clear();
-        lcd.print(current);
-      }       
-    }
+      {
+        servo.init();  
+      }
+    }else
+    if(currentMenu == Menu::BoundMax || currentMenu == Menu::BoundMin)
+    {
+      if(btnUp.isLongPress())
+      {
+        INFO(F("Up "), BUTTON_IS_LONGPRESSED_MSG);
+        const auto &startPos = servo.read();
+        TRACE(F("startAngle: "), startPos);
+        if(startPos < _settings.endAngle)
+        {
+          //_settings.startAngle = startPos;
+          SaveChanges();
+        }else
+        {
+          lcd.clear();
+          lcd.setCursor(0, 1);
+          lcd.print("Error:Min>=Max");
+        }        
+        btnUp.resetTicks();
+      }else
+      {      
+        if(servo.attach())
+        {       
+          const auto &currentPos = servo.move(-5, DEFAULT_MOVE_SPEED_DELAY);
+          LCDPrintBoundMenu(currentPos);
+        }       
+      }
+    }        
+  }
+
+  if(btnDw.isPressed())
+  {
+    INFO(F("Dw "), BUTTON_IS_PRESSED_MSG);
     BacklightOn(current);
   }
 
@@ -272,25 +317,56 @@ void loop()
   {
     INFO(F("Dw "), BUTTON_IS_RELEASED_MSG);
     BacklightOn(current);
-
+    
     if(currentMenu == Menu::Main)
     {
+      currentMenu = Menu::BoundMax;
       if(servo.attach())
-      {       
-        const auto &current = servo.move(-10, DEFAULT_MOVE_SPEED_DELAY);
-        lcd.clear();
-        lcd.print(current);
-      }       
-    }
+      {
+        servo.init();  
+      }
+    }else
+    if(currentMenu == Menu::BoundMax || currentMenu == Menu::BoundMin)
+    {
+      if(btnDw.isLongPress())
+      {
+        INFO(F("Dw "), BUTTON_IS_LONGPRESSED_MSG);
+        const auto &endPos = servo.read();
+        TRACE(F("endAngle: "), endPos);
+        if(endPos > _settings.startAngle)
+        {
+          //_settings.endAngle = endPos;
+          SaveChanges();
+        }else
+        {
+          lcd.clear();
+          lcd.setCursor(0, 1);
+          lcd.print("Error:Max>=Min");
+        }
+        btnDw.resetTicks();
+      }else
+      {      
+        if(servo.attach())
+        {       
+          const auto &currentPos = servo.move(+5, DEFAULT_MOVE_SPEED_DELAY);
+          LCDPrintBoundMenu(currentPos);
+        }       
+      }
+    }        
   }
 
   if(btnRt.isPressed())
   {
     INFO(F("Rt "), BUTTON_IS_PRESSED_MSG);
     BacklightOn(current);
+
+    if(currentMenu != Menu::Main)
+    {
+      currentMenu = Menu::Main;
+    }
   }
 
-  HandleMovement(current, status, statusMsg); 
+  HandleMenuAndActions(current, status, statusMsg); 
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
@@ -312,7 +388,7 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-void HandleMovement(const unsigned long &currentTicks, int &status, String &statusMsg)
+void HandleMenuAndActions(const unsigned long &currentTicks, int &status, String &statusMsg)
 {
   if(currentMenu == Menu::Main)
   {    
@@ -335,11 +411,19 @@ void HandleMovement(const unsigned long &currentTicks, int &status, String &stat
     }
     if((currentTicks - updateTicks) >= CURRENT_STATUS_UPDATE) 
     {
-      //TRACE(F("HandleMovement: "), currentInSec);
+      //TRACE(F("HandleMenuAndActions: "), currentInSec);
       MainMenuStatus(currentInSec);
       updateTicks = currentTicks;
     }
-  }  
+  } else
+  if(currentMenu == Menu::BoundMax || currentMenu == Menu::BoundMin)
+  {
+    if((currentTicks - updateTicks) >= CURRENT_STATUS_UPDATE) 
+    {
+      LCDPrintBoundMenu(servo.read());
+      updateTicks = currentTicks;
+    }
+  }
 }
 
 const bool FillRandomValues(int &status, String &statusMsg)
@@ -376,12 +460,12 @@ const bool FillRandomValues(int &status, String &statusMsg)
 
   yield(); // watchdog  
 
-  DebugPrintRandomValues();
+  DebugPrintSettingsValues();
 
   return true;
 }
 
-void DebugPrintRandomValues()
+void DebugPrintSettingsValues()
 {
   TRACE(F("moveAngleR: "), _settings.moveAngleR, F(" "), F("startAngle: "), _settings.startAngle, F(" "), F("endAngle: "), _settings.endAngle);
   TRACE(F("movmoveSpeedDelayR: "), _settings.moveSpeedDelayR);
@@ -449,7 +533,8 @@ void SaveChanges()
   SaveSettings();
   lcd.clear();
   lcd.print(F("Save..."));
-  delay(700);
+  DebugPrintSettingsValues();
+  delay(700); 
 }
 
 void MainMenuStatus(const unsigned long &currentInSec)
@@ -477,6 +562,20 @@ void LCDPrintWiFiStatus()
   lcd.print(W);
 }
 
+void LCDPrintBoundMenu(const int& currentPos)
+{
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(_settings.startAngle); 
+  lcd.print(F(" > ")); lcd.print(currentPos); lcd.print(F(" < "));
+  lcd.print(_settings.endAngle); 
+
+  lcd.setCursor(0, 1);
+  lcd.print(F("SaveMin")); 
+  lcd.print(F("|"));
+  lcd.print(F("|"));
+  lcd.print(F("MaxSave"));
+}
 
 void LCDPrintRandomValues()
 {
@@ -500,7 +599,7 @@ void HandleDebugSerialCommands()
   { 
     _settings.init();
     SaveSettings();  
-    DebugPrintRandomValues();  
+    DebugPrintSettingsValues();  
   }
 
   if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
