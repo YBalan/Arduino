@@ -148,7 +148,10 @@ void setup()
   Serial.print(F("!!!! Start ")); Serial.println(F("MouseMover"));
   Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(String(VER) + VER_POSTFIX);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
-  Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
+  Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);  
+
+  servo.attach();
+  //servo.init();  
 
   LoadSettings();
   LoadSettingsExt();  
@@ -199,10 +202,7 @@ void setup()
   //bot->setPeriod(_settings.alarmsUpdateTimeout);
   bot->setLimit(1);
   bot->skipUpdates();
-  #endif 
-
-  servo.attach();
-  //servo.init();
+  #endif   
 }
 
 void LCDPrintVersion()
