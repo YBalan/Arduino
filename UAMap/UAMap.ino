@@ -5,7 +5,7 @@
 #ifdef ESP8266
   #define VER F("1.33")
 #else //ESP32
-  #define VER F("1.39")
+  #define VER F("1.40")
 #endif
 
 #define AVOID_FLICKERING
@@ -14,8 +14,8 @@
 //#define DEBUG
 
 #define NETWORK_STATISTIC
-#define ENABLE_TRACE
-#define ENABLE_INFO_MAIN
+//#define ENABLE_TRACE
+//#define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
 
@@ -584,6 +584,11 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode
 
         SetRelayStatus();           
       }                       
+    }
+    else
+    {
+      WiFi.disconnect();
+      WiFi.reconnect();
     }   
     
     bool statusChanged = SetStatusLED(httpCode, statusMsg);
@@ -778,6 +783,11 @@ const bool SetStatusLED(const int &status, const String &msg)
         TRACE(F("STATUS JSON ERROR START BLINK"));
         ledsState[LED_STATUS_IDX].Color = led.Color;
         ledsState[LED_STATUS_IDX].StartBlink(200, LED_STATUS_NO_CONNECTION_TOTALTIME);
+      break;
+      case ApiStatusCode::NO_WIFI:
+      INFO(F("STATUS NO WIFI"));
+      ledsState[LED_STATUS_IDX].Color = CRGB::Green;
+      ledsState[LED_STATUS_IDX].StartBlink(LED_STATUS_NO_CONNECTION_PERIOD, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
       default:
         INFO(F("STATUS NOT OK START BLINK"));

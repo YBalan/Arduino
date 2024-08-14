@@ -200,6 +200,7 @@ class WiFiOps
       }
 
       WiFi.setAutoReconnect(true);
+      //WiFi.persistent(true);
       #ifdef ESP8266
       WiFi.setAutoConnect(true); 
       #endif
