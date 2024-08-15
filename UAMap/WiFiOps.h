@@ -14,13 +14,13 @@
 #include "WiFiParameters.h"
 
 #ifdef ENABLE_INFO_WIFI
-#define WIFI_INFO(...) SS_TRACE("[WiFi OPS INFO] ", __VA_ARGS__)
+#define WIFI_INFO(...) SS_TRACE(F("[WiFi OPS INFO] "), __VA_ARGS__)
 #else
 #define WIFI_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_WIFI
-#define WIFI_TRACE(...) SS_TRACE("[WiFi OPS TRACE] ", __VA_ARGS__)
+#define WIFI_TRACE(...) SS_TRACE(F("[WiFi OPS TRACE] "), __VA_ARGS__)
 #else
 #define WIFI_TRACE(...) {}
 #endif
@@ -69,7 +69,7 @@ class WiFiOps
   public:
     
   public:    
-    WiFiOps(const String &title = "WiFIManager", const String &apName = "AutoConnectAP", const String &apPass = "00000", const bool &addMacToAPName = true) 
+    WiFiOps(const String &title = F("WiFIManager"), const String &apName = F("AutoConnectAP"), const String &apPass = "00000", const bool &addMacToAPName = true) 
     : _title(std::move(title))
     , _APName(std::move(apName))
     , _APPass(std::move(apPass))

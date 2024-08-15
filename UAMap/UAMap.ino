@@ -587,8 +587,11 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode
     }
     else
     {
+      leds[LED_STATUS_IDX] = CRGB::Green;
+      FastLEDShow(500);      
       WiFi.disconnect();
       WiFi.reconnect();
+      delay(200);
     }   
     
     bool statusChanged = SetStatusLED(httpCode, statusMsg);
@@ -785,9 +788,9 @@ const bool SetStatusLED(const int &status, const String &msg)
         ledsState[LED_STATUS_IDX].StartBlink(200, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
       case ApiStatusCode::NO_WIFI:
-      INFO(F("STATUS NO WIFI"));
-      ledsState[LED_STATUS_IDX].Color = CRGB::Green;
-      ledsState[LED_STATUS_IDX].StartBlink(LED_STATUS_NO_CONNECTION_PERIOD, LED_STATUS_NO_CONNECTION_TOTALTIME);
+        INFO(F("STATUS NO WIFI"));
+        ledsState[LED_STATUS_IDX].Color = CRGB::Green;
+        ledsState[LED_STATUS_IDX].StartBlink(LED_STATUS_NO_CONNECTION_PERIOD, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
       default:
         INFO(F("STATUS NOT OK START BLINK"));

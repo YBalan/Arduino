@@ -13,13 +13,13 @@
   #include "DEBUGHelper.h"
 
   #ifdef ENABLE_INFO_PMONITOR
-  #define PM_INFO(...) SS_TRACE("[PM INFO] ", __VA_ARGS__)
+  #define PM_INFO(...) SS_TRACE(F("[PM INFO] "), __VA_ARGS__)
   #else
   #define PM_INFO(...) {}
   #endif
 
   #ifdef ENABLE_TRACE_PMONITOR
-  #define PM_TRACE(...) SS_TRACE("[PM TRACE] ", __VA_ARGS__)
+  #define PM_TRACE(...) SS_TRACE(F("[PM TRACE] "), __VA_ARGS__)
   #else
   #define PM_TRACE(...) {}
   #endif
