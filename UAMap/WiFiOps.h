@@ -69,7 +69,11 @@ class WiFiOps
   public:
     
   public:    
+    #ifdef ESP32
     WiFiOps(const String &title = F("WiFIManager"), const String &apName = F("AutoConnectAP"), const String &apPass = "00000", const bool &addMacToAPName = true) 
+    #else
+    WiFiOps(const String &title, const String &apName, const String &apPass = "00000", const bool &addMacToAPName = true) 
+    #endif
     : _title(std::move(title))
     , _APName(std::move(apName))
     , _APPass(std::move(apPass))
