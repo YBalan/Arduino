@@ -6,13 +6,13 @@
 #include "CommonHelper.h"
 
 #ifdef ENABLE_INFO_BUZZ
-#define BUZZ_INFO(...) SS_TRACE("[BUZZ INFO] ", __VA_ARGS__)
+#define BUZZ_INFO(...) SS_TRACE(F("[BUZZ INFO] "), __VA_ARGS__)
 #else
 #define BUZZ_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_BUZZ
-#define BUZZ_TRACE(...) SS_TRACE("[BUZZ TRACE] ", __VA_ARGS__)
+#define BUZZ_TRACE(...) SS_TRACE(F("[BUZZ TRACE] "), __VA_ARGS__)
 #else
 #define BUZZ_TRACE(...) {}
 #endif

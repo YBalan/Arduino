@@ -31,13 +31,13 @@
 #include "Config.h"
 
 #ifdef ENABLE_INFO_ALARMS
-#define ALARMS_INFO(...) SS_TRACE("[ALARMS API INFO] ", __VA_ARGS__)
+#define ALARMS_INFO(...) SS_TRACE(F("[ALARMS API INFO] "), __VA_ARGS__)
 #else
 #define ALARMS_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_ALARMS
-#define ALARMS_TRACE(...) SS_TRACE("[ALARMS API TRACE] ", __VA_ARGS__)
+#define ALARMS_TRACE(...) SS_TRACE(F("[ALARMS API TRACE] "), __VA_ARGS__)
 #else
 #define ALARMS_TRACE(...) {}
 #endif

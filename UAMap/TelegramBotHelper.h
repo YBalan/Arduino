@@ -7,13 +7,13 @@
 #include "DEBUGHelper.h"
 
 #ifdef ENABLE_INFO_BOT
-#define BOT_INFO(...) SS_TRACE("[BOT INFO] ", __VA_ARGS__)
+#define BOT_INFO(...) SS_TRACE(F("[BOT INFO] "), __VA_ARGS__)
 #else
 #define BOT_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_BOT
-#define BOT_TRACE(...) SS_TRACE("[BOT TRACE] ", __VA_ARGS__)
+#define BOT_TRACE(...) SS_TRACE(F("[BOT TRACE] "), __VA_ARGS__)
 #else
 #define BOT_TRACE(...) {}
 #endif
