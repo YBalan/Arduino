@@ -1,9 +1,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.2")
+  #define VER F("1.3")
 #else //ESP32
-  #define VER F("1.2")
+  #define VER F("1.3")
 #endif
 
 #define AVOID_FLICKERING
@@ -423,10 +423,23 @@ void HandleMenuAndActions(const unsigned long &currentTicks, int &status, String
       if ((WiFi.status() == WL_CONNECTED)) 
       { 
         FillRandomValues(status, statusMsg);
+        TRACE(F("http Status: "), status, F(" "), statusMsg);
         delay(1000);
         SaveChanges();
       }
-      TRACE(F("http Status: "), status, F(" "), statusMsg);
+      else
+      {   
+        TRACE(F("\t\t"), F("WiFi Reconnect..."), F("SSID:"), WiFi.SSID());
+        BacklightOn(currentTicks);
+        lcd.clear();        
+        lcd.setCursor(0, 0);
+        lcd.print(F("WiFi Reconnect..."));
+        lcd.setCursor(0, 1);
+        lcd.print(F("SSID:")); lcd.print(WiFi.SSID());        
+        WiFi.disconnect();
+        WiFi.reconnect();
+        delay(1000);
+      }      
       #endif
     }
     if((currentTicks - updateTicks) >= CURRENT_STATUS_UPDATE) 
