@@ -203,8 +203,7 @@ class WiFiOps
         delay(5000);
       }
 
-      WiFi.setAutoReconnect(true);
-      //WiFi.persistent(true);
+      WiFi.setAutoReconnect(true);      
       #ifdef ESP8266
       WiFi.setAutoConnect(true); 
       #endif
