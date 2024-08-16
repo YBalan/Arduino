@@ -3,9 +3,9 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.34")
+  #define VER F("1.35")
 #else //ESP32
-  #define VER F("1.40")
+  #define VER F("1.41")
 #endif
 
 #define AVOID_FLICKERING
@@ -877,10 +877,65 @@ void PrintNetworkStatistic(String &str, const int& codeFilter)
   str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
       + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
       
-  //str.replace("(", "");
-  //str.replace(")", "");
+  //str += F(" ") + String(ESP.getResetInfoPtr()->reason);
+  #ifdef ESP8266
+  str += F(" ") + GetResetReason();
+  #else //ESP32
+  str += String(F(" Rst:[")) + GetResetReason() + F("]");
+  #endif
   #else
   str += F("Off");
+  #endif
+}
+
+const String GetResetReason()
+{
+  #ifdef ESP8266
+  return ESP.getResetReason();
+  #else //ESP32
+  // Get the reset reason
+  esp_reset_reason_t resetReason = esp_reset_reason();
+
+  // Print the reset reason to the Serial Monitor
+  
+  switch (resetReason) {
+    case ESP_RST_UNKNOWN:
+      return F("Unknown");
+      break;
+    case ESP_RST_POWERON:
+      return F("Power on");
+      break;
+    case ESP_RST_EXT:
+      return F("External reset");
+      break;
+    case ESP_RST_SW:
+      return F("Software reset");
+      break;
+    case ESP_RST_PANIC:
+      return F("Exception/panic");
+      break;
+    case ESP_RST_INT_WDT:
+      return F("Watchdog reset (Interrupt)");
+      break;
+    case ESP_RST_TASK_WDT:
+      return F("Watchdog reset (Task)");
+      break;
+    case ESP_RST_WDT:
+      return F("Watchdog reset");
+      break;
+    case ESP_RST_DEEPSLEEP:
+      return F("Deep sleep reset");
+      break;
+    case ESP_RST_BROWNOUT:
+      return F("Brownout reset");
+      break;
+    case ESP_RST_SDIO:
+      return F("SDIO reset");
+      break;
+    default:
+      return F("Unknown reason");
+      break;
+  }
   #endif
 }
 
