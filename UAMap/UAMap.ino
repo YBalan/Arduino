@@ -3,7 +3,7 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.33")
+  #define VER F("1.34")
 #else //ESP32
   #define VER F("1.40")
 #endif
@@ -588,10 +588,12 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode
     else
     {
       leds[LED_STATUS_IDX] = CRGB::Green;
-      FastLEDShow(500);      
+      FastLEDShow(500);
+      #ifdef ESP32      
       WiFi.disconnect();
       WiFi.reconnect();
       delay(200);
+      #endif
     }   
     
     bool statusChanged = SetStatusLED(httpCode, statusMsg);
