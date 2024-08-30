@@ -435,9 +435,11 @@ void HandleMenuAndActions(const unsigned long &currentTicks, int &status, String
         lcd.setCursor(0, 0);
         lcd.print(F("WiFi Reconnect..."));
         lcd.setCursor(0, 1);
-        lcd.print(F("SSID:")); lcd.print(WiFi.SSID());        
+        lcd.print(F("SSID:")); lcd.print(WiFi.SSID());   
+        #ifdef ESP32     
         WiFi.disconnect();
         WiFi.reconnect();
+        #endif
         delay(1000);
       }      
       #endif
