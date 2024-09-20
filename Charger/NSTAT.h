@@ -53,10 +53,12 @@ void PrintNetworkStatToSerial()
   #endif
 }
 
+#ifdef NETWORK_STATISTIC
 void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
-{  
-  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
+{      
+  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");  
 }
+#endif
 
 void PrintNetworkStatistic(String &str, const int& codeFilter)
 {
