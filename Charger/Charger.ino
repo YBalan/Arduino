@@ -6,10 +6,9 @@
   #define VER F("1.0")
 #endif
 
-#define AVOID_FLICKERING
-
 //#define RELEASE
 #define DEBUG
+#define VER_POSTFIX F("D")
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -18,8 +17,6 @@
 #ifdef DEBUG
 
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
-
-#define USE_BUZZER_MELODIES 
 
 #define ENABLE_TRACE_MAIN
 
@@ -32,20 +29,14 @@
 #define ENABLE_INFO_BOT_MENU
 #define ENABLE_TRACE_BOT_MENU
 
-#define ENABLE_INFO_ALARMS
-#define ENABLE_TRACE_ALARMS
-
 #define ENABLE_INFO_WIFI
 #define ENABLE_TRACE_WIFI
 
-#define ENABLE_INFO_PMONITOR
-#define ENABLE_TRACE_PMONITOR
-
-#define ENABLE_INFO_BUZZ
-#define ENABLE_TRACE_BUZZ
-
+#define ENABLE_INFO_API
+#define ENABLE_TRACE_API
 #else
 
+#define VER_POSTFIX F("R")
 #define WM_NODEBUG
 //#define WM_DEBUG_LEVEL 0
 
@@ -55,7 +46,7 @@
 #define RELAY_ON  LOW
 
 //DebounceTime
-#define DebounceTime 50
+#define DEBOUNCE_TIME 50
 
 #ifdef ESP32
   #define IsESP32 true
@@ -70,7 +61,7 @@
   #define ESPresetHeap ESP.resetHeap()
   #define ESPresetFreeContStack ESP.resetFreeContStack()
 #else //ESP32
-  #define ESPgetFreeContStack F("Not supported")
+  #define ESPgetFreeContStack F("NA")
   #define ESPresetHeap {}
   #define ESPresetFreeContStack {}
 #endif
@@ -82,10 +73,15 @@
 //#include <ezButton.h>
 
 #include "DEBUGHelper.h"
+#include "ESPHelper.h"
+#include "NSTAT.h"
+#include "HttpApi.h"
 #include "Settings.h"
 #include "WiFiOps.h"
+#ifdef USE_BOT
 #include "TelegramBotHelper.h"
 #include "TBotMenu.h"
+#endif
 
 #define LONG_PRESS_VALUE_MS 1000
 #include "Button.h"
@@ -102,32 +98,31 @@
 #define TRACE(...) {}
 #endif
 
-#ifdef NETWORK_STATISTIC
-struct NetworkStatInfo{ int code; int count; String description; };
-std::map<int, NetworkStatInfo> networkStat;
-#endif
+static uint8_t debugButtonFromSerial = 0;
 
-Button resetBtn(PIN_RESET_BTN);
+#define XYDJ Serial2
 
 void setup() 
 {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  while (!Serial);   
+  while (!Serial);     
 
-  resetBtn.setDebounceTime(DebounceTime);  
+  XYDJ.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  while (!Serial2); 
 
   Serial.println();
-  Serial.println(F("!!!! Start Charger !!!!"));
-  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(VER);
+  Serial.print(F("!!!! Start ")); Serial.print(PRODUCT_NAME); Serial.println(F(" !!!!"));
+  Serial.print(F("Flash Date: ")); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print(F("V:")); Serial.println(String(VER) + VER_POSTFIX);
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
   LoadSettings();
   LoadSettingsExt();  
-  //_settings.reset();
+  //_settings.reset(); 
+  //return;
 
-  WiFiOps::WiFiOps wifiOps(F("Charger WiFi Manager"), F("ChargerAP"), F("password"));
+  WiFiOps::WiFiOps wifiOps(PORTAL_TITLE, AP_NAME, AP_PASS);
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -142,11 +137,11 @@ void setup()
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
   ;    
-
-  auto resetButtonState = resetBtn.getState();
-  INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
-  INFO(F("ResetFlag: "), _settings.resetFlag);
-  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+  
+  // auto resetButtonState = resetBtn.getState();
+  // INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
+   INFO(F("ResetFlag: "), _settings.resetFlag);
+  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
   if(_settings.resetFlag == 1985)
   {
     _settings.resetFlag = 200;
@@ -168,14 +163,40 @@ void setup()
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());
-  
+  INFO(F("Portal Started: "), manager->getConfigPortalSSID());  
 }
 
 void loop()
 {
+  static uint32_t currentTicks = millis();
+  currentTicks = millis();  
 
-  resetBtn.loop();
+  #ifdef DEBUG
+  if(XYDJ.available() > 0)
+  { 
+    const auto &received = XYDJ.readStringUntil('\n');
+    INFO("XYDJ = ", received);     
+  }
+
+  //delay(1000);  
+
+  if(Serial.available() > 0)
+  {
+    const auto &sendCommand = Serial.readString();
+    debugButtonFromSerial = sendCommand.toInt();
+    if(debugButtonFromSerial == 0)
+    {    
+      SendCommand(sendCommand);
+    }
+    else
+    {
+      TRACE(F("Serial = "), debugButtonFromSerial);
+    }
+  }
+  #endif
+
+  RunAndHandleHttpApi(currentTicks);
+
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
   yield(); // watchdog
@@ -192,79 +213,109 @@ void loop()
   }  
   #endif   
 
+  HandleDebugSerialCommands();
 }
 
-void PrintFSInfo(String &fsInfo)
+const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {
-  #ifdef ESP8266
-  FSInfo fs_info;
-  SPIFFS.info(fs_info);   
-  const auto &total = fs_info.totalBytes;
-  const auto &used = fs_info.usedBytes;
-  #else //ESP32
-  const auto &total = SPIFFS.totalBytes();
-  const auto &used = SPIFFS.usedBytes();
-  #endif
-  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+  httpCode = 200;
+  int status = httpCode;
+  HandleErrors(httpCode, status, statusMsg);
+  return true;
 }
 
-
-#ifdef NETWORK_STATISTIC  
-void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
-{  
-  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
-}
-#endif
-
-void PrintNetworkStatToSerial()
+void RunAndHandleHttpApi(const unsigned long &currentTicks)
 {
-  #ifdef NETWORK_STATISTIC
-  Serial.print(F("Network Statistic: "));
-  if(networkStat.size() > 0)
-  {
-    if(networkStat.count(200) > 0)
-      PrintNetworkStatInfoToSerial(networkStat[200]);
-    for(const auto &de : networkStat)
-    {
-      const auto &info = de.second;
-      if(info.code != 200)
-        PrintNetworkStatInfoToSerial(info);
-    }
+  // wait for WiFi connection
+  int httpCode = ApiStatusCode::NO_WIFI;
+  String statusMsg = F("No WiFi");  
+  
+  if ((WiFi.status() == WL_CONNECTED)) 
+  {  
+    #ifdef USE_STOPWATCH
+    uint32_t sw = millis();
+    #endif
+
+    RunHttp(currentTicks, httpCode, statusMsg);    
+
+    #ifdef USE_STOPWATCH
+    sw = millis() - sw;
+    #endif
+
+    #ifdef USE_BOT
+      #ifdef USE_NOTIFY
+        if(_settings.notifyHttpCode == 1 || //All http codes
+            (_settings.notifyHttpCode != 0  // Notify is ON
+              &&(
+                    (_settings.notifyHttpCode < 0 && httpCode != abs(_settings.notifyHttpCode)) //-200 means - All except 200
+                  || (_settings.notifyHttpCode == httpCode)
+                )
+            )
+          )
+        {
+          String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode)
+          #ifdef USE_STOPWATCH
+          + F(" (") + String(sw) + F("ms") + F(")")
+          #endif
+          ;
+
+          if(strlen(_settings.NotifyChatId) > 0)
+          {
+            TRACE(notifyMessage, F(" ChatId: "), _settings.NotifyChatId);
+            bot->sendMessage(notifyMessage, _settings.NotifyChatId);
+          }
+        }
+      #endif
+    #endif
+
+    #ifdef USE_STOPWATCH
+      TRACE(F("API Stop watch: "), sw, F("ms..."));
+    #endif
   }
-  Serial.print(F(" ")); Serial.print(millis() / 1000); Serial.print(F("sec"));
-  Serial.println();
-  #endif
+  else
+  {  
+    #ifdef ESP32      
+    WiFi.disconnect();
+    WiFi.reconnect();
+    delay(200);
+    #endif
+  }   
+
+  FillNetworkStat(httpCode, statusMsg);
+  PrintNetworkStatToSerial();   
 }
 
-void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
-{  
-  str += String(F("[\"")) + info.description + F("\": ") + String(info.count) + F("]; ");
-}
-
-void PrintNetworkStatistic(String &str, const int& codeFilter)
+void HandleDebugSerialCommands()
 {
-  str = F("NSTAT: ");
-  #ifdef NETWORK_STATISTIC  
-  if(networkStat.size() > 0)
-  {
-    if(networkStat.count(200) > 0 && (codeFilter == 0 || codeFilter == 200))
-      PrintNetworkStatInfo(networkStat[200], str);
-    for(const auto &de : networkStat)
-    {
-      const auto &info = de.second;
-      if(info.code != 200 && (codeFilter == 0 || codeFilter == info.code))
-        PrintNetworkStatInfo(info, str);
-    }
+  if(debugButtonFromSerial == 1) // Reset WiFi
+  { 
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
   }
-  const auto &millisec = millis();
-  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
-      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
-      
-  //str.replace("(", "");
-  //str.replace(")", "");
-  #else
-  str += F("Off");
-  #endif
+
+  if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
+  { 
+    INFO(F("\t\t\tFormat..."));   
+    SPIFFS.format();
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
+  }
+
+  debugButtonFromSerial = 0;
+  if(Serial.available() > 0)
+  {
+    debugButtonFromSerial = Serial.readString().toInt();
+    TRACE(F("Serial = "), debugButtonFromSerial);
+  }
 }
+
+void SendCommand(const String &command)
+{
+  INFO(F("Send command: "), command);
+  XYDJ.print(command);    
+}
+
 
 
