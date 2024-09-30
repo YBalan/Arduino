@@ -98,7 +98,7 @@
 #define TRACE(...) {}
 #endif
 
-static uint8_t debugButtonFromSerial = 0;
+static uint8_t debugCommandFromSerial = 0;
 
 #define XYDJ Serial2
 
@@ -183,15 +183,12 @@ void loop()
   if(Serial.available() > 0)
   {
     const auto &sendCommand = Serial.readString();
-    debugButtonFromSerial = sendCommand.toInt();
-    if(debugButtonFromSerial == 0)
+    TRACE(F("STR "), F("Serial = "), sendCommand);
+    debugCommandFromSerial = sendCommand.toInt();    
+    if(debugCommandFromSerial == 0)
     {    
       SendCommand(sendCommand);
-    }
-    else
-    {
-      TRACE(F("Serial = "), debugButtonFromSerial);
-    }
+    }    
   }
   #endif
 
@@ -225,8 +222,7 @@ const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &sta
 }
 
 void RunAndHandleHttpApi(const unsigned long &currentTicks)
-{
-  // wait for WiFi connection
+{  
   int httpCode = ApiStatusCode::NO_WIFI;
   String statusMsg = F("No WiFi");  
   
@@ -287,14 +283,14 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks)
 
 void HandleDebugSerialCommands()
 {
-  if(debugButtonFromSerial == 1) // Reset WiFi
+  if(debugCommandFromSerial == 1) // Reset WiFi
   { 
     _settings.resetFlag = 1985;
     SaveSettings();
     ESP.restart();
   }
 
-  if(debugButtonFromSerial == 130) // Format FS and reset WiFi and restart
+  if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
     INFO(F("\t\t\tFormat..."));   
     SPIFFS.format();
@@ -303,12 +299,14 @@ void HandleDebugSerialCommands()
     ESP.restart();
   }
 
-  debugButtonFromSerial = 0;
-  if(Serial.available() > 0)
-  {
-    debugButtonFromSerial = Serial.readString().toInt();
-    TRACE(F("Serial = "), debugButtonFromSerial);
-  }
+  // if(debugCommandFromSerial == 0)
+  // {    
+  //   if(Serial.available() > 0)
+  //   {
+  //     debugCommandFromSerial = Serial.readString().toInt();
+  //     TRACE(F("INT "), F("Serial = "), debugCommandFromSerial);
+  //   }
+  // }  
 }
 
 void SendCommand(const String &command)
