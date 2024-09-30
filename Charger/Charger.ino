@@ -10,7 +10,7 @@
 #define DEBUG
 #define VER_POSTFIX F("D")
 
-#define NETWORK_STATISTIC
+//#define NETWORK_STATISTIC
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 
@@ -19,6 +19,9 @@
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
 #define ENABLE_TRACE_MAIN
+
+#define ENABLE_INFO_DS
+#define ENABLE_TRACE_DS
 
 #define ENABLE_INFO_SETTINGS
 #define ENABLE_TRACE_SETTINGS
@@ -78,6 +81,7 @@
 #include "HttpApi.h"
 #include "Settings.h"
 #include "WiFiOps.h"
+#include "DataStorage.h"
 #ifdef USE_BOT
 #include "TelegramBotHelper.h"
 #include "TBotMenu.h"
@@ -101,6 +105,10 @@
 static uint8_t debugCommandFromSerial = 0;
 
 #define XYDJ Serial2
+std::unique_ptr<DataStorage> ds(new DataStorage());
+
+static uint32_t storeDataTicks = 0;
+static Data currentData;
 
 void setup() 
 {
@@ -120,7 +128,10 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset(); 
-  //return;
+
+  ds->begin();
+
+  return;
 
   WiFiOps::WiFiOps wifiOps(PORTAL_TITLE, AP_NAME, AP_PASS);
 
@@ -169,30 +180,35 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 void loop()
 {
   static uint32_t currentTicks = millis();
-  currentTicks = millis();  
-
-  #ifdef DEBUG
+  currentTicks = millis();   
+  
   if(XYDJ.available() > 0)
   { 
     const auto &received = XYDJ.readStringUntil('\n');
-    INFO("XYDJ = ", received);     
+    currentData.readFromXYDJ(received);
+    // INFO("EXT Device = ", F("'"), received, F("'"));
+    // INFO("      Data = ", F("'"), currentData.writeToCsv(), F("'"));
   }
-
-  //delay(1000);  
-
+  
   if(Serial.available() > 0)
   {
     const auto &sendCommand = Serial.readString();
-    TRACE(F("STR "), F("Serial = "), sendCommand);
+    TRACE(F("STR "), F("Serial = "), F("'"), sendCommand, F("'"));
     debugCommandFromSerial = sendCommand.toInt();    
     if(debugCommandFromSerial == 0)
     {    
       SendCommand(sendCommand);
     }    
-  }
-  #endif
+  }  
 
   RunAndHandleHttpApi(currentTicks);
+
+  const uint32_t ticks = currentTicks - storeDataTicks;
+  if(ticks >= _settings.storeDataTimeout)
+  {
+    StoreData(ticks);
+    storeDataTicks = millis();
+  }
 
   #ifdef USE_BOT
   uint8_t botStatus = bot->tick();  
@@ -211,6 +227,16 @@ void loop()
   #endif   
 
   HandleDebugSerialCommands();
+}
+
+void StoreData(const uint32_t &ticks)
+{
+  TRACE(F("\t\tStore currentData..."));
+  ds->appendData(currentData, (int)(ticks / 1000));
+  ds->TraceToSerial();   
+  String fsInfo;
+  PrintFSInfo(fsInfo); 
+  TRACE(fsInfo);
 }
 
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
@@ -290,6 +316,32 @@ void HandleDebugSerialCommands()
     ESP.restart();
   }
 
+  if(debugCommandFromSerial == 2) // Show current currentData
+  { 
+    ds->TraceToSerial();
+  }
+
+  if(debugCommandFromSerial == 3) // Extract all
+  { 
+    TRACE(F("Extract All..."))
+    String out;
+    ds->extractAllData(out);
+    TRACE(out);
+  }
+
+  if(debugCommandFromSerial == 4) // Remove all
+  { 
+    TRACE(F("Remove All..."))
+    String out;
+    const auto &files = ds->removeAllData();
+    TRACE(files);
+  }
+
+  if(debugCommandFromSerial == 5) // Store currentData
+  { 
+    StoreData(millis() - storeDataTicks);
+  }
+
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
     INFO(F("\t\t\tFormat..."));   
@@ -299,6 +351,7 @@ void HandleDebugSerialCommands()
     ESP.restart();
   }
 
+  debugCommandFromSerial = 0;
   // if(debugCommandFromSerial == 0)
   // {    
   //   if(Serial.available() > 0)

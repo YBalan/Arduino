@@ -32,13 +32,16 @@ namespace UAMap
     int notifyHttpCode = 0;   
     
     char NotifyChatId[MAX_CHAT_ID_LENGTH];
-    int8_t timeZone;
+    int8_t timeZone = 3;
+    uint32_t storeDataTimeout = STORE_DATA_TIMEOUT;
+
     void init()
     {      
       memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
       resetFlag = 200;
       notifyHttpCode = 0;      
       timeZone = 3;
+      storeDataTimeout = STORE_DATA_TIMEOUT;
     }
 
     void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }

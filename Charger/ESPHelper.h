@@ -2,17 +2,8 @@
 #ifndef ESP_HELPER_H
 #define ESP_HELPER_H
 
-const String GetResetReason(int &resetReason)
+const String ResetReasonToString(const int &resetReason)
 {
-  #ifdef ESP8266
-  resetReason = ESP.getResetInfoPtr()->reason;
-  return ESP.getResetReason();  
-  #else //ESP32
-  // Get the reset reason
-  /*esp_reset_reason_t*/ resetReason = esp_reset_reason();
-
-  // Print the reset reason to the Serial Monitor
-  
   switch (resetReason) {
     case ESP_RST_UNKNOWN:
       return F("Unknown");
@@ -51,6 +42,17 @@ const String GetResetReason(int &resetReason)
       return F("Unknown reason");
       break;
   }
+}
+
+const String GetResetReason(int &resetReason)
+{
+  #ifdef ESP8266
+  resetReason = ESP.getResetInfoPtr()->reason;
+  return ESP.getResetReason();  
+  #else //ESP32
+  // Get the reset reason
+  /*esp_reset_reason_t*/ resetReason = esp_reset_reason();
+  return ResetReasonToString(resetReason);
   #endif
 }
 
@@ -65,7 +67,7 @@ void PrintFSInfo(String &fsInfo)
   const auto &total = SPIFFS.totalBytes();
   const auto &used = SPIFFS.usedBytes();
   #endif
-  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used);  
+  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
 }
 
 #endif //ESP_HELPER_H

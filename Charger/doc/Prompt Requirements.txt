@@ -1,0 +1,26 @@
+Charger save statistic requirements: (ESP32 C++)
+
+1. Using structure below organize storing and reading data using LittleFS
+	struct Data
+	{
+		uint32_t dateTime;
+		float voltage;
+		bool relayON;
+		String relayOnTime; //format: hh:mm:ss
+		uint8_t startReason;
+	};
+	Extend this structure with readFromCsv and writeToCsv and size_t recordLength. String should have equal size to have possibility to read from the end of file using known offset.
+	
+2. Each file contains only one day data. Data should be minutes based
+3. File name based on date, startReason should not affect file name
+4. File format csv
+5. Check storage size capacity and in case of lack of space remove old file one by one when new file saved
+6. Method to read last record from latest file in storage
+7. Method begin should readLatestFileRecord and keep it as a class member
+8. appendData(Data &data, const uint32_t &dateTime, const uint8_t &startReason) and appendData(Data &data, const int &secondsOffset) both methods should change dateTime from current record and append to file (startReason should not affect these methods)
+9. Method extractAllData(String &out) to extract all data from csv files in storage to memory buffer
+10. Class members String StartDate (means oldest dateTime avaliable) and String CurrentDate should be fulfilled
+11. Method to remove all stored data
+
+Do it in one ready to use *.h file with pragma once dirrective and #define _H dirrectives named DataStorage.h
+Avoid magic numbers
