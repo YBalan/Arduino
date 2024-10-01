@@ -50,6 +50,7 @@ notify429 - Notify To-many Requests (429)
 #define BOT_COMMAND_RSSI F("/rssi")
 #define BOT_COMMAND_CHID F("/chid")
 #define BOT_COMMAND_FS F("/fs")
+#define BOT_COMMAND_DOWNLOAD F("/download")
 
 //Fast Menu
 
@@ -122,7 +123,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
+    value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER + VER_POSTFIX;
   }else
   if(GetCommandValue(BOT_COMMAND_FS, filtered, value))
   {
@@ -153,7 +154,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       BOT_MENU_INFO(F("\t"), channel.first);
       value += String(F("[")) + channel.first + F("]") + F("; ");
     }
-  }else  
+  }else
+  if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT DOWNLOAD:"));
+    bot->sendTyping(msg.chatID);
+    String buff;
+    ds->extractAllData(buff, true);
+    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, ds->generateAllDataFileName(),  msg.chatID);
+    value.clear();
+  }
+  
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
       messages.push_back(value);  

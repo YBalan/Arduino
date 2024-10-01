@@ -10,7 +10,6 @@
 #define STORE_DATA_TIMEOUT 60000
 
 #define USE_BOT
-#define USE_BUZZER
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
 
@@ -18,7 +17,7 @@
   #ifdef USE_BOT
     
   #endif
-  #define USE_API
+  //#define USE_API
   //#define HTTP_TIMEOUT 3000
   #define LANGUAGE_UA
   #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
@@ -40,9 +39,11 @@
 #ifdef ESP8266    
   #define RXD2 D8
   #define TXD2 D7
+  #define PIN_WIFI_BTN  D2
 #else //ESP32
   #define RXD2 16
   #define TXD2 17
+  #define PIN_WIFI_BTN  15
 #endif
 
 

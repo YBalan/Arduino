@@ -33,7 +33,7 @@
 #define ENABLE_TRACE_BOT_MENU
 
 #define ENABLE_INFO_WIFI
-#define ENABLE_TRACE_WIFI
+//#define ENABLE_TRACE_WIFI
 
 #define ENABLE_INFO_API
 #define ENABLE_TRACE_API
@@ -102,10 +102,12 @@
 #define TRACE(...) {}
 #endif
 
+std::unique_ptr<WiFiOps::WiFiOps> wifiOps(new WiFiOps::WiFiOps(PORTAL_TITLE, AP_NAME, AP_PASS));
+
 static uint8_t debugCommandFromSerial = 0;
 
 #define XYDJ Serial2
-std::unique_ptr<DataStorage> ds(new DataStorage());
+Button wifiBtn(PIN_WIFI_BTN);
 
 uint32_t storeDataTicks = 0;
 Data currentData;
@@ -118,6 +120,9 @@ void setup()
 
   XYDJ.begin(9600, SERIAL_8N1, RXD2, TXD2);
   while (!Serial2); 
+
+  //pinMode(PIN_WIFI_BTN, INPUT_PULLUP);
+  wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
   Serial.print(F("!!!! Start ")); Serial.print(PRODUCT_NAME); Serial.println(F(" !!!!"));
@@ -133,9 +138,8 @@ void setup()
   storeDataTicks = millis();
   
   ds->begin();
-  return;
 
-  WiFiOps::WiFiOps wifiOps(PORTAL_TITLE, AP_NAME, AP_PASS);
+  currentData.setDateTime(ds->lastRecord.getDateTime()); 
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -145,35 +149,28 @@ void setup()
 
   wifiOps  
   #ifdef USE_BOT
-  .AddParameter(F("telegramToken"), F("Telegram Bot Token"), F("telegram_token"), F("TELEGRAM_TOKEN"), 47)
+  ->AddParameter(F("telegramToken"), F("Telegram Bot Token"), F("telegram_token"), F("TELEGRAM_TOKEN"), 47)
   .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
-  ;    
+  ;  
   
-  // auto resetButtonState = resetBtn.getState();
-  // INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
-  INFO(F("ResetFlag: "), _settings.resetFlag);
-  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
-  if(_settings.resetFlag == 1985)
+  if(IsWiFiOn())
   {
-    _settings.resetFlag = 200;
-    SaveSettings();
+    INFO(F("ResetFlag: "), _settings.resetFlag);
+    wifiOps->TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
+    if(_settings.resetFlag == 1985)
+    {
+      _settings.resetFlag = 200;
+      SaveSettings();
+    }
+
+    const auto &now = GetCurrentTime();
+    TRACE(F("Current epochTime: "), now);
+    currentData.setDateTime(now);  
   }
 
-  currentData.setDateTime(GetCurrentTime());  
-
-  #ifdef USE_BOT  
-  LoadChannelIDs();
-  bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
-  _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
-  _botSettings.botSecure = wifiOps.GetParameterValueById(F("telegramSec"));
-  bot->attach(HangleBotMessages);
-  bot->setTextMode(FB_TEXT); 
-  //bot->setPeriod(_settings.alarmsUpdateTimeout);
-  bot->setLimit(1);
-  bot->skipUpdates();
-  #endif   
+  InitBot();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -181,10 +178,49 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
   INFO(F("Portal Started: "), manager->getConfigPortalSSID());  
 }
 
+const bool IsWiFiOn()
+{
+  const auto &wifiBtnState = wifiBtn.getState(); //digitalRead(PIN_WIFI_BTN);  
+  return wifiBtnState == LOW;  
+}
+
+void InitBot()
+{
+  #ifdef USE_BOT  
+  LoadChannelIDs();
+  bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
+  _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
+  _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
+  bot->attach(HangleBotMessages);
+  bot->setTextMode(FB_TEXT); 
+  //bot->setPeriod(_settings.alarmsUpdateTimeout);
+  bot->setLimit(1);
+  bot->skipUpdates();
+  #endif
+}
+
 void loop()
 {
   static uint32_t currentTicks = millis(); 
   currentTicks = millis(); 
+
+  wifiBtn.loop();
+
+  if(wifiBtn.isPressed())
+  {
+    TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\tWiFi switch"));
+    wifiOps->TryToConnectOrOpenConfigPortal();
+    const auto &now = GetCurrentTime();
+    TRACE(F("Current epochTime: "), now);
+    currentData.setDateTime(now);    
+    InitBot();
+  }
+
+  if(wifiBtn.isReleased())
+  {
+    TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\tWiFi switch"));
+    WiFi.disconnect();
+  }
   
   if(XYDJ.available() > 0)
   { 
@@ -192,7 +228,7 @@ void loop()
     currentData.readFromXYDJ(received);
     //currentData.setResetReason(resetReason);
     // INFO("EXT Device = ", F("'"), received, F("'"));
-    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"));    
+    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
   }
   
   if(Serial.available() > 0)
@@ -206,15 +242,17 @@ void loop()
     }    
   }     
 
-  int httpCode = 0;
-  String statusMsg;
+  int httpCode = 200;
+  String statusMsg = F("OK");
   RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
 
   const uint32_t &ticks = currentTicks - storeDataTicks;
   //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
   if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout)
   {
-    storeDataTicks = currentTicks;    
+    storeDataTicks = currentTicks;
+
+    INFO(F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));
 
     currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
     StoreData(ticks);    
@@ -222,19 +260,22 @@ void loop()
   }
 
   #ifdef USE_BOT
-  uint8_t botStatus = bot->tick();  
-  yield(); // watchdog
-  if(botStatus == 0)
+  if(IsWiFiOn())
   {
-    // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
-    // botStatus = bot->tickManual();
+    const uint8_t &botStatus = bot->tick();  
+    yield(); // watchdog
+    if(botStatus == 0)
+    {
+      // BOT_INFO(F("BOT UPDATE MANUAL: millis: "), millis(), F(" current: "), currentTicks, F(" "));
+      // botStatus = bot->tickManual();
+    }
+    if(botStatus == 2)
+    {
+      BOT_INFO(F("Bot overloaded!"));
+      bot->skipUpdates();
+      //bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
+    }  
   }
-  if(botStatus == 2)
-  {
-    BOT_INFO(F("Bot overloaded!"));
-    bot->skipUpdates();
-    //bot->answer(F("Bot overloaded!"), /**alert:*/ true); 
-  }  
   #endif   
 
   HandleDebugSerialCommands();
@@ -250,88 +291,79 @@ void StoreData(const uint32_t &ticks)
   TRACE(fsInfo);
 }
 
-const uint32_t GetCurrentTime()
-{
-    // Configure time with NTP server (UTC time)
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-
-    // Wait for time to be set
-    struct tm timeInfo;
-    while (!getLocalTime(&timeInfo)) {
-        INFO("Waiting for time...");
-        delay(1000);
-    }
-
-    // Get the current time as epoch
-    time_t now = time(NULL);
-    TRACE(F("Current epochTime: "), now);
-    return static_cast<uint32_t>(now);
-}
-
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {
   httpCode = 200;
   int status = httpCode;
+  statusMsg = F("OK"); 
+  #ifdef USE_API
   HandleErrors(httpCode, status, statusMsg);
+  #endif //USE_API
   return true;
 }
 
 void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {  
-  httpCode = ApiStatusCode::NO_WIFI;
+  httpCode = 1002;
   statusMsg = F("NoWiFi");  
   
-  if ((WiFi.status() == WL_CONNECTED)) 
-  {  
-    #ifdef USE_STOPWATCH
-    uint32_t sw = millis();
-    #endif
-
-    RunHttp(currentTicks, httpCode, statusMsg);    
-
-    #ifdef USE_STOPWATCH
-    sw = millis() - sw;
-    #endif
-
-    #ifdef USE_BOT
-      #ifdef USE_NOTIFY
-        if(_settings.notifyHttpCode == 1 || //All http codes
-            (_settings.notifyHttpCode != 0  // Notify is ON
-              &&(
-                    (_settings.notifyHttpCode < 0 && httpCode != abs(_settings.notifyHttpCode)) //-200 means - All except 200
-                  || (_settings.notifyHttpCode == httpCode)
-                )
-            )
-          )
-        {
-          String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode)
-          #ifdef USE_STOPWATCH
-          + F(" (") + String(sw) + F("ms") + F(")")
-          #endif
-          ;
-
-          if(strlen(_settings.NotifyChatId) > 0)
-          {
-            TRACE(notifyMessage, F(" ChatId: "), _settings.NotifyChatId);
-            bot->sendMessage(notifyMessage, _settings.NotifyChatId);
-          }
-        }
+  if(IsWiFiOn())
+  {    
+    if ((WiFi.status() == WL_CONNECTED)) 
+    {
+      httpCode = 200;
+      statusMsg = F("OK"); 
+      #ifdef USE_API      
+      #ifdef USE_STOPWATCH
+      uint32_t sw = millis();
       #endif
-    #endif
 
-    #ifdef USE_STOPWATCH
-      TRACE(F("API Stop watch: "), sw, F("ms..."));
-    #endif
+      RunHttp(currentTicks, httpCode, statusMsg);    
+
+      #ifdef USE_STOPWATCH
+      sw = millis() - sw;
+      #endif
+
+      #ifdef USE_BOT
+        #ifdef USE_NOTIFY
+          if(_settings.notifyHttpCode == 1 || //All http codes
+              (_settings.notifyHttpCode != 0  // Notify is ON
+                &&(
+                      (_settings.notifyHttpCode < 0 && httpCode != abs(_settings.notifyHttpCode)) //-200 means - All except 200
+                    || (_settings.notifyHttpCode == httpCode)
+                  )
+              )
+            )
+          {
+            String notifyMessage = String(F("Notification: ")) + statusMsg + F(" ") + String(httpCode)
+            #ifdef USE_STOPWATCH
+            + F(" (") + String(sw) + F("ms") + F(")")
+            #endif
+            ;
+
+            if(strlen(_settings.NotifyChatId) > 0)
+            {
+              TRACE(notifyMessage, F(" ChatId: "), _settings.NotifyChatId);
+              bot->sendMessage(notifyMessage, _settings.NotifyChatId);
+            }
+          }
+        #endif //USE_NOTIFY
+      #endif //USE_BOT
+
+      #ifdef USE_STOPWATCH
+        TRACE(F("API Stop watch: "), sw, F("ms..."));
+      #endif
+      #endif //USE_API
+    }
+    else
+    {  
+      #ifdef ESP32      
+      WiFi.disconnect();
+      WiFi.reconnect();
+      delay(200);
+      #endif
+    }   
   }
-  else
-  {  
-    #ifdef ESP32      
-    WiFi.disconnect();
-    WiFi.reconnect();
-    delay(200);
-    #endif
-  }   
-
   FillNetworkStat(httpCode, statusMsg);
   PrintNetworkStatToSerial();   
 }
@@ -340,8 +372,8 @@ void HandleDebugSerialCommands()
 {
   if(debugCommandFromSerial == 1) // Reset WiFi
   { 
-    _settings.resetFlag = 1985;
-    SaveSettings();
+    // _settings.resetFlag = 1985;
+    // SaveSettings();
     ESP.restart();
   }
 

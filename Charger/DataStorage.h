@@ -21,18 +21,21 @@
 
 #define fileSystem SPIFFS // LittleFS
 
-#define YEAR_2024_SECONDS 1704075408u
-#define YEAR_2021_SECONDS 1609459200u; // Example timestamp for January 1, 2021
-#define UINT32_MAX        4294967295u
+#define YEAR_2024_SECONDS   1704075408u
+#define YEAR_2021_SECONDS   1609459200u; // Example timestamp for January 1, 2021
+#define MILLIS_MAX_SECONDS  4294967u
+#define UINT32_MAX          4294967295u
 #define FILE_PATH "/data"
 #define FILE_EXT ".csv"
 #define FILE_EXT_LEN strlen(FILE_EXT)
-#define FILE_NAME_FORMAT "%Y-%m-%d"
-#define BUFFER_DATE_SIZE 16
+#define FILE_NAME_FORMAT F("%Y-%m-%d")
+#define BUFFER_DATE_SIZE 30
 
 #define MAX_RECORD_LENGTH   48  // Target record length with fixed size for consistent read offsets
 #define RECORD_FORMAT       "%lu,%00.1f,%d,%03d:%02d:%02d,%00.1f,%s,%s,"
-#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s"
+#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
+
+#define EXCEL_DATE_FORMAT F("%Y-%m-%d %H:%M:%S")
 
 struct Data {
   private:
@@ -87,7 +90,7 @@ struct Data {
         return *this;
     }
 
-    void setDateTime(const uint32_t &datetime) { dateTime = datetime < YEAR_2024_SECONDS ? dateTime + datetime : datetime;  }
+    void setDateTime(const uint32_t &datetime) { dateTime = datetime < MILLIS_MAX_SECONDS ? dateTime + datetime : datetime;  }
     const uint32_t &getDateTime() const { return dateTime; }
 
     void setResetReason(const String &resetreason) { resetReason = resetreason; }
@@ -108,8 +111,8 @@ struct Data {
     const String writeToCsv() const { size_t s; return writeToCsv(s); }
 
     void readFromCsv(const String& str) {
-        char startReasonBuff[7];
-        char wifiStatusBuff[7];
+        char startReasonBuff[6];
+        char wifiStatusBuff[6];
         sscanf(str.c_str(), RECORD_FORMAT_SCANF, &dateTime, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, startReasonBuff, wifiStatusBuff);
         resetReason = String(startReasonBuff);
         wifiStatus = String(wifiStatusBuff);
@@ -221,20 +224,40 @@ public:
         lastRecord = data;
     }    
 
-    const int extractAllData(String &out) {
+    const String generateAllDataFileName()
+    {
+      return String(PRODUCT_NAME) 
+            + startDate + F("-") + endDate 
+            + F("(") + String(filesCount) + F(")")
+            + FILE_EXT
+          ;
+    }
+
+    const int extractAllData(String &out, const bool &convertToDateTime = false) {
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
 
         File file = root.openNextFile();
         if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return 0; }
         int recordsTotal = 0;        
+        filesCount = 0;
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();            
             if (fileName.endsWith(FILE_EXT)) {
                 //out += file.readString();
+                filesCount++;
                 while (file.available()) {
-                    out += file.readStringUntil('\n') + '\n';
+                    String str = file.readStringUntil('\n');
+                    if(convertToDateTime)
+                    {
+                      const uint32_t &epochTime = str.substring(0, 10).toInt();
+                      //"%Y-%m-%d %H:%M:%S"
+                      out += epochToDateTime(epochTime, EXCEL_DATE_FORMAT) + str.substring(10);
+                    }
+                    else
+                      out += str;
+                    out +=  '\n';
                     recordsInFile++;
                 } 
                 DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
@@ -333,14 +356,20 @@ private:
         }
     }
 
-    String generateFileName(uint32_t epochTime) {
-        char buffer[BUFFER_DATE_SIZE];
-        struct tm *timeinfo;
-        time_t tempTime = epochTime;
-        timeinfo = localtime(&tempTime);
-        strftime(buffer, BUFFER_DATE_SIZE, FILE_NAME_FORMAT, timeinfo);
-        return String(FILE_PATH) + F("/") + buffer + FILE_EXT;
+    static const String generateFileName(const uint32_t &epochTime) {        
+        return String(FILE_PATH) + F("/") + epochToDateTime(epochTime, FILE_NAME_FORMAT) + FILE_EXT;
+    }
+
+    static const String epochToDateTime(const uint32_t &epochTime, const String &fromat){
+      char buffer[BUFFER_DATE_SIZE];
+      struct tm *timeinfo;
+      time_t tempTime = epochTime;
+      timeinfo = localtime(&tempTime);
+      strftime(buffer, BUFFER_DATE_SIZE, fromat.c_str(), timeinfo);
+      return buffer;
     }
 };
+
+std::unique_ptr<DataStorage> ds(new DataStorage());
 
 #endif // DATASTORAGE_H

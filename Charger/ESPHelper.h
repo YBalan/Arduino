@@ -67,6 +67,23 @@ const String GetResetReason(const bool &shortView)
   return GetResetReason(reasonCode, shortView);
 }
 
+const uint32_t GetCurrentTime()
+{
+    // Configure time with NTP server (UTC time)
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+
+    // Wait for time to be set
+    struct tm timeInfo;
+    while (!getLocalTime(&timeInfo)) {
+        Serial.println(F("Waiting for time..."));
+        delay(1000);
+    }
+
+    // Get the current time as epoch
+    time_t now = time(NULL);    
+    return static_cast<uint32_t>(now);
+}
+
 void PrintFSInfo(String &fsInfo)
 {
   #ifdef ESP8266
