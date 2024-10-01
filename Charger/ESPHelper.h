@@ -2,49 +2,49 @@
 #ifndef ESP_HELPER_H
 #define ESP_HELPER_H
 
-const String ResetReasonToString(const int &resetReason)
+const String ResetReasonToString(const int &resetReason, const bool &shortView)
 {
   switch (resetReason) {
     case ESP_RST_UNKNOWN:
-      return F("Unknown");
+      return shortView ? F("Unknwn") : F("Unknown");
       break;
     case ESP_RST_POWERON:
-      return F("Power on");
+      return shortView ? F("PowrOn") : F("Power on");
       break;
     case ESP_RST_EXT:
-      return F("External reset");
+      return shortView ? F("ExtRst") : F("External reset");
       break;
     case ESP_RST_SW:
-      return F("Software reset");
+      return shortView ? F("SftRst") : F("Software reset");
       break;
     case ESP_RST_PANIC:
-      return F("Exception/panic");
+      return shortView ? F("Excptn") : F("Exception/panic");
       break;
     case ESP_RST_INT_WDT:
-      return F("Watchdog reset (Interrupt)");
+      return shortView ? F("WdtINT") : F("Watchdog reset (Interrupt)");
       break;
     case ESP_RST_TASK_WDT:
-      return F("Watchdog reset (Task)");
+      return shortView ? F("WdtTSK") : F("Watchdog reset (Task)");
       break;
     case ESP_RST_WDT:
-      return F("Watchdog reset");
+      return shortView ? F("WdtRST") : F("Watchdog reset");
       break;
     case ESP_RST_DEEPSLEEP:
-      return F("Deep sleep reset");
+      return shortView ? F("DepSlp") : F("Deep sleep reset");
       break;
     case ESP_RST_BROWNOUT:
-      return F("Brownout reset");
+      return shortView ? F("BwnOut") : F("Brownout reset");
       break;
     case ESP_RST_SDIO:
-      return F("SDIO reset");
+      return shortView ? F("SDIOrs") : F("SDIO reset");
       break;
     default:
-      return F("Unknown reason");
+      return shortView ? F("NA") : F("Unknown reason");
       break;
   }
 }
 
-const String GetResetReason(int &resetReason)
+const String GetResetReason(int &resetReason, const bool &shortView)
 {
   #ifdef ESP8266
   resetReason = ESP.getResetInfoPtr()->reason;
@@ -52,8 +52,19 @@ const String GetResetReason(int &resetReason)
   #else //ESP32
   // Get the reset reason
   /*esp_reset_reason_t*/ resetReason = esp_reset_reason();
-  return ResetReasonToString(resetReason);
+  return ResetReasonToString(resetReason, shortView);
   #endif
+}
+
+const String GetResetReason(int &resetReason)
+{
+  return GetResetReason(resetReason, /*shortView:*/false);
+}
+
+const String GetResetReason(const bool &shortView)
+{
+  int reasonCode = 0;
+  return GetResetReason(reasonCode, shortView);
 }
 
 void PrintFSInfo(String &fsInfo)

@@ -6,8 +6,8 @@ Charger save statistic requirements: (ESP32 C++)
 		uint32_t dateTime;
 		float voltage;
 		bool relayON;
-		String relayOnTime; //format: hh:mm:ss
-		uint8_t startReason;
+		String relayOnTime; 
+		String startReason;
 	};
 	Extend this structure with readFromCsv and writeToCsv and size_t recordLength. String should have equal size to have possibility to read from the end of file using known offset.
 	
@@ -17,7 +17,7 @@ Charger save statistic requirements: (ESP32 C++)
 5. Check storage size capacity and in case of lack of space remove old file one by one when new file saved
 6. Method to read last record from latest file in storage
 7. Method begin should readLatestFileRecord and keep it as a class member
-8. appendData(Data &data, const uint32_t &dateTime, const uint8_t &startReason) and appendData(Data &data, const int &secondsOffset) both methods should change dateTime from current record and append to file (startReason should not affect these methods)
+8. appendData(Data &data, const uint32_t &dateTime) method should change dateTime from current record and append to file (startReason should not affect these methods)
 9. Method extractAllData(String &out) to extract all data from csv files in storage to memory buffer
 10. Class members String StartDate (means oldest dateTime avaliable) and String CurrentDate should be fulfilled
 11. Method to remove all stored data

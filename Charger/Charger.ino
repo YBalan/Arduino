@@ -107,8 +107,8 @@ static uint8_t debugCommandFromSerial = 0;
 #define XYDJ Serial2
 std::unique_ptr<DataStorage> ds(new DataStorage());
 
-static uint32_t storeDataTicks = 0;
-static Data currentData;
+uint32_t storeDataTicks = 0;
+Data currentData;
 
 void setup() 
 {
@@ -128,9 +128,11 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset(); 
-
+  
+  currentData.setResetReason(GetResetReason(/*shortView:*/true));
+  storeDataTicks = millis();
+  
   ds->begin();
-
   return;
 
   WiFiOps::WiFiOps wifiOps(PORTAL_TITLE, AP_NAME, AP_PASS);
@@ -151,13 +153,15 @@ void setup()
   
   // auto resetButtonState = resetBtn.getState();
   // INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
-   INFO(F("ResetFlag: "), _settings.resetFlag);
+  INFO(F("ResetFlag: "), _settings.resetFlag);
   wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
   if(_settings.resetFlag == 1985)
   {
     _settings.resetFlag = 200;
     SaveSettings();
   }
+
+  currentData.setDateTime(GetCurrentTime());  
 
   #ifdef USE_BOT  
   LoadChannelIDs();
@@ -169,7 +173,7 @@ void setup()
   //bot->setPeriod(_settings.alarmsUpdateTimeout);
   bot->setLimit(1);
   bot->skipUpdates();
-  #endif 
+  #endif   
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -179,15 +183,16 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 
 void loop()
 {
-  static uint32_t currentTicks = millis();
-  currentTicks = millis();   
+  static uint32_t currentTicks = millis(); 
+  currentTicks = millis(); 
   
   if(XYDJ.available() > 0)
   { 
     const auto &received = XYDJ.readStringUntil('\n');
     currentData.readFromXYDJ(received);
+    //currentData.setResetReason(resetReason);
     // INFO("EXT Device = ", F("'"), received, F("'"));
-    // INFO("      Data = ", F("'"), currentData.writeToCsv(), F("'"));
+    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"));    
   }
   
   if(Serial.available() > 0)
@@ -199,15 +204,21 @@ void loop()
     {    
       SendCommand(sendCommand);
     }    
-  }  
+  }     
 
-  RunAndHandleHttpApi(currentTicks);
+  int httpCode = 0;
+  String statusMsg;
+  RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
 
-  const uint32_t ticks = currentTicks - storeDataTicks;
-  if(ticks >= _settings.storeDataTimeout)
+  const uint32_t &ticks = currentTicks - storeDataTicks;
+  //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
+  if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout)
   {
-    StoreData(ticks);
-    storeDataTicks = millis();
+    storeDataTicks = currentTicks;    
+
+    currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+    StoreData(ticks);    
+    currentData.setResetReason(F("Normal"));    
   }
 
   #ifdef USE_BOT
@@ -239,6 +250,24 @@ void StoreData(const uint32_t &ticks)
   TRACE(fsInfo);
 }
 
+const uint32_t GetCurrentTime()
+{
+    // Configure time with NTP server (UTC time)
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+
+    // Wait for time to be set
+    struct tm timeInfo;
+    while (!getLocalTime(&timeInfo)) {
+        INFO("Waiting for time...");
+        delay(1000);
+    }
+
+    // Get the current time as epoch
+    time_t now = time(NULL);
+    TRACE(F("Current epochTime: "), now);
+    return static_cast<uint32_t>(now);
+}
+
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {
   httpCode = 200;
@@ -247,10 +276,10 @@ const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &sta
   return true;
 }
 
-void RunAndHandleHttpApi(const unsigned long &currentTicks)
+void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
 {  
-  int httpCode = ApiStatusCode::NO_WIFI;
-  String statusMsg = F("No WiFi");  
+  httpCode = ApiStatusCode::NO_WIFI;
+  statusMsg = F("NoWiFi");  
   
   if ((WiFi.status() == WL_CONNECTED)) 
   {  
@@ -339,7 +368,9 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 5) // Store currentData
   { 
-    StoreData(millis() - storeDataTicks);
+    currentData.setResetReason(F("Test"));  
+    currentData.setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
+    StoreData(millis() - storeDataTicks);      
   }
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart

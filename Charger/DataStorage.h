@@ -21,28 +21,84 @@
 
 #define fileSystem SPIFFS // LittleFS
 
+#define YEAR_2024_SECONDS 1704075408u
+#define YEAR_2021_SECONDS 1609459200u; // Example timestamp for January 1, 2021
+#define UINT32_MAX        4294967295u
 #define FILE_PATH "/data"
-#define MAX_RECORD_LENGTH 64  // Target record length with fixed size for consistent read offsets
 #define FILE_EXT ".csv"
 #define FILE_EXT_LEN strlen(FILE_EXT)
 #define FILE_NAME_FORMAT "%Y-%m-%d"
 #define BUFFER_DATE_SIZE 16
 
-#define RECORD_FORMAT "%lu,%f,%d,%d:%d:%d,%d,"
+#define MAX_RECORD_LENGTH   48  // Target record length with fixed size for consistent read offsets
+#define RECORD_FORMAT       "%lu,%00.1f,%d,%03d:%02d:%02d,%00.1f,%s,%s,"
+#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s"
 
 struct Data {
-    uint32_t dateTime;
+  private:
+    uint32_t dateTime = YEAR_2024_SECONDS;
+    String resetReason;
+    String wifiStatus;
+  public:
     float voltage;
     bool relayOn;
-    uint8_t relayOnHH;
+    uint16_t relayOnHH;
     uint8_t relayOnMM;
     uint8_t relayOnSS;
-    uint8_t startReason;
+    float temperature = 22.1;  
     static constexpr size_t recordLength = MAX_RECORD_LENGTH;
+
+    // Default constructor
+    Data() = default;
+
+    // Copy constructor
+    Data(const Data& other)
+        : dateTime(other.dateTime),
+          voltage(other.voltage),
+          relayOn(other.relayOn),
+          relayOnHH(other.relayOnHH),
+          relayOnMM(other.relayOnMM),
+          relayOnSS(other.relayOnSS),
+          resetReason(other.resetReason),
+          temperature(other.temperature),
+          wifiStatus(other.wifiStatus)
+    {
+        // Optionally, you can add some logging or custom logic here.
+    }
+
+    // Assignment operator
+    Data& operator=(const Data& other) {
+        if (this == &other) {
+            // Handle self-assignment (e.g., a = a)
+            return *this;
+        }
+
+        // Copy all members from 'other' to 'this'
+        dateTime = other.dateTime;
+        voltage = other.voltage;
+        relayOn = other.relayOn;
+        relayOnHH = other.relayOnHH;
+        relayOnMM = other.relayOnMM;
+        relayOnSS = other.relayOnSS;
+        resetReason = other.resetReason;
+        temperature = other.temperature;
+        wifiStatus = other.wifiStatus;
+
+        return *this;
+    }
+
+    void setDateTime(const uint32_t &datetime) { dateTime = datetime < YEAR_2024_SECONDS ? dateTime + datetime : datetime;  }
+    const uint32_t &getDateTime() const { return dateTime; }
+
+    void setResetReason(const String &resetreason) { resetReason = resetreason; }
+    const String &getResetReason() const { return resetReason; }
+
+    void setWiFiStatus(const String &wifistatus) { wifiStatus = wifistatus; }
+    const String &getWiFiStatus() const { return wifiStatus; }
 
     const String writeToCsv(size_t &realDataSize) const {
         char buffer[MAX_RECORD_LENGTH];        
-        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTime, voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, startReason);
+        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTime, voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, resetReason, wifiStatus);
         auto res = String(buffer);
         realDataSize = res.length();
         for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
@@ -52,7 +108,11 @@ struct Data {
     const String writeToCsv() const { size_t s; return writeToCsv(s); }
 
     void readFromCsv(const String& str) {
-        sscanf(str.c_str(), RECORD_FORMAT, &dateTime, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &startReason);
+        char startReasonBuff[7];
+        char wifiStatusBuff[7];
+        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &dateTime, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, startReasonBuff, wifiStatusBuff);
+        resetReason = String(startReasonBuff);
+        wifiStatus = String(wifiStatusBuff);
     }
 
     //00.3,00:00:00,CL
@@ -121,10 +181,13 @@ public:
             file = fileSystem.open(lastFile, "r");
             if (!file) { TraceOpenFileFailed(lastFile); return; }
 
-            const auto &seek = file.size() - (Data::recordLength + 1);
+            int seek = file.size() - ((Data::recordLength + 1) * 2);
+            seek = seek < 0 ? 0 : seek;
             DS_TRACE(F("FileSize: "), file.size(), F(" "), F("Seek: "), seek);
             file.seek(seek);
-            const String &lastString = file.readStringUntil('\n');
+            String lastString;
+            while(file.available() > 0)
+              lastString = file.readStringUntil('\n');
             DS_TRACE(F("Last Record: "), F("'"), lastString, F("'"), F(" "), F("Size: "), lastString.length());
             lastRecord.readFromCsv(lastString);
             currentFileName = lastFile;
@@ -135,8 +198,9 @@ public:
         extractDates(firstFile, lastFile);
     }
 
-    void appendData(Data &data, const uint32_t &dateTime, const uint8_t &startReason) {
-        const String &fileName = generateFileName(dateTime);
+    void appendData(Data &data, const uint32_t &dateTime) {
+        data.setDateTime(dateTime);        
+        const String &fileName = generateFileName(data.getDateTime());
 
         manageStorage();
 
@@ -148,22 +212,14 @@ public:
 
         File file = fileSystem.open(fileName, "a");
         if (!file) { TraceOpenFileFailed(fileName); return; }
-
-        data.dateTime = dateTime;
-        data.startReason = startReason;
+        
         size_t realDataSize = 0;
         String csv = data.writeToCsv(realDataSize) + '\n';
         const auto &size = file.write((uint8_t*)csv.c_str(), csv.length());
-        DS_TRACE(F("Real data size: "), realDataSize, F(" "), F("Wrote: "), size);
-        //file.print(csv);
+        DS_TRACE(F("Real data size: "), realDataSize, F(" "), F("Wrote: "), size);        
         file.close();
         lastRecord = data;
-    }
-
-    void appendData(Data &data, const int &secondsOffset) {
-        uint32_t newTime = lastRecord.dateTime + secondsOffset;
-        appendData(data, newTime, 0);
-    }
+    }    
 
     const int extractAllData(String &out) {
         File root = fileSystem.open(FILE_PATH);
@@ -282,8 +338,8 @@ private:
         struct tm *timeinfo;
         time_t tempTime = epochTime;
         timeinfo = localtime(&tempTime);
-        strftime(buffer, BUFFER_DATE_SIZE, (String(FILE_NAME_FORMAT) + FILE_EXT).c_str(), timeinfo);
-        return String(FILE_PATH) + F("/") + buffer;
+        strftime(buffer, BUFFER_DATE_SIZE, FILE_NAME_FORMAT, timeinfo);
+        return String(FILE_PATH) + F("/") + buffer + FILE_EXT;
     }
 };
 
