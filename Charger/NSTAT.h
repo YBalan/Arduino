@@ -77,14 +77,14 @@ void PrintNetworkStatistic(String &str, const int& codeFilter)
   }
   const auto &millisec = millis();
   str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
-      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
-      
-  int resetReason = 0;
-  str += String(F(" Rst:[")) + GetResetReason(resetReason) + F(" ") + F("(") + String(resetReason) + F(")") + F("]");
-
+      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));     
+  
   #else
   str += F("Off");
   #endif
+  
+  int resetReason = 0;
+  str += String(F(" Rst:[")) + GetResetReason(resetReason) + F(" ") + F("(") + String(resetReason) + F(")") + F("]");
 }
 
 #endif //NSTAT_H

@@ -388,8 +388,15 @@ void HandleDebugSerialCommands()
   { 
     TRACE(F("Extract All..."))
     String out;
-    ds->extractAllData(out);
-    TRACE(out);
+    const auto &recordsCount = ds->extractAllData(out);
+    if(recordsCount <= 100)
+    {
+      TRACE(out);
+    }
+    else
+    {
+      TRACE(F("Records Count: "), recordsCount);
+    }
   }
 
   if(debugCommandFromSerial == 4) // Remove all

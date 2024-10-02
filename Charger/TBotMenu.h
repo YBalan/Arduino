@@ -160,8 +160,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT DOWNLOAD:"));
     bot->sendTyping(msg.chatID);
     String buff;
-    ds->extractAllData(buff, true);
-    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, ds->generateAllDataFileName(),  msg.chatID);
+    const auto &recordsCount = ds->extractAllData(buff, true);
+    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, ds->generateAllDataFileName() + String(recordsCount) + FILE_EXT,  msg.chatID);
     value.clear();
   }
   

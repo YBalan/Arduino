@@ -230,8 +230,7 @@ public:
     {
       return String(PRODUCT_NAME) 
             + startDate + F("-") + endDate 
-            + F("(") + String(filesCount) + F(")")
-            + FILE_EXT
+            + F("(") + String(filesCount) + F(")")            
           ;
     }
 
