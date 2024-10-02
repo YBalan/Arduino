@@ -232,7 +232,7 @@ void loop()
     currentData.readFromXYDJ(received);
     //currentData.setResetReason(resetReason);
     // INFO("EXT Device = ", F("'"), received, F("'"));
-    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi switch is: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi Status: "), statusMsg);    
+    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
   }
   
   if(Serial.available() > 0)
@@ -254,11 +254,15 @@ void loop()
   {
     storeDataTicks = currentTicks;
 
-    INFO(F("WiFi switch is: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi Status: "), statusMsg);
+    INFO(F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
 
     //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
     StoreData(ticks);    
     currentData.setResetReason(F("Normal"));    
+
+    String nstatTrace;
+    PrintNetworkStatistic(nstatTrace, 0);
+    TRACE(nstatTrace);
   }
 
   #ifdef USE_BOT
@@ -366,8 +370,7 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
       #endif
     }   
   }
-  FillNetworkStat(httpCode, statusMsg);
-  PrintNetworkStatToSerial();   
+  FillNetworkStat(httpCode, statusMsg);  
 }
 
 void HandleDebugSerialCommands()

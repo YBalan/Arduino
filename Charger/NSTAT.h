@@ -20,39 +20,6 @@ void FillNetworkStat(const int& code, const String &desc)
   #endif
 }
 
-#ifdef NETWORK_STATISTIC  
-void PrintNetworkStatInfoToSerial(const NetworkStatInfo &info)
-{  
-  Serial.print(F("[\"")); Serial.print(info.description); Serial.print(F("\": ")); Serial.print(info.count); Serial.print(F("]; "));   
-}
-#endif
-
-void PrintNetworkStatToSerial()
-{
-  #ifdef NETWORK_STATISTIC
-  Serial.print(F("Network Statistic: "));
-  if(networkStat.size() > 0)
-  {
-    if(networkStat.count(200) > 0)
-      PrintNetworkStatInfoToSerial(networkStat[200]);
-    for(const auto &de : networkStat)
-    {
-      const auto &info = de.second;
-      if(info.code != 200)
-        PrintNetworkStatInfoToSerial(info);
-    }
-  }
-  const auto &millisec = millis();
-  String lifetime = (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
-      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));
-  Serial.println(lifetime);
-
-  int resetReason = 0;
-  String rst = String(F(" Rst:[")) + GetResetReason(resetReason) + F(" ") + F("(") + String(resetReason) + F(")") + F("]");
-  Serial.println(rst);
-  #endif
-}
-
 #ifdef NETWORK_STATISTIC
 void PrintNetworkStatInfo(const NetworkStatInfo &info, String &str)
 {      
@@ -75,16 +42,16 @@ void PrintNetworkStatistic(String &str, const int& codeFilter)
         PrintNetworkStatInfo(info, str);
     }
   }
-  const auto &millisec = millis();
-  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")))
-      + (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec")));     
   
+  str += (networkStat.size() > 0 ? String(F(" ")) : String(F("")));  
   #else
-  str += F("Off");
+  str += F("Off;");
   #endif
-  
+
+  const auto &millisec = millis();
   int resetReason = 0;
-  str += String(F(" Rst:[")) + GetResetReason(resetReason) + F(" ") + F("(") + String(resetReason) + F(")") + F("]");
+  str += (millisec >= 60000 ? String(millisec / 60000) + String(F("min")) : String(millisec / 1000) + String(F("sec"))) 
+      + String(F(" Rst:[")) + GetResetReason(resetReason) + F(" ") + F("(") + String(resetReason) + F(")") + F("]");
 }
 
 #endif //NSTAT_H
