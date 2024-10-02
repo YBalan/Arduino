@@ -136,14 +136,16 @@ public:
     uint8_t filesCount;
 
 public:
-    void begin() {
+    const Data& begin() {
         if (!fileSystem.begin()) {
             DS_INFO(F("fileSystem initialization failed"));
-            return;
+            return Data();
         }
         readLastFileRecord();
         fileSystem.mkdir(FILE_PATH);
         TraceToSerial();
+
+        return lastRecord;
     }
 
     void TraceToSerial() const

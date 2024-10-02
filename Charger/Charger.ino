@@ -16,7 +16,8 @@
 
 #ifdef DEBUG
 
-#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+//#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+#undef WM_DEBUG_LEVEL
 
 #define ENABLE_TRACE_MAIN
 
@@ -41,7 +42,7 @@
 
 #define VER_POSTFIX F("R")
 #define WM_NODEBUG
-//#define WM_DEBUG_LEVEL 0
+//#define WM_DEBUG_LEVEL WM_DEBUG_SILENT
 
 #endif
 
@@ -132,14 +133,13 @@ void setup()
 
   LoadSettings();
   LoadSettingsExt();  
-  //_settings.reset(); 
+  //_settings.reset();   
   
-  currentData.setResetReason(GetResetReason(/*shortView:*/true));
   storeDataTicks = millis();
   
-  ds->begin();
+  currentData = ds->begin();
 
-  currentData.setDateTime(ds->lastRecord.getDateTime()); 
+  currentData.setResetReason(GetResetReason(/*shortView:*/true));
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -216,6 +216,10 @@ void loop()
     InitBot();
   }
 
+  int httpCode = 200;
+  String statusMsg = F("OK");
+  RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
+
   if(wifiBtn.isReleased())
   {
     TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\tWiFi switch"));
@@ -228,7 +232,7 @@ void loop()
     currentData.readFromXYDJ(received);
     //currentData.setResetReason(resetReason);
     // INFO("EXT Device = ", F("'"), received, F("'"));
-    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
+    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi switch is: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi Status: "), statusMsg);    
   }
   
   if(Serial.available() > 0)
@@ -240,11 +244,9 @@ void loop()
     {    
       SendCommand(sendCommand);
     }    
-  }     
+  }
 
-  int httpCode = 200;
-  String statusMsg = F("OK");
-  RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
+  currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
 
   const uint32_t &ticks = currentTicks - storeDataTicks;
   //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
@@ -252,9 +254,9 @@ void loop()
   {
     storeDataTicks = currentTicks;
 
-    INFO(F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));
+    INFO(F("WiFi switch is: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi Status: "), statusMsg);
 
-    currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+    //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
     StoreData(ticks);    
     currentData.setResetReason(F("Normal"));    
   }

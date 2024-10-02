@@ -16,7 +16,7 @@ Charger save statistic requirements: (ESP32 C++)
 4. File format csv
 5. Check storage size capacity and in case of lack of space remove old file one by one when new file saved
 6. Method to read last record from latest file in storage
-7. Method begin should readLatestFileRecord and keep it as a class member
+7. Method const Data &begin() should readLatestFileRecord and keep it as a class member
 8. appendData(Data &data, const uint32_t &dateTime) method should change dateTime from current record and append to file (startReason should not affect these methods)
 9. Method extractAllData(String &out) to extract all data from csv files in storage to memory buffer
 10. Class members String StartDate (means oldest dateTime avaliable) and String CurrentDate should be fulfilled
