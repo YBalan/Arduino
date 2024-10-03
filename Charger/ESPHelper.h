@@ -67,10 +67,12 @@ const String GetResetReason(const bool &shortView)
   return GetResetReason(reasonCode, shortView);
 }
 
-const uint32_t GetCurrentTime()
+const uint32_t GetCurrentTime(const uint8_t &timeZone)
 {
+    // For GMT+1 with an additional hour for daylight saving time
+    //configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
     // Configure time with NTP server (UTC time)
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    configTime(timeZone * 3600, 0, "pool.ntp.org", "time.nist.gov");    
 
     // Wait for time to be set
     struct tm timeInfo;
@@ -82,6 +84,37 @@ const uint32_t GetCurrentTime()
     // Get the current time as epoch
     time_t now = time(NULL);    
     return static_cast<uint32_t>(now);
+}
+
+// Converts epoch time to a formatted date-time string
+const String epochToDateTime(const time_t &epochTime, const String &format = F("%Y-%m-%d %H:%M:%S")) {
+    struct tm *timeinfo;  // Pointer to struct tm which holds time values
+    char buffer[30];      // Buffer to hold the formatted date-time string
+
+    // Convert epoch time to calendar local time
+    timeinfo = localtime(&epochTime);
+
+    // Format time from struct tm into a readable format
+    strftime(buffer, sizeof(buffer), format.c_str(), timeinfo);
+
+    // Return the formatted string
+    return String(buffer);
+}
+
+// Converts a formatted date-time string to epoch time
+const time_t dateTimeToEpoch(const String& dateTime, const String &format = F("%Y-%m-%d %H:%M:%S")) {
+    struct tm tm;             // Struct to hold decomposed time
+    memset(&tm, 0, sizeof(tm));  // Initialize tm structure
+
+    // Populate tm structure with values extracted from string
+    sscanf(dateTime.c_str(), format.c_str(), &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
+
+    // Adjust year and month values to fit struct tm conventions
+    tm.tm_year -= 1900;   // Convert year to years since 1900
+    tm.tm_mon--;          // Convert month from 1-12 to 0-11
+
+    // Convert struct tm to time_t (epoch time)
+    return mktime(&tm);
 }
 
 void PrintFSInfo(String &fsInfo)

@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.0")
+  #define VER F("1.1")
 #endif
 
 //#define RELEASE
@@ -122,7 +122,8 @@ void setup()
   XYDJ.begin(9600, SERIAL_8N1, RXD2, TXD2);
   while (!Serial2); 
 
-  //pinMode(PIN_WIFI_BTN, INPUT_PULLUP);
+  pinMode(PIN_WIFI_LED_BTN, OUTPUT);
+  digitalWrite(PIN_WIFI_LED_BTN, LOW);
   wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
@@ -158,6 +159,7 @@ void setup()
   if(IsWiFiOn())
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
+    digitalWrite(PIN_WIFI_LED_BTN, HIGH);
     wifiOps->TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
     if(_settings.resetFlag == 1985)
     {
@@ -165,22 +167,26 @@ void setup()
       SaveSettings();
     }
 
-    const auto &now = GetCurrentTime();
+    const auto &now = GetCurrentTime(_settings.timeZone);
     TRACE(F("Current epochTime: "), now);
     currentData.setDateTime(now);  
   }
 
   InitBot();
+
+  SendCommand(F("start"));
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("Portal Started: "), manager->getConfigPortalSSID());  
+  INFO(F("Portal Started: "), manager->getConfigPortalSSID()); 
+  digitalWrite(PIN_WIFI_LED_BTN, HIGH); 
 }
 
 const bool IsWiFiOn()
 {
   const auto &wifiBtnState = wifiBtn.getState(); //digitalRead(PIN_WIFI_BTN);  
+  digitalWrite(PIN_WIFI_LED_BTN, wifiBtnState == LOW ? HIGH : LOW);
   return wifiBtnState == LOW;  
 }
 
@@ -208,9 +214,9 @@ void loop()
 
   if(wifiBtn.isPressed())
   {
-    TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\tWiFi switch"));
+    TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
     wifiOps->TryToConnectOrOpenConfigPortal();
-    const auto &now = GetCurrentTime();
+    const auto &now = GetCurrentTime(_settings.timeZone);
     TRACE(F("Current epochTime: "), now);
     currentData.setDateTime(now);    
     InitBot();
@@ -222,7 +228,7 @@ void loop()
 
   if(wifiBtn.isReleased())
   {
-    TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\tWiFi switch"));
+    TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));   
     WiFi.disconnect();
   }
   
@@ -251,7 +257,7 @@ void loop()
   const uint32_t &ticks = currentTicks - storeDataTicks;
   //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
   if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout)
-  {
+  {    
     storeDataTicks = currentTicks;
 
     INFO(F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
@@ -290,6 +296,7 @@ void loop()
 void StoreData(const uint32_t &ticks)
 {
   TRACE(F("\t\tStore currentData..."));
+  digitalWrite(PIN_WIFI_LED_BTN, HIGH);
   ds->appendData(currentData, (int)(ticks / 1000));
   ds->TraceToSerial();   
   String fsInfo;

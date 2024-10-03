@@ -31,9 +31,12 @@
 #define FILE_NAME_FORMAT F("%Y-%m-%d")
 #define BUFFER_DATE_SIZE 30
 
-#define MAX_RECORD_LENGTH   48  // Target record length with fixed size for consistent read offsets
-#define RECORD_FORMAT       "%lu,%00.1f,%d,%03d:%02d:%02d,%00.1f,%s,%s,"
-#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
+#define MAX_RECORD_LENGTH   58  // Target record length with fixed size for consistent read offsets
+//#define RECORD_FORMAT       "%lu,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%s,"
+//#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
+
+#define RECORD_FORMAT       "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%02d,%s,%02d"
+#define RECORD_FORMAT_SCANF "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%s,%d,%s,%d"
 
 #define EXCEL_DATE_FORMAT F("%Y-%m-%d %H:%M:%S")
 
@@ -48,7 +51,9 @@ struct Data {
     uint16_t relayOnHH;
     uint8_t relayOnMM;
     uint8_t relayOnSS;
-    float temperature = 22.1;  
+    float temperature = 22.1; 
+    uint16_t reserv1; 
+    uint16_t reserv2; 
     static constexpr size_t recordLength = MAX_RECORD_LENGTH;
 
     // Default constructor
@@ -64,7 +69,9 @@ struct Data {
           relayOnSS(other.relayOnSS),
           resetReason(other.resetReason),
           temperature(other.temperature),
-          wifiStatus(other.wifiStatus)
+          wifiStatus(other.wifiStatus),
+          reserv1(other.reserv1),
+          reserv2(other.reserv2)
     {
         // Optionally, you can add some logging or custom logic here.
     }
@@ -86,6 +93,8 @@ struct Data {
         resetReason = other.resetReason;
         temperature = other.temperature;
         wifiStatus = other.wifiStatus;
+        reserv1 = other.reserv1;
+        reserv2 = other.reserv2;
 
         return *this;
     }
@@ -100,8 +109,12 @@ struct Data {
     const String &getWiFiStatus() const { return wifiStatus; }
 
     const String writeToCsv(size_t &realDataSize) const {
+        //DS_TRACE(F("writeToCsv"));
         char buffer[MAX_RECORD_LENGTH];        
-        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTime, voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, resetReason, wifiStatus);
+        const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);
+        //DS_TRACE(dateTimeStr);
+
+        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, resetReason.c_str(), reserv1, wifiStatus.c_str(), reserv2);
         auto res = String(buffer);
         realDataSize = res.length();
         for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
@@ -111,11 +124,26 @@ struct Data {
     const String writeToCsv() const { size_t s; return writeToCsv(s); }
 
     void readFromCsv(const String& str) {
+        DS_TRACE(F("readFromCsv"));
         char startReasonBuff[6];
-        char wifiStatusBuff[6];
-        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &dateTime, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, startReasonBuff, wifiStatusBuff);
+        char wifiStatusBuff[6];        
+
+        struct tm tm;             // Struct to hold decomposed time
+        memset(&tm, 0, sizeof(tm));  // Initialize tm structure
+
+        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+
         resetReason = String(startReasonBuff);
-        wifiStatus = String(wifiStatusBuff);
+        wifiStatus = String(wifiStatusBuff);  
+
+        DS_TRACE("dateTimeToEpoch: ", tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+        // Adjust year and month values to fit struct tm conventions
+        tm.tm_year -= 1900;   // Convert year to years since 1900
+        tm.tm_mon--;          // Convert month from 1-12 to 0-11      
+        
+        dateTime = mktime(&tm);
+        DS_TRACE(F("From str: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT));        
     }
 
     //00.3,00:00:00,CL
@@ -123,6 +151,33 @@ struct Data {
       char relayOnBuff[3];
       sscanf(str.c_str(), "%f,%d:%d:%d,%s", &voltage, &relayOnHH, &relayOnMM, &relayOnSS, relayOnBuff);
       relayOn = !String(relayOnBuff).startsWith(F("CL"));
+    }
+
+    public:
+    static const String epochToDateTime(const time_t &epochTime, const String &fromat){
+      char buffer[BUFFER_DATE_SIZE];
+      struct tm *timeinfo;
+      time_t tempTime = epochTime;
+      timeinfo = localtime(&tempTime);
+      strftime(buffer, BUFFER_DATE_SIZE, fromat.c_str(), timeinfo);
+      return buffer;
+    }
+
+    static const uint32_t dateTimeToEpoch(const String& dateTime, const String &format) {
+        struct tm tm;             // Struct to hold decomposed time
+        memset(&tm, 0, sizeof(tm));  // Initialize tm structure
+
+        // Populate tm structure with values extracted from string
+        sscanf(dateTime.c_str(), format.c_str(), &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
+
+        DS_TRACE("dateTimeToEpoch: ", tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+        // Adjust year and month values to fit struct tm conventions
+        tm.tm_year -= 1900;   // Convert year to years since 1900
+        tm.tm_mon--;          // Convert month from 1-12 to 0-11
+
+        // Convert struct tm to time_t (epoch time)
+        return static_cast<uint32_t>(mktime(&tm));
     }
 
 };
@@ -234,7 +289,7 @@ public:
           ;
     }
 
-    const int extractAllData(String &out, const bool &convertToDateTime = false) {
+    const int extractAllData(String &out) {
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
 
@@ -242,23 +297,15 @@ public:
         if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return 0; }
         int recordsTotal = 0;        
         filesCount = 0;
+        String fileFilter = out;
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();            
-            if (fileName.endsWith(FILE_EXT)) {
+            if (fileName.endsWith(FILE_EXT) && (fileFilter.isEmpty() || fileName.startsWith(fileFilter))) {
                 //out += file.readString();
                 filesCount++;
                 while (file.available()) {
-                    String str = file.readStringUntil('\n');
-                    if(convertToDateTime)
-                    {
-                      const uint32_t &epochTime = str.substring(0, 10).toInt();
-                      //"%Y-%m-%d %H:%M:%S"
-                      out += epochToDateTime(epochTime, EXCEL_DATE_FORMAT) + str.substring(10);
-                    }
-                    else
-                      out += str;
-                    out +=  '\n';
+                    out += file.readStringUntil('\n') + '\n';                    
                     recordsInFile++;
                 } 
                 DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
@@ -358,16 +405,7 @@ private:
     }
 
     static const String generateFileName(const uint32_t &epochTime) {        
-        return String(FILE_PATH) + F("/") + epochToDateTime(epochTime, FILE_NAME_FORMAT) + FILE_EXT;
-    }
-
-    static const String epochToDateTime(const uint32_t &epochTime, const String &fromat){
-      char buffer[BUFFER_DATE_SIZE];
-      struct tm *timeinfo;
-      time_t tempTime = epochTime;
-      timeinfo = localtime(&tempTime);
-      strftime(buffer, BUFFER_DATE_SIZE, fromat.c_str(), timeinfo);
-      return buffer;
+        return String(FILE_PATH) + F("/") + Data::epochToDateTime(epochTime, FILE_NAME_FORMAT) + FILE_EXT;
     }
 };
 

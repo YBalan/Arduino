@@ -159,9 +159,20 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     BOT_MENU_INFO(F("BOT DOWNLOAD:"));
     bot->sendTyping(msg.chatID);
-    String buff;
-    const auto &recordsCount = ds->extractAllData(buff, true);
-    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, ds->generateAllDataFileName() + String(recordsCount) + FILE_EXT,  msg.chatID);
+    String buff = value.isEmpty() ? ds->endDate : value;
+    String fileName = (buff.isEmpty() ? ds->generateAllDataFileName() : buff);
+
+    const auto &recordsCount = ds->extractAllData(buff);    
+
+    fileName += String(F("(")) + String(recordsCount) + F(")") + FILE_EXT;
+    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, fileName,  msg.chatID);
+
+    File f = SPIFFS.open("/data/2024-10-02.csv");
+    bot->sendFile(f, FB_DOC, fileName,  msg.chatID);
+    f.close();
+
+    //SPIFFS.remove("/data/2041-06-11.csv");
+
     value.clear();
   }
   
