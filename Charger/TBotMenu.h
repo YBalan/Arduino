@@ -159,16 +159,20 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     BOT_MENU_INFO(F("BOT DOWNLOAD:"));
     bot->sendTyping(msg.chatID);
-    String buff = value.isEmpty() ? ds->endDate : value;
-    String fileName = (buff.isEmpty() ? ds->generateAllDataFileName() : buff);
-
+    
+    String internalFileName = value.isEmpty() ? ds->endDate : value;
+    String outerFileName = (internalFileName.isEmpty() ? ds->generateAllDataFileName() : internalFileName);
+    
+    String buff = internalFileName; 
     const auto &recordsCount = ds->extractAllData(buff);    
 
-    fileName += String(F("(")) + String(recordsCount) + F(")") + FILE_EXT;
-    bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, fileName,  msg.chatID);
+    outerFileName += String(F("(")) + String(recordsCount) + F(")") + FILE_EXT;
+    //bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, outerFileName,  msg.chatID);
 
-    File f = SPIFFS.open("/data/2024-10-02.csv");
-    bot->sendFile(f, FB_DOC, fileName,  msg.chatID);
+    internalFileName = String(FILE_PATH) + F("/") + internalFileName + FILE_EXT;
+    BOT_MENU_TRACE(internalFileName);
+    File f = SPIFFS.open(internalFileName.c_str());
+    bot->sendFile(f, FB_DOC, outerFileName,  msg.chatID);
     f.close();
 
     //SPIFFS.remove("/data/2041-06-11.csv");

@@ -298,6 +298,7 @@ public:
         int recordsTotal = 0;        
         filesCount = 0;
         String fileFilter = out;
+        out.clear();
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();            

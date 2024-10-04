@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.1")
+  #define VER F("1.4")
 #endif
 
 //#define RELEASE
@@ -186,8 +186,12 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 const bool IsWiFiOn()
 {
   const auto &wifiBtnState = wifiBtn.getState(); //digitalRead(PIN_WIFI_BTN);  
-  digitalWrite(PIN_WIFI_LED_BTN, wifiBtnState == LOW ? HIGH : LOW);
   return wifiBtnState == LOW;  
+}
+
+void WiFiStatusLED()
+{
+  digitalWrite(PIN_WIFI_LED_BTN, WiFi.status() == WL_CONNECTED ? HIGH : LOW);
 }
 
 void InitBot()
@@ -234,11 +238,12 @@ void loop()
   
   if(XYDJ.available() > 0)
   { 
-    const auto &received = XYDJ.readStringUntil('\n');
+    digitalWrite(PIN_WIFI_LED_BTN, !digitalRead(PIN_WIFI_LED_BTN));
+    const auto &received = XYDJ.readStringUntil('\n');    
     currentData.readFromXYDJ(received);
     //currentData.setResetReason(resetReason);
     // INFO("EXT Device = ", F("'"), received, F("'"));
-    TRACE("      Data = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+    TRACE("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
   }
   
   if(Serial.available() > 0)
@@ -324,6 +329,7 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
   {    
     if ((WiFi.status() == WL_CONNECTED)) 
     {
+      WiFiStatusLED();
       httpCode = 200;
       statusMsg = F("OK"); 
       #ifdef USE_API      
@@ -370,10 +376,15 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
     }
     else
     {  
-      #ifdef ESP32      
-      WiFi.disconnect();
-      WiFi.reconnect();
-      delay(200);
+      #ifdef ESP32     
+      WiFiStatusLED();
+      TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
+      if(WiFi.status() == WL_CONNECT_FAILED  ||  WiFi.status() == WL_CONNECTION_LOST)
+      {        
+        TRACE(F("\t\t\t\t\t"), F("RECONNECT"));
+        WiFi.reconnect();
+        delay(200);
+      }
       #endif
     }   
   }
