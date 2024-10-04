@@ -161,23 +161,22 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     
     String internalFileName = value.isEmpty() ? ds->endDate : value;
-    String outerFileName = (internalFileName.isEmpty() ? ds->generateAllDataFileName() : internalFileName);
-    
-    String buff = internalFileName; 
-    const auto &recordsCount = ds->extractAllData(buff);    
+    if(!internalFileName.isEmpty())
+    { 
+      int totalRecordsCount = 0;
+      auto filesInfo = ds->downloadData(internalFileName, totalRecordsCount);    
 
-    outerFileName += String(F("(")) + String(recordsCount) + F(")") + FILE_EXT;
-    //bot->sendFile((uint8_t*)buff.c_str(), buff.length(), FB_DOC, outerFileName,  msg.chatID);
+      String outerFileName = internalFileName + F("(") + String(filesInfo[internalFileName]) + F(")") + FILE_EXT;         
 
-    internalFileName = String(FILE_PATH) + F("/") + internalFileName + FILE_EXT;
-    BOT_MENU_TRACE(internalFileName);
-    File f = SPIFFS.open(internalFileName.c_str());
-    bot->sendFile(f, FB_DOC, outerFileName,  msg.chatID);
-    f.close();
+      internalFileName = String(FILE_PATH) + F("/") + internalFileName + FILE_EXT;
+      BOT_MENU_TRACE(internalFileName, F(" -> "), outerFileName);
+      File f = SPIFFS.open(internalFileName.c_str());
+      bot->sendFile(f, FB_DOC, outerFileName,  msg.chatID);
+      f.close();    
 
-    //SPIFFS.remove("/data/2041-06-11.csv");
-
-    value.clear();
+      value.clear();
+    }else
+      value = String(F("(")) + internalFileName + F(")") + F(" does not exists or empty");    
   }
   
 

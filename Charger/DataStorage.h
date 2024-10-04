@@ -5,6 +5,7 @@
 #include <FS.h>
 #include <Arduino.h>
 #include <vector>
+#include <map>
 #include <time.h>
 
 #ifdef ENABLE_INFO_DS
@@ -281,35 +282,32 @@ public:
         lastRecord = data;
     }    
 
-    const String generateAllDataFileName()
-    {
-      return String(PRODUCT_NAME) 
-            + startDate + F("-") + endDate 
-            + F("(") + String(filesCount) + F(")")            
-          ;
-    }
+    std::map<String, int> downloadData(const String &filter, int &recordsTotal) {
+        std::map<String, int> result;
 
-    const int extractAllData(String &out) {
         File root = fileSystem.open(FILE_PATH);
-        if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
+        if (!root) { TraceOpenFileFailed(FILE_PATH); return std::move(result); }
 
         File file = root.openNextFile();
-        if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return 0; }
-        int recordsTotal = 0;        
-        filesCount = 0;
-        String fileFilter = out;
-        out.clear();
+        if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return std::move(result); }
+        
+        recordsTotal = 0;            
+        filesCount = 0;        
         while (file) {
             int recordsInFile = 0;
-            const String &fileName = file.name();            
-            if (fileName.endsWith(FILE_EXT) && (fileFilter.isEmpty() || fileName.startsWith(fileFilter))) {
-                //out += file.readString();
-                filesCount++;
+            const String &fileName = file.name();                  
+            if (fileName.endsWith(FILE_EXT))
+            {
+              filesCount++;
+              if(filter.isEmpty() || fileName.startsWith(filter)) {
+                //out += file.readString();                
                 while (file.available()) {
-                    out += file.readStringUntil('\n') + '\n';                    
+                    file.readStringUntil('\n') + '\n';                    
                     recordsInFile++;
                 } 
                 DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
+                result[fileName] = recordsInFile;
+              }
             }
             recordsTotal += recordsInFile;
             file.close();
@@ -318,10 +316,17 @@ public:
         file.close();
         root.close();
 
-        return recordsTotal;
+        return std::move(result);
     }
 
-    const int removeAllData()
+    const int removeAllExceptLast()
+    {
+      if(!endDate.isEmpty())
+        return removeData(endDate, /*except:*/true);
+      return 0;
+    }
+
+    const int removeData(const String &filter, const bool &except = false)
     {
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
@@ -330,12 +335,14 @@ public:
         if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return 0; }
 
         filesCount = 0;
+        uint8_t removedFiles = 0;
 
         std::vector<String> files;
 
         while (file) {
             const String &fileName = file.name();
             if (fileName.endsWith(FILE_EXT)) {
+              filesCount++;
               files.push_back(fileName);
             }
             file.close();
@@ -344,14 +351,19 @@ public:
 
         for(const auto &f : files)
         {
-          String fileName = String(F("/")) + root.name() + F("/") + f;
-          DS_TRACE(F("Remove: "), fileName);
-          fileSystem.remove(fileName);
+          if(filter.isEmpty() || (f.startsWith(filter) == !except))
+          {
+            String fileName = String(F("/")) + root.name() + F("/") + f;
+            DS_TRACE(F("Remove: "), fileName);
+            fileSystem.remove(fileName);
+            filesCount--; 
+            removedFiles++;           
+          }
         }
 
         root.close();
 
-        return files.size();
+        return removedFiles;
     }
 
 private:

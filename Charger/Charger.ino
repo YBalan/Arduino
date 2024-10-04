@@ -400,31 +400,26 @@ void HandleDebugSerialCommands()
     ESP.restart();
   }
 
-  if(debugCommandFromSerial == 2) // Show current currentData
+  if(debugCommandFromSerial == 2) // Show currentData
   { 
     ds->TraceToSerial();
   }
 
   if(debugCommandFromSerial == 3) // Extract all
   { 
-    TRACE(F("Extract All..."))
-    String out;
-    const auto &recordsCount = ds->extractAllData(out);
-    if(recordsCount <= 100)
-    {
-      TRACE(out);
-    }
-    else
-    {
-      TRACE(F("Records Count: "), recordsCount);
-    }
+    TRACE(F("Download All..."))
+    String filter;
+    int totalRecordsCount = 0;
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount);    
+    
+    TRACE(F("Records Count: "), totalRecordsCount);    
   }
 
   if(debugCommandFromSerial == 4) // Remove all
   { 
     TRACE(F("Remove All..."))
-    String out;
-    const auto &files = ds->removeAllData();
+    String filter;
+    const auto &files = ds->removeData(filter);
     TRACE(files);
   }
 
