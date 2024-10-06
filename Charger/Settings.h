@@ -93,7 +93,7 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
       }
       else
       {
-        SETTINGS_INFO(F("Failed to open "), fileName);
+        SETTINGS_INFO(F("Failed to open: "), fileName);
         return false;
       }
     }

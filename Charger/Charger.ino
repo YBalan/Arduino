@@ -3,18 +3,18 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.4")
+  #define VER F("1.5")
 #endif
 
 //#define RELEASE
 #define DEBUG
-#define VER_POSTFIX F("D")
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
+#define VER_POSTFIX F("D")
 
 //#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 #undef WM_DEBUG_LEVEL
@@ -409,10 +409,12 @@ void HandleDebugSerialCommands()
   { 
     TRACE(F("Download All..."))
     String filter;
+
+    uint32_t totalSize = 0;
     int totalRecordsCount = 0;
-    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount);    
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize);    
     
-    TRACE(F("Records Count: "), totalRecordsCount);    
+    TRACE(F("Records Count: "), totalRecordsCount, F(" "), F("Total size: "), totalSize);    
   }
 
   if(debugCommandFromSerial == 4) // Remove all

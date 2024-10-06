@@ -7,6 +7,8 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include "TelegramBot.h"
+
 
 #ifdef ENABLE_INFO_DS
 #define DS_INFO(...) SS_TRACE(F("[DS INFO] "), __VA_ARGS__)
@@ -19,6 +21,9 @@
 #else
 #define DS_TRACE(...) {}
 #endif
+
+struct FileInfo { size_t size; int linesCount; };
+typedef std::map<String, FileInfo> FilesInfo;
 
 #define fileSystem SPIFFS // LittleFS
 
@@ -282,17 +287,27 @@ public:
         lastRecord = data;
     }    
 
-    std::map<String, int> downloadData(const String &filter, int &recordsTotal) {
-        std::map<String, int> result;
+    const bool fileFilterPrepare(String &filter){      
+        filter.replace('_', '-');
+        return true;
+    }
+
+
+    FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
+        FilesInfo result;        
 
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return std::move(result); }
 
         File file = root.openNextFile();
         if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return std::move(result); }
+
+        fileFilterPrepare(filter);
         
+        totalSize = 0;
         recordsTotal = 0;            
-        filesCount = 0;        
+        filesCount = 0;  
+
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();                  
@@ -306,10 +321,11 @@ public:
                     recordsInFile++;
                 } 
                 DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
-                result[fileName] = recordsInFile;
+                result[fileName] = { file.size(), recordsInFile };
+                totalSize += file.size();
               }
             }
-            recordsTotal += recordsInFile;
+            recordsTotal += recordsInFile;            
             file.close();
             file = root.openNextFile();
         }
@@ -326,13 +342,15 @@ public:
       return 0;
     }
 
-    const int removeData(const String &filter, const bool &except = false)
+    const int removeData(String &filter, const bool &except = false)
     {
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
 
         File file = root.openNextFile();
         if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return 0; }
+
+        fileFilterPrepare(filter);
 
         filesCount = 0;
         uint8_t removedFiles = 0;

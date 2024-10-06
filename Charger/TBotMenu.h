@@ -160,23 +160,41 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT DOWNLOAD:"));
     bot->sendTyping(msg.chatID);
     
-    String internalFileName = value.isEmpty() ? ds->endDate : value;
-    if(!internalFileName.isEmpty())
-    { 
-      int totalRecordsCount = 0;
-      auto filesInfo = ds->downloadData(internalFileName, totalRecordsCount);    
+    String filter = value.isEmpty() ? ds->endDate : value;
+    
+    int totalRecordsCount = 0;
+    uint32_t totalSize = 0;
+    auto filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    BOT_MENU_TRACE(F("Records Count: "), totalRecordsCount, F(" "), F("Total size: "), totalSize);
+    if(filesInfo.size() > 0)
+    {
+      //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
+      String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT;         
 
-      String outerFileName = internalFileName + F("(") + String(filesInfo[internalFileName]) + F(")") + FILE_EXT;         
+      filter = String(FILE_PATH) + F("/") + filter;
+      BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
 
-      internalFileName = String(FILE_PATH) + F("/") + internalFileName + FILE_EXT;
-      BOT_MENU_TRACE(internalFileName, F(" -> "), outerFileName);
-      File f = SPIFFS.open(internalFileName.c_str());
-      bot->sendFile(f, FB_DOC, outerFileName,  msg.chatID);
-      f.close();    
+      std::vector<String> files;
+      for(const auto& fi : filesInfo)
+        files.push_back(String(FILE_PATH) + F("/") + fi.first);
 
-      value.clear();
+      // Sort vector in descending order using a lambda function as comparator
+      std::sort(files.begin(), files.end(), [](const String& a, const String& b) {
+          return a < b; // Ascending order
+      });
+
+      // File f = SPIFFS.open(filter.c_str());
+      // bot->sendFile(f, FB_DOC, outerFileName,  msg.chatID);
+      // f.close();    
+      
+      if(bot->sendFile(files, totalSize, outerFileName, msg.chatID) != 1)
+      {
+        value = F("Telegram error");
+      }
+      else
+        value.clear();
     }else
-      value = String(F("(")) + internalFileName + F(")") + F(" does not exists or empty");    
+      value = F("files not found");
   }
   
 
