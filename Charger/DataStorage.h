@@ -304,6 +304,7 @@ public:
         if (fileName != currentFileName || !fileSystem.exists(fileName)) {            
             currentFileName = fileName;
             filesCount++;
+            data.count = 0;
             endDate = extractDate(fileName);
         }        
 

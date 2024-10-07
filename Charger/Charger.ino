@@ -7,7 +7,7 @@
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE

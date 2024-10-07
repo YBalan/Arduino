@@ -172,20 +172,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
 
     const float &intValue = value.toFloat();
-    String command = value.isEmpty() || intValue > 0 ? F("get") : value;
+    String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
+    command.toLowerCase();
 
-    SendCommand(command);
-
-    value.clear();
-    
-    const String &receive = DeviceReceive();
-    BOT_MENU_INFO(receive);
-    
-    value = receive;      
-
-    if(value.isEmpty())
+    if(command.startsWith(F("up")) || command.startsWith(F("dw")))
     {
-      value = F("Device does not respond...");
+      const String &cmd = command.substring(0, 2);
+      const float &fVal = command.substring(2).toFloat();
+      if(fVal > 0 && fVal <= 80.0)
+      {
+        command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
+      }else
+      {
+        command.clear();      
+        value = String(F("'")) + value + F("'") + F(" ") + F(" Wrong command");
+      }
+    }
+
+    if(!command.isEmpty())
+    {
+      SendCommand(command);
+
+      value.clear();
+      
+      const String &receive = DeviceReceive();
+      BOT_MENU_INFO(receive);
+      
+      value = receive;      
+
+      if(value.isEmpty())
+      {
+        value = F("Device does not respond...");
+      }
     }
   }
   else 
