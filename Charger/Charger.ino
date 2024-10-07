@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.6")
+  #define VER F("1.7")
 #endif
 
 //#define RELEASE
@@ -135,6 +135,8 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();   
+
+  SPIFFS.remove((String(FILE_PATH) + F("/") + F("header") + FILE_EXT).c_str());
   
   storeDataTicks = millis();
   

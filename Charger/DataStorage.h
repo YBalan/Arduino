@@ -39,6 +39,8 @@ typedef std::map<String, FileInfo> FilesInfo;
 //#define RECORD_FORMAT       "%lu,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%s,"
 //#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
 
+#define HEADER_FILE_NAME    F("0000header")
+#define RECORD_HEADER       String(F("DateTime"))+F(",")+F("Voltage")+F(",")+F("RelayOnOff")+F(",")+F("RelayTime")+F(",")+F("Temperature")+F(",")+F("Num")+F(",")+F("ESP")+F(",")+F("R1")+F(",")+F("WiFi")+F(",")+F("R2")
 #define RECORD_FORMAT       "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%04d,%s,%01d,%s,%01d"
 #define RECORD_FORMAT_SCANF "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%d,%s,%d,%s,%d"
 
@@ -76,6 +78,7 @@ struct Data {
           temperature(other.temperature),
           wifiStatus(other.wifiStatus),
           reserv1(other.reserv1),
+          reserv2(other.reserv2),
           count(other.count)
     {
         // Optionally, you can add some logging or custom logic here.
@@ -103,6 +106,7 @@ struct Data {
         temperature = other.temperature;
         wifiStatus = other.wifiStatus;
         reserv1 = other.reserv1;
+        reserv2 = other.reserv2;
         count = other.count;
 
         return *this;
@@ -209,6 +213,19 @@ public:
         }
         readLastFileRecord();
         fileSystem.mkdir(FILE_PATH);
+
+        String headerName = String(HEADER_FILE_NAME) + FILE_EXT;
+        String headerPath = String(FILE_PATH) + F("/") + headerName;        
+        File header = fileSystem.open(headerPath.c_str(), "w");
+        if(!header) TraceOpenFileFailed(headerPath);        
+        else 
+        { 
+          String headerContent = RECORD_HEADER + '\n';
+          header.write((uint8_t*)headerContent.c_str(), headerContent.length() + 1);          
+          header.close();
+          filesInfo[headerName] = { headerContent.length(), 1 };
+        }
+
         TraceToSerial();
 
         return lastRecord;
@@ -236,7 +253,7 @@ public:
         while (file) {            
             const String &fileName = file.name();
             DS_TRACE(String(F("/")) + root.name() + F("/") + fileName);
-            if(fileName.endsWith(FILE_EXT))
+            if(fileName.endsWith(FILE_EXT) && !fileName.startsWith(HEADER_FILE_NAME))
             {
               filesCount++;
               if (lastFile.isEmpty() || fileName > lastFile) {
@@ -303,8 +320,12 @@ public:
         return true;
     }
 
-    const FilesInfo &downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
-        totalSize = 0;        recordsTotal = 0;                    filesCount = 0; 
+    const FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
+        FilesInfo result;
+        totalSize = 0;
+        recordsTotal = 0;
+        filesCount = 0; 
+
         File root = fileSystem.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return filesInfo; }
 
@@ -316,8 +337,13 @@ public:
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();                  
-            if (fileName.endsWith(FILE_EXT))
-            {              
+            if(fileName.startsWith(HEADER_FILE_NAME)) {
+              recordsInFile = 1;
+              totalSize += file.size();
+              filesInfo[fileName] = { file.size(), recordsInFile };
+              result[fileName] = { file.size(), recordsInFile };
+            }
+            else if (fileName.endsWith(FILE_EXT)) {              
               filesCount++;
               if(filter.isEmpty() || fileName.startsWith(filter)) {
                 //DS_TRACE(F("endDate: "), endDate, F(" "), F("fileName: "), fileName, F(" "), F("filesInfo.size: "), filesInfo.size());
@@ -329,12 +355,13 @@ public:
                       recordsInFile++;
                   } 
                   DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
-                  filesInfo[fileName] = { file.size(), recordsInFile };                  
+                  filesInfo[fileName] = { file.size(), recordsInFile };
+                  result[fileName] = { file.size(), recordsInFile };
                 }
-                else
-                {
+                else {
                   const auto &fileInfo = filesInfo[fileName];
                   recordsInFile = fileInfo.linesCount;
+                  result[fileName] = { file.size(), recordsInFile };
                   DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile, F(" "), F("Exist in map: "), filesInfo.size()); 
                 }
               }
@@ -346,7 +373,7 @@ public:
         file.close();
         root.close();
 
-        return filesInfo;
+        return std::move(result);
     }
 
     const int removeAllExceptLast()
@@ -426,7 +453,7 @@ private:
             if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return; }
             while (file) {
                 const String &fileName = file.name();
-                if (fileName.endsWith(FILE_EXT)) {
+                if (fileName.endsWith(FILE_EXT) && !fileName.startsWith(HEADER_FILE_NAME)) {
                   prevFile = fileName;                
                   if (oldestFile.isEmpty() || prevFile < oldestFile) {
                       oldestFile = prevFile;

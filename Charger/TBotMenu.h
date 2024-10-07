@@ -209,6 +209,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       for(uint8_t idx = 0; idx < num; idx++)
       {
         const String &fileName = files[idx].substring(0, fileName.length() - FILE_EXT_LEN);
+        if(fileName.startsWith(HEADER_FILE_NAME)) continue;
         String fileNameCmd = fileName; fileNameCmd.replace('-', '_');
         const auto &fileInfo = filesInfo.at(fileName);
 
