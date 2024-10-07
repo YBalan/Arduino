@@ -7,8 +7,6 @@
 #include <vector>
 #include <map>
 #include <time.h>
-#include "TelegramBot.h"
-
 
 #ifdef ENABLE_INFO_DS
 #define DS_INFO(...) SS_TRACE(F("[DS INFO] "), __VA_ARGS__)
@@ -37,12 +35,12 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define FILE_NAME_FORMAT F("%Y-%m-%d")
 #define BUFFER_DATE_SIZE 30
 
-#define MAX_RECORD_LENGTH   58  // Target record length with fixed size for consistent read offsets
+#define MAX_RECORD_LENGTH   62  // Target record length with fixed size for consistent read offsets
 //#define RECORD_FORMAT       "%lu,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%s,"
 //#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
 
-#define RECORD_FORMAT       "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%02d,%s,%02d"
-#define RECORD_FORMAT_SCANF "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%s,%d,%s,%d"
+#define RECORD_FORMAT       "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%04d,%s,%01d,%s,%01d"
+#define RECORD_FORMAT_SCANF "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%d,%s,%d,%s,%d"
 
 #define EXCEL_DATE_FORMAT F("%Y-%m-%d %H:%M:%S")
 
@@ -59,7 +57,8 @@ struct Data {
     uint8_t relayOnSS;
     float temperature = 22.1; 
     uint16_t reserv1; 
-    uint16_t reserv2; 
+    uint16_t reserv2;
+    uint16_t count; 
     static constexpr size_t recordLength = MAX_RECORD_LENGTH;
 
     // Default constructor
@@ -77,17 +76,21 @@ struct Data {
           temperature(other.temperature),
           wifiStatus(other.wifiStatus),
           reserv1(other.reserv1),
-          reserv2(other.reserv2)
+          count(other.count)
     {
         // Optionally, you can add some logging or custom logic here.
+        DS_TRACE(F("Data copy ctor"));
     }
 
     // Assignment operator
-    Data& operator=(const Data& other) {
+    Data& operator=(const Data& other) {        
         if (this == &other) {
             // Handle self-assignment (e.g., a = a)
+            DS_TRACE(F("Data self-assignment"));
             return *this;
         }
+
+        DS_TRACE(F("Data assignment"));
 
         // Copy all members from 'other' to 'this'
         dateTime = other.dateTime;
@@ -100,7 +103,7 @@ struct Data {
         temperature = other.temperature;
         wifiStatus = other.wifiStatus;
         reserv1 = other.reserv1;
-        reserv2 = other.reserv2;
+        count = other.count;
 
         return *this;
     }
@@ -120,7 +123,7 @@ struct Data {
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);
         //DS_TRACE(dateTimeStr);
 
-        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, resetReason.c_str(), reserv1, wifiStatus.c_str(), reserv2);
+        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, count, resetReason.c_str(), reserv1, wifiStatus.c_str(), reserv2);
         auto res = String(buffer);
         realDataSize = res.length();
         for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
@@ -137,7 +140,7 @@ struct Data {
         struct tm tm;             // Struct to hold decomposed time
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
 
-        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
 
         resetReason = String(startReasonBuff);
         wifiStatus = String(wifiStatusBuff);  
@@ -189,12 +192,14 @@ struct Data {
 };
 
 class DataStorage {
+private:
+  FilesInfo filesInfo;
+  int filesCount;
 public:
     String currentFileName;
     Data lastRecord;
     String startDate;
-    String endDate;
-    uint8_t filesCount;
+    String endDate;    
 
 public:
     const Data& begin() {
@@ -212,8 +217,13 @@ public:
     void TraceToSerial() const
     {
       DS_TRACE(F("CurrentFile: "), currentFileName);
-      DS_TRACE(F("Last Record: "), lastRecord.writeToCsv());
+      DS_TRACE(F("Last Record: "), lastRecord.writeToCsv(), F(" "), F("Count: "), lastRecord.count);
       DS_TRACE(F("startDate: "), startDate, F(" "), F("endDate: "), endDate, F(" "), F("Files: "), filesCount);
+    }
+
+    const int &getFilesCount()
+    {
+      return filesCount;
     }
 
     void readLastFileRecord() {
@@ -280,6 +290,7 @@ public:
         if (!file) { TraceOpenFileFailed(fileName); return; }
         
         size_t realDataSize = 0;
+        data.count++;
         String csv = data.writeToCsv(realDataSize) + '\n';
         const auto &size = file.write((uint8_t*)csv.c_str(), csv.length());
         DS_TRACE(F("Real data size: "), realDataSize, F(" "), F("Wrote: "), size);        
@@ -292,37 +303,40 @@ public:
         return true;
     }
 
-
-    FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
-        FilesInfo result;        
-
+    const FilesInfo &downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
+        totalSize = 0;        recordsTotal = 0;                    filesCount = 0; 
         File root = fileSystem.open(FILE_PATH);
-        if (!root) { TraceOpenFileFailed(FILE_PATH); return std::move(result); }
+        if (!root) { TraceOpenFileFailed(FILE_PATH); return filesInfo; }
 
         File file = root.openNextFile();
-        if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return std::move(result); }
+        if(!file) { DS_TRACE(F("No files found in: "), FILE_PATH); return filesInfo; }
 
         fileFilterPrepare(filter);
-        
-        totalSize = 0;
-        recordsTotal = 0;            
-        filesCount = 0;  
 
         while (file) {
             int recordsInFile = 0;
             const String &fileName = file.name();                  
             if (fileName.endsWith(FILE_EXT))
-            {
+            {              
               filesCount++;
               if(filter.isEmpty() || fileName.startsWith(filter)) {
-                //out += file.readString();                
-                while (file.available()) {
-                    file.readStringUntil('\n') + '\n';                    
-                    recordsInFile++;
-                } 
-                DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
-                result[fileName] = { file.size(), recordsInFile };
+                //DS_TRACE(F("endDate: "), endDate, F(" "), F("fileName: "), fileName, F(" "), F("filesInfo.size: "), filesInfo.size());
                 totalSize += file.size();
+                if(fileName.startsWith(endDate) || filesInfo.count(fileName) == 0){              
+                  //out += file.readString();                
+                  while (file.available()) {
+                      file.readStringUntil('\n') + '\n';                    
+                      recordsInFile++;
+                  } 
+                  DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile);
+                  filesInfo[fileName] = { file.size(), recordsInFile };                  
+                }
+                else
+                {
+                  const auto &fileInfo = filesInfo[fileName];
+                  recordsInFile = fileInfo.linesCount;
+                  DS_TRACE(String(F("/")) + root.name() + F("/") + fileName, F(" Records: "), recordsInFile, F(" "), F("Exist in map: "), filesInfo.size()); 
+                }
               }
             }
             recordsTotal += recordsInFile;            
@@ -332,7 +346,7 @@ public:
         file.close();
         root.close();
 
-        return std::move(result);
+        return filesInfo;
     }
 
     const int removeAllExceptLast()
@@ -374,6 +388,7 @@ public:
             String fileName = String(F("/")) + root.name() + F("/") + f;
             DS_TRACE(F("Remove: "), fileName);
             fileSystem.remove(fileName);
+            filesInfo.erase(f);
             filesCount--; 
             removedFiles++;           
           }
@@ -424,9 +439,10 @@ private:
             file.close();
 
             if (!oldestFile.isEmpty()) {
-                oldestFile = String(F("/")) + root.name() + F("/") + oldestFile;
-                DS_TRACE(F("Old file to remove: "), oldestFile, F(" "), F("Prev file: "), prevFile);
-                fileSystem.remove(oldestFile);
+                String oldestFilePath = String(F("/")) + root.name() + F("/") + oldestFile;
+                DS_TRACE(F("Old file to remove: "), oldestFilePath, F(" "), F("Prev file: "), prevFile);
+                fileSystem.remove(oldestFilePath);
+                filesInfo.erase(oldestFile);
                 startDate = extractDate(prevFile);
                 filesCount--;
             }

@@ -412,9 +412,11 @@ void HandleDebugSerialCommands()
 
     uint32_t totalSize = 0;
     int totalRecordsCount = 0;
+
+    uint32_t sw = millis();
     const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize);    
     
-    TRACE(F("Records Count: "), totalRecordsCount, F(" "), F("Total size: "), totalSize);    
+    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
   }
 
   if(debugCommandFromSerial == 4) // Remove all

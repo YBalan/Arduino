@@ -174,9 +174,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     String filter;
     int totalRecordsCount = 0;
     uint32_t totalSize = 0;
-    auto filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    
+    uint32_t sw = millis();
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 
-    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize);
     if(filesInfo.size() > 0)
     {
       std::vector<String> files;
@@ -206,12 +208,13 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       const size_t &num = last > 0 ? min(files.size(), last) : files.size();
       for(uint8_t idx = 0; idx < num; idx++)
       {
-        const String &fileName = files[idx];
+        const String &fileName = files[idx].substring(0, fileName.length() - FILE_EXT_LEN);
         String fileNameCmd = fileName; fileNameCmd.replace('-', '_');
+        const auto &fileInfo = filesInfo.at(fileName);
 
         value +=
-                fileName.substring(0, fileName.length() - FILE_EXT_LEN)         // fileName without extension
-                + F("(") + filesInfo[fileName].linesCount + F(")")              // + lines count
+                fileName                                                        // fileName without extension
+                + F("(") + fileInfo.linesCount + F(")")                         // + lines count
                 + F(" ")                                                        // delimeter
                 + F("(") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F(")")          // /download or /get
                 + F(" ")                                                        // delimeter
@@ -234,8 +237,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     
     int totalRecordsCount = 0;
     uint32_t totalSize = 0;
-    auto filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
-    BOT_MENU_TRACE(F("Records Count: "), totalRecordsCount, F(" "), F("Total size: "), totalSize);
+
+    uint32_t sw = millis();
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+
     if(filesInfo.size() > 0)
     {
       filter = String(FILE_PATH) + F("/") + filter;      
