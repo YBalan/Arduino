@@ -112,6 +112,10 @@ struct Data {
         return *this;
     }
 
+    const String dateTimeToString(const String &format = EXCEL_DATE_FORMAT) const{
+      return epochToDateTime(dateTime, format);
+    }
+
     void setDateTime(const uint32_t &datetime) { dateTime = datetime < MILLIS_MAX_SECONDS ? dateTime + datetime : datetime;  }
     const uint32_t &getDateTime() const { return dateTime; }
 
@@ -253,7 +257,7 @@ public:
         while (file) {            
             const String &fileName = file.name();
             DS_TRACE(String(F("/")) + root.name() + F("/") + fileName);
-            if(fileName.endsWith(FILE_EXT) && !fileName.startsWith(HEADER_FILE_NAME))
+            if(fileName.length() == 10 + FILE_EXT_LEN && fileName.endsWith(FILE_EXT) && !fileName.startsWith(HEADER_FILE_NAME))
             {
               filesCount++;
               if (lastFile.isEmpty() || fileName > lastFile) {

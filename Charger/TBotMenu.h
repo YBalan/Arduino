@@ -63,6 +63,7 @@ notify429 - Notify To-many Requests (429)
 #define BOT_COMMAND_DOWNLOAD      F("/get")
 #define BOT_COMMAND_REMOVE        F("/rem")
 #define BOT_COMMAND_LIST          F("/ls")
+#define BOT_COMMAND_CMD          F("/cmd")
 
 
 //Fast Menu
@@ -73,6 +74,7 @@ const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
+const String DeviceReceive();
 
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -164,7 +166,30 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     }
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  else if(GetCommandValue(BOT_COMMAND_LIST, filtered, value))
+  else if(GetCommandValue(BOT_COMMAND_CMD, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT CMD:"));
+    bot->sendTyping(msg.chatID);
+
+    const float &intValue = value.toFloat();
+    String command = value.isEmpty() || intValue > 0 ? F("get") : value;
+
+    SendCommand(command);
+
+    value.clear();
+    
+    const String &receive = DeviceReceive();
+    BOT_MENU_INFO(receive);
+    
+    value = receive;      
+
+    if(value.isEmpty())
+    {
+      value = F("Device does not respond...");
+    }
+  }
+  else 
+  if(GetCommandValue(BOT_COMMAND_LIST, filtered, value))
   {
     BOT_MENU_INFO(F("BOT LIST:"));
     bot->sendTyping(msg.chatID);
@@ -174,6 +199,9 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     String filter;
     int totalRecordsCount = 0;
     uint32_t totalSize = 0;
+
+    const auto &total = SPIFFS.totalBytes();
+    const auto &used = SPIFFS.usedBytes();
     
     uint32_t sw = millis();
     const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
@@ -191,7 +219,16 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       });     
 
       value.clear();
-      value += ds->startDate + F(" - ") + ds->endDate + F(" : ") + F("(") + F("Records: ") + String(totalRecordsCount) + F(" ") + F("Total size: ") + String(totalSize) + F(")");
+
+      value += String(ds->lastRecord.voltage) + F("V") + F(" ") + F("(") + ds->lastRecord.dateTimeToString() + F(")");      
+      messages.push_back(value); value.clear();      
+      value += F("\n");                                                       // NewLine
+
+      value += ds->startDate + F(" - ") + ds->endDate;      
+      messages.push_back(value); value.clear();      
+      value += F("\n");                                                       // NewLine
+
+      value += String(F("Files: ")) + String(ds->getFilesCount()) + F(" ") + F("Records: ") + String(totalRecordsCount) + F(" ") + F("Total size: ") + String(totalSize) + F(" ") + F("Size Left: ") + String(total - used);
       messages.push_back(value); value.clear();
       value += F("\n");                                                       // NewLine
 
@@ -226,7 +263,21 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       }
 
     }else
-      value = F("Files not found");
+      value = F("File(s) not found");
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT REMOVE:"));
+    bot->sendTyping(msg.chatID);
+
+    String filter = value; 
+    if(!filter.isEmpty())
+    {
+      const auto &filesRemoved = ds->removeData(filter);
+      value = (filesRemoved == 1 ? filter : String(filesRemoved)) + F(" ") + F("File(s) removed");
+    }else
+      value = F("File(s) not found");
   }
   else
   if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
@@ -267,7 +318,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       else
         value.clear();
     }else
-      value = F("Files not found");
+      value = F("File(s) not found");
   }
   
 

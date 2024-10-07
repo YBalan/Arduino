@@ -134,9 +134,7 @@ void setup()
 
   LoadSettings();
   LoadSettingsExt();  
-  //_settings.reset();   
-
-  SPIFFS.remove((String(FILE_PATH) + F("/") + F("header") + FILE_EXT).c_str());
+  //_settings.reset();     
   
   storeDataTicks = millis();
   
@@ -171,7 +169,8 @@ void setup()
 
     const auto &now = GetCurrentTime(_settings.timeZone);
     TRACE(F("Current epochTime: "), now);
-    currentData.setDateTime(now);  
+    currentData.setDateTime(now);
+    ds->lastRecord.setDateTime(now);
   }
 
   InitBot();
@@ -224,7 +223,8 @@ void loop()
     wifiOps->TryToConnectOrOpenConfigPortal();
     const auto &now = GetCurrentTime(_settings.timeZone);
     TRACE(F("Current epochTime: "), now);
-    currentData.setDateTime(now);    
+    currentData.setDateTime(now); 
+    ds->lastRecord.setDateTime(now);   
     InitBot();
   }
 
@@ -242,10 +242,24 @@ void loop()
   { 
     digitalWrite(PIN_WIFI_LED_BTN, !digitalRead(PIN_WIFI_LED_BTN));
     const auto &received = XYDJ.readStringUntil('\n');    
-    currentData.readFromXYDJ(received);
-    //currentData.setResetReason(resetReason);
-    // INFO("EXT Device = ", F("'"), received, F("'"));
-    TRACE("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+
+    if(received.startsWith(F("U")))
+    {
+      INFO("EXT Device = ", F("'"), received, F("'"));
+    }
+    else if(received.startsWith(F("FALL")))
+    {
+      INFO("EXT Device = ", F("'"), received, F("'"));
+    }
+    else if(received.startsWith(F("DOWN")))
+    {
+      INFO("EXT Device = ", F("'"), received, F("'"));
+    }
+    else
+    {
+      currentData.readFromXYDJ(received);
+      TRACE("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+    }
   }
   
   if(Serial.available() > 0)
@@ -462,5 +476,14 @@ void SendCommand(const String &command)
   XYDJ.print(command);    
 }
 
-
+const String DeviceReceive()
+{
+  INFO(F("Waiting for device..."));  
+  
+  if(XYDJ.available() > 0)
+  {     
+    return XYDJ.readStringUntil('\n');
+  }  
+  return String();
+}
 
