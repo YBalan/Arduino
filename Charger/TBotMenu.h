@@ -1,7 +1,8 @@
 #pragma once
 #ifndef TELEGRAM_BOT_MENU_H
 #define TELEGRAM_BOT_MENU_H
-//#include <math.h>
+
+#include <math.h>
 #include "DEBUGHelper.h"
 #include "Settings.h"
 
@@ -37,79 +38,43 @@ notify0 - Notifications Off
 notify1 - Notify All http code result
 notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)
-
-!!!!!!!!!!!!!!!! - Bot Commands for Power Monitor
-pm - Show Power monitor
-powerupdate - Power Monitor update period in milliseconds
-alarmpm - Alarm - send message when voltage <= value
-adjpm - Adjust voltage 0.50-1.0
-
-!!!!!!!!!!!!!!!! - Bot Commands for Users
-gay - trolololo
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
 
 */
 
-#define BOT_COMMAND_BR F("/br")
-#define BOT_COMMAND_RESET F("/reset")
-#define BOT_COMMAND_TEST F("/test")
-#define BOT_COMMAND_VER F("/ver")
+#define BOT_COMMAND_RESTART       F("/restart")
+#define BOT_COMMAND_TEST          F("/test")
+#define BOT_COMMAND_VER           F("/ver")
 #define BOT_COMMAND_CHANGE_CONFIG F("/changeconfig")
-#define BOT_COMMAND_RAINBOW F("/rainbow")
-#define BOT_COMMAND_STROBE F("/strobe")
-#define BOT_COMMAND_SCHEMA F("/schema")
-#define BOT_COMMAND_BASEURI F("/baseuri")
-#define BOT_COMMAND_ALARMED F("/alarmed")
-#define BOT_COMMAND_ALL F("/all")
-#define BOT_COMMAND_MENU F("/menu")
-#define BOT_COMMAND_RELAY1 F("/relay1")
-#define BOT_COMMAND_RELAY2 F("/relay2")
-#define BOT_COMMAND_UPDATE F("/update")
-#define BOT_COMMAND_BUZZTIME F("/buzztime")
-#define BOT_COMMAND_TOKEN F("/token")
-#define BOT_COMMAND_NSTAT F("/nstat")
-#define BOT_COMMAND_RSSI F("/rssi")
-#define BOT_COMMAND_GAY F("/gay")
-#define BOT_COMMAND_UA F("/ua")
-#define BOT_COMMAND_CHID F("/chid")
+#define BOT_COMMAND_MENU          F("/menu")
+#define BOT_COMMAND_UPDATE        F("/update")
+#define BOT_COMMAND_TOKEN         F("/token")
+#define BOT_COMMAND_NSTAT         F("/nstat")
+#define BOT_COMMAND_RSSI          F("/rssi")
+#define BOT_COMMAND_CHID          F("/chid")
+#define BOT_COMMAND_FS            F("/fs")
 
-#define BOT_COMMAND_PLAY F("/play")
-#define BOT_COMMAND_SAVEMELODY F("/savemelody")
-#define BOT_COMMAND_MODEALARMS F("/modealarms")
-#define BOT_COMMAND_MODESOUVENIR F("/modesouvenir")
-#define BOT_COMMAND_FS F("/fs")
-#define BOT_COMMAND_FILLRGB F("/fillrgb")
-#define BOT_COMMAND_PALETTE F("/palette")
-
-//Fast Menu
-#define BOT_MENU_UA_PRAPOR F("UA Prapor")
-#define BOT_MENU_ALARMED F("Alarmed")
-#define BOT_MENU_ALL F("All")
-#define BOT_MENU_MIN_BR F("Min Br")
-#define BOT_MENU_MID_BR F("Mid Br")
-#define BOT_MENU_MAX_BR F("Max Br")
-#define BOT_MENU_NIGHT_BR F("Night Br")
-
-#ifdef USE_POWER_MONITOR
-#define BOT_COMMAND_PM F("/pm")
-#define BOT_COMMAND_PMALARM F("/alarmpm")
-#define BOT_COMMAND_PMUPDATE F("/powerupdate")
-#define BOT_COMMAND_PMADJ F("/adjpm")
-struct PMChatInfo { int32_t MsgID = -1; float AlarmValue = 0.0; float CurrentValue = 0.0; };
-static std::map<String, PMChatInfo> pmChatIds; // = new (std::map<String, PMChatInfo>());
-static uint32_t pmUpdatePeriod = PM_UPDATE_PERIOD;
-static uint32_t pmUpdateTicks = 0;
-const float GetLEDVoltageFactor();
-#endif
-
+//Notify
 #ifdef USE_NOTIFY
 #define BOT_COMMAND_NOTIFY F("/notify")
 #endif
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
+#define BOT_COMMAND_DOWNLOAD      F("/get")
+#define BOT_COMMAND_REMOVE        F("/rem")
+#define BOT_COMMAND_LIST          F("/ls")
+#define BOT_COMMAND_CMD          F("/cmd")
+
+
+//Fast Menu
 
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
+void SendCommand(const String &command);
+const String DeviceReceive();
 
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -130,45 +95,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   { 
     bot->sendTyping(msg.chatID);    
 
-    #ifdef USE_BOT_INLINE_MENU
-      #ifdef ESP8266    
-        BOT_MENU_INFO(F("Inline Menu"));
-        #ifdef USE_BUZZER
-        static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec");
-        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000");
-        #else
-        static const String BotInlineMenu = F("Alarmed \t All \n Mix Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2");
-        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu");
-        #endif
-      #else //ESP32
-        BOT_MENU_INFO(F("Inline Menu"));
-        static const String BotInlineMenu = F("Alarmed \t All \n Min Br \t Mid Br \t Max Br \n Blue \t Yellow \t White \n Strobe \t Rainbow \n Relay 1 \t Relay 2 \n Buzzer Off \t Buzzer 3sec \n Alarms Mode \n Alarms (Only Custom) Mode \n Souvenir UA Mode");
-        static const String BotInlineMenuCall = F("/alarmed, /all, /br2, /br128, /br255, /schema0, /schema2, /schema1, /strobe, /rainbow, /relay1menu, /relay2menu, /buzztime0, /buzztime3000, /modealarms0, /modealarms2, /modesouvenir0");
-      #endif
-    ESPresetHeap;
-    ESPresetFreeContStack;
-
-    BOT_MENU_INFO(F(" HEAP: "), ESP.getFreeHeap());
-    BOT_MENU_INFO(F("STACK: "), ESPgetFreeContStack);
-      
-    bot->inlineMenuCallback(_botSettings.botNameForMenu, BotInlineMenu, BotInlineMenuCall, msg.chatID); 
-    #endif
     
-    #ifdef USE_BOT_FAST_MENU    
-      BOT_MENU_INFO(F("Fast Menu"));        
-      static const String BotFastMenu = String(BOT_MENU_UA_PRAPOR)    
-        + F(" \n ") + BOT_MENU_MIN_BR + F(" \t ") + BOT_MENU_MID_BR + F(" \t ") + BOT_MENU_MAX_BR + F(" \t ") + BOT_MENU_NIGHT_BR
-        + F(" \n ") + BOT_MENU_ALARMED + F(" \t ") + BOT_MENU_ALL
-      ;     
-      bot->showMenuText(_botSettings.botNameForMenu, BotFastMenu, msg.chatID, true);
-    #endif  
     
   } else
   #ifdef USE_NOTIFY
   if(GetCommandValue(BOT_COMMAND_NOTIFY, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
-    _settingsExt.setNotifyChatId(msg.chatID);
+    _settings.setNotifyChatId(msg.chatID);
     if(value.length() > 0)
     {
       bool negate = value.startsWith(F("not"));
@@ -181,93 +115,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(F("NotifyHttpCode: ")) + String(_settings.notifyHttpCode) + F(" ChatId: ") + msg.chatID;
     BOT_MENU_TRACE(value);    
   }else
-  #endif
-  #ifdef USE_POWER_MONITOR
-  if(GetCommandValue(BOT_COMMAND_PM, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);
-
-    pmUpdatePeriod = pmUpdatePeriod == 0 ? PM_UPDATE_PERIOD : pmUpdatePeriod;
-    pmUpdateTicks = pmUpdatePeriod == 0 ? 0 : millis();
-
-    BOT_MENU_TRACE(F("PM Update period: "), pmUpdatePeriod);
-    
-    const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
-    const float &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);
-    pmChatIds[msg.chatID].CurrentValue = voltage;
-
-    const String &menu = GetPMMenu(voltage, msg.chatID, led_consumption_voltage_factor);
-    const String &call = GetPMMenuCall(voltage, msg.chatID);
-    BOT_MENU_TRACE(F("\t"), menu, F(" ChatId: "), msg.chatID);
-
-    bot->inlineMenuCallback(_botSettings.botNameForMenu + PM_MENU_NAME, menu, call, msg.chatID);
-    pmChatIds[msg.chatID].MsgID = bot->lastBotMsg(); 
-      
-  } else
-  if(GetCommandValue(BOT_COMMAND_PMALARM, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);    
-    auto &chatIdInfo = pmChatIds[msg.chatID];
-    if(value.length() > 0)
-    {      
-      chatIdInfo.AlarmValue = value.toFloat();      
-      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);      
-      //noAnswerIfFromMenu = true;
-    }    
-    value = String(F("PM Alarm set: <= ")) + String(chatIdInfo.AlarmValue, 2) + PM_MENU_VOLTAGE_UNIT;
-    BOT_MENU_TRACE(value);
-  } else    
-  if(GetCommandValue(BOT_COMMAND_PMADJ, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);    
-    if(value.length() > 0)
-    {
-      auto &chatIdInfo = pmChatIds[msg.chatID];
-
-      PMonitor::AdjCalibration(value.toFloat());
-
-      const float &led_consumption_voltage_factor = GetLEDVoltageFactor();
-      const float &voltage = PMonitor::GetVoltage(led_consumption_voltage_factor);
-      chatIdInfo.CurrentValue = voltage;
-      
-      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue, led_consumption_voltage_factor);
-      
-      PMonitor::SaveSettings();      
-    }    
-    const auto &adjValue = PMonitor::GetCalibration();
-    value = String(F("PM Adjust set: ")) + String(adjValue, 3);
-    BOT_MENU_TRACE(value);    
-  } else    
-  if(GetCommandValue(BOT_COMMAND_PMUPDATE, filtered, value))
-  { 
-    bot->sendTyping(msg.chatID);      
-    auto &chatIdInfo = pmChatIds[msg.chatID];
-    auto newValue = value.toInt();
-    value.clear();
-    if(newValue == 0 || (newValue >= PM_MIN_UPDATE_PERIOD && newValue <= PM_UPDATE_PERIOD))
-    {
-      pmUpdatePeriod = newValue;      
-      pmUpdateTicks = pmUpdatePeriod == 0 ? 0 : millis();
-      SetPMMenu(msg.chatID, chatIdInfo.MsgID, chatIdInfo.CurrentValue);
-      value = String(F("PM Update set: ")) + String(pmUpdatePeriod) + F("ms...");
-      BOT_MENU_TRACE(value);
-      noAnswerIfFromMenu = true;
-    }
-
-    if(pmUpdatePeriod == 0)
-    {
-      for(const auto &chatIDkv : pmChatIds)
-      {
-        const auto &chatID = chatIDkv.first;
-        const auto &chatIDInfo = chatIDkv.second;        
-        SetPMMenu(chatID, chatIDInfo.MsgID, chatIdInfo.CurrentValue);
-      }
-    }
-    
-    BOT_MENU_TRACE(F("PM Update period: "), pmUpdatePeriod);
-  } else  
   #endif  
-  if(GetCommandValue(BOT_COMMAND_RESET, filtered, value))
+  if(GetCommandValue(BOT_COMMAND_RESTART, filtered, value))
   {
     bot->sendTyping(msg.chatID);
     bot->sendMessage(F("Wait for restart..."), msg.chatID);
@@ -284,7 +133,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER;
+    value = String(F("Flash Date: ")) + String(__DATE__) + F(" ") + String(__TIME__) + F(" ") + F("V:") + VER + VER_POSTFIX;
   }else
   if(GetCommandValue(BOT_COMMAND_FS, filtered, value))
   {
@@ -315,7 +164,181 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       BOT_MENU_INFO(F("\t"), channel.first);
       value += String(F("[")) + channel.first + F("]") + F("; ");
     }
-  }else  
+  }
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  else if(GetCommandValue(BOT_COMMAND_CMD, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT CMD:"));
+    bot->sendTyping(msg.chatID);
+
+    const float &intValue = value.toFloat();
+    String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
+    command.toLowerCase();
+
+    if(command.startsWith(F("up")) || command.startsWith(F("dw")))
+    {
+      const String &cmd = command.substring(0, 2);
+      const float &fVal = command.substring(2).toFloat();
+      if(fVal > 0 && fVal <= 80.0)
+      {
+        command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
+      }else
+      {
+        command.clear();      
+        value = String(F("'")) + value + F("'") + F(" ") + F(" Wrong command");
+      }
+    }
+
+    if(!command.isEmpty())
+    {
+      SendCommand(command);
+
+      value.clear();
+      
+      const String &receive = DeviceReceive();
+      BOT_MENU_INFO(receive);
+      
+      value = receive;      
+
+      if(value.isEmpty())
+      {
+        value = F("Device does not respond...");
+      }
+    }
+  }
+  else 
+  if(GetCommandValue(BOT_COMMAND_LIST, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT LIST:"));
+    bot->sendTyping(msg.chatID);
+
+    const size_t &last = value.toInt();
+
+    String filter;
+    int totalRecordsCount = 0;
+    uint32_t totalSize = 0;
+
+    const auto &total = SPIFFS.totalBytes();
+    const auto &used = SPIFFS.usedBytes();
+    
+    uint32_t sw = millis();
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+
+    if(filesInfo.size() > 0)
+    {
+      std::vector<String> files;
+      for(const auto& fi : filesInfo)
+        files.push_back(fi.first);
+
+      // Sort vector in descending order using a lambda function as comparator
+      std::sort(files.begin(), files.end(), [](const String& a, const String& b) {
+          return a > b; // Descending order
+      });     
+
+      value.clear();
+
+      value += String(ds->lastRecord.voltage) + F("V") + F(" ") + F("(") + ds->lastRecord.dateTimeToString() + F(")");      
+      messages.push_back(value); value.clear();      
+      value += F("\n");                                                       // NewLine
+
+      value += ds->startDate + F(" - ") + ds->endDate;      
+      messages.push_back(value); value.clear();      
+      value += F("\n");                                                       // NewLine
+
+      value += String(F("Files: ")) + String(ds->getFilesCount()) + F(" ") + F("Records: ") + String(totalRecordsCount) + F(" ") + F("Total size: ") + String(totalSize) + F(" ") + F("Size Left: ") + String(total - used);
+      messages.push_back(value); value.clear();
+      value += F("\n");                                                       // NewLine
+
+      String endDateCmd = ds->endDate; endDateCmd.replace('-', '_');
+
+      value += String(F("Download All: ")) + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 4);
+      messages.push_back(value); value.clear();
+      value += F("\n");                                                       // NewLine
+
+      value += String(F("Download Last Month: ")) + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 7);
+      messages.push_back(value); value.clear();
+      value += F("\n");                                                       // NewLine
+
+      const size_t &num = last > 0 ? min(files.size(), last) : files.size();
+      for(uint8_t idx = 0; idx < num; idx++)
+      {
+        const String &fileName = files[idx].substring(0, fileName.length() - FILE_EXT_LEN);
+        if(fileName.startsWith(HEADER_FILE_NAME)) continue;
+        String fileNameCmd = fileName; fileNameCmd.replace('-', '_');
+        const auto &fileInfo = filesInfo.at(fileName);
+
+        value +=
+                fileName                                                        // fileName without extension
+                + F("(") + fileInfo.linesCount + F(")")                         // + lines count
+                + F(" ")                                                        // delimeter
+                + F("(") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F(")")          // /download or /get
+                + F(" ")                                                        // delimeter
+                + F("(") + BOT_COMMAND_REMOVE + fileNameCmd + F(")")            // /remove or /rem                
+        ;
+        messages.push_back(value); value.clear();
+        value += F("\n");                                                       // NewLine        
+      }
+
+    }else
+      value = F("File(s) not found");
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT REMOVE:"));
+    bot->sendTyping(msg.chatID);
+
+    String filter = value; 
+    if(!filter.isEmpty())
+    {
+      const auto &filesRemoved = ds->removeData(filter);
+      value = (filesRemoved == 1 ? filter : String(filesRemoved)) + F(" ") + F("File(s) removed");
+    }else
+      value = F("File(s) not found");
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT DOWNLOAD:"));
+    bot->sendTyping(msg.chatID);
+    
+    String filter = value.isEmpty() ? ds->endDate : value;
+    
+    int totalRecordsCount = 0;
+    uint32_t totalSize = 0;
+
+    uint32_t sw = millis();
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+
+    if(filesInfo.size() > 0)
+    {
+      filter = String(FILE_PATH) + F("/") + filter;      
+
+      std::vector<String> files;
+      for(const auto& fi : filesInfo)
+        files.push_back(String(FILE_PATH) + F("/") + fi.first);
+
+      // Sort vector in descending order using a lambda function as comparator
+      std::sort(files.begin(), files.end(), [](const String& a, const String& b) {
+          return a < b; // Ascending order
+      });     
+      
+      //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
+      String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT; 
+      BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
+
+      if(bot->sendFile(files, totalSize, outerFileName, msg.chatID) != 1)
+      {
+        value = F("Telegram error");
+      }
+      else
+        value.clear();
+    }else
+      value = F("File(s) not found");
+  }
+  
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
       messages.push_back(value);  
@@ -328,54 +351,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
-#ifdef USE_POWER_MONITOR
-void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float &led_consumption_voltage_factor)
-{
-  const String &menu = GetPMMenu(voltage, chatId, led_consumption_voltage_factor);
-  const String &call = GetPMMenuCall(voltage, chatId);
 
-  BOT_MENU_TRACE(F("\t"), menu, F(" -> "), chatId);
-  
-  bot->editMenuCallback(msgId, menu, call, chatId);
-}
 
-const String GetPMMenu(const float &voltage, const String &chatId, const float &led_consumption_voltage_factor)
-{
-  const auto &chatIdInfo = pmChatIds[chatId];
-  const auto periodStr = String(pmUpdatePeriod / 1000) + F("s.");
-  String voltageMainMenu = String(voltage, 2) + PM_MENU_VOLTAGE_UNIT
-  #ifdef SHOW_PM_FACTOR
-    + (led_consumption_voltage_factor > 0.0 && !isnan(led_consumption_voltage_factor) ? String(F(" (")) + String(led_consumption_voltage_factor, 3) + F(")") : String(F("")))
-  #endif
-  #ifdef SHOW_PM_TIME
-    + String(F(" (")) + bot->getTime(3).timeString() + String(F(")"))
-  #endif
-  ;
-
-  String voltageMenu = voltageMainMenu 
-    + F(" \n ") + F("Set ") + PM_MENU_ALARM_NAME + F(" <= ") + String(voltage - PM_MENU_ALARM_DECREMENT, 2) + PM_MENU_VOLTAGE_UNIT
-    + (chatIdInfo.AlarmValue > 0 ? String(F(" \t ")) + PM_MENU_ALARM_NAME + F(" <= ") + String(chatIdInfo.AlarmValue, 2) : String(F("")))
-    + (chatIdInfo.AlarmValue > 0 ? String(F(" \n ")) + PM_MENU_ALARM_NAME + F(" ") + F("Off") : String(F("")))    
-    + F(" \n ") + (pmUpdatePeriod == 0 ? String(F("Stoped")) : (pmUpdatePeriod > PM_MIN_UPDATE_PERIOD ? String(F("Timeout: ")) + periodStr : String(F("Stop")) + F(" ") + periodStr))     
-  ;
-  
-  return std::move(voltageMenu);
-}
-
-const String GetPMMenuCall(const float &voltage, const String &chatId)
-{  
-  const auto &chatIdInfo = pmChatIds[chatId];
-  const auto newpmPeriod = pmUpdatePeriod / 2;
-  String call = String(BOT_COMMAND_PM) 
-        + F(",") + BOT_COMMAND_PMALARM + String(voltage - PM_MENU_ALARM_DECREMENT, 2)  
-        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM : String(F(""))) //Fake
-        + (chatIdInfo.AlarmValue > 0 ? String(F(",")) + BOT_COMMAND_PMALARM + F("0") : String(F("")))         
-        + F(",") + BOT_COMMAND_PMUPDATE + String(newpmPeriod < PM_MIN_UPDATE_PERIOD ? 0 : newpmPeriod)
-    ;
-  return std::move(call);
-}
-#endif
-
-#endif
+#endif //USE_BOT
 
 #endif //TELEGRAM_BOT_MENU_H

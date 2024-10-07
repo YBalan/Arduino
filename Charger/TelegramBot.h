@@ -3,6 +3,19 @@
 #define TELEGRAM_BOT_H
 
 #include "FastBot.h"
+#include <vector>
+
+#ifdef ENABLE_INFO_BOT
+#define BOT_INFO(...) SS_TRACE("[BOT INFO] ", __VA_ARGS__)
+#else
+#define BOT_INFO(...) {}
+#endif
+
+#ifdef ENABLE_TRACE_BOT
+#define BOT_TRACE(...) SS_TRACE("[BOT TRACE] ", __VA_ARGS__)
+#else
+#define BOT_TRACE(...) {}
+#endif
 
 class TelegramBot : public FastBot
 {
@@ -57,12 +70,12 @@ class TelegramBot : public FastBot
         #endif
         
         int size = _http->getSize();
-		#ifdef BOT_MAX_INCOME_MSG_SIZE
-		BOT_INFO(F("BOT INCOME MESSAGE SIZE: "), size);
-        ovfFlag = size > BOT_MAX_INCOME_MSG_SIZE;         
-		#else
-			ovfFlag = size > 25000;							// 1 полное сообщение на русском языке или ~5 на английском
-		#endif
+        #ifdef BOT_MAX_INCOME_MSG_SIZE
+        BOT_INFO(F("BOT INCOME MESSAGE SIZE: "), size);
+            ovfFlag = size > BOT_MAX_INCOME_MSG_SIZE;         
+        #else
+          ovfFlag = size > 25000;							// 1 полное сообщение на русском языке или ~5 на английском
+        #endif
         uint8_t status = 1;             // OK
         if (size) {                     // не пустой ответ?
             StreamString sstring;
@@ -80,6 +93,40 @@ class TelegramBot : public FastBot
         BOT_TRACE(F("Bot Status: "), status);
         return status;
     }
+
+    #ifdef FS_H    
+    private:
+    void _sendFilesRoutine(FB_SECURE_CLIENT& client, const std::vector<String> &files) {        
+        // Start SPIFFS if not started
+        if (!SPIFFS.begin()) {
+            BOT_TRACE("Failed to mount FS");
+            return;
+        }
+
+        for (const auto &filename : files) {            
+            BOT_TRACE(F("Sending file: "), filename);            
+            yield(); // watchdog
+            // Open the file for reading
+            File file = SPIFFS.open(filename.c_str(), "r");
+            if (!file) {
+                BOT_TRACE(F("Failed to open: "), filename);                
+                continue;
+            }
+
+            _sendFileRoutine(client, file);
+          
+            file.close();  // Close the file after finished transmitting
+        }
+    }    
+   
+    public:
+    uint8_t sendFile(const std::vector<String> &files, const uint32_t size, const String& name, const String& id) {
+        FB_DECLARE_CLIENT();        
+        if (!_multipartSend(client, size, FB_DOC, name, id)) return 4;
+          _sendFilesRoutine(client, files);
+        return _multipartEnd(client);
+    }
+    #endif
 };
 
 #endif //TELEGRAM_BOT_H

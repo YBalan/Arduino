@@ -31,25 +31,32 @@ namespace UAMap
     int16_t resetFlag = 200;
     int notifyHttpCode = 0;   
     
+    char NotifyChatId[MAX_CHAT_ID_LENGTH];
+    int8_t timeZone = 3;
+    uint32_t storeDataTimeout = STORE_DATA_TIMEOUT;
 
     void init()
     {      
+      memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
       resetFlag = 200;
       notifyHttpCode = 0;      
+      timeZone = 3;
+      storeDataTimeout = STORE_DATA_TIMEOUT;
     }
+
+    void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
   };
 
   class SettingsExt
   {
     public:    
-    char NotifyChatId[MAX_CHAT_ID_LENGTH];
+    
     public:
     void init()
     {
       SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));     
-      memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
-    }
-    void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
+      
+    }    
   };  
 } 
 
@@ -86,7 +93,7 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
       }
       else
       {
-        SETTINGS_INFO(F("Failed to open "), fileName);
+        SETTINGS_INFO(F("Failed to open: "), fileName);
         return false;
       }
     }
@@ -140,6 +147,7 @@ const bool LoadSettings()
   
   SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
   SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
+  SETTINGS_INFO(F("NotifyChatId: "), _settings.NotifyChatId);
   if(!res)
   {
     //SETTINGS_INFO(F("Reset Settings..."));
@@ -148,6 +156,7 @@ const bool LoadSettings()
   
   SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
   SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
+  SETTINGS_INFO(F("NotifyChatId: "), _settings.NotifyChatId);
 
   return res;
 }
@@ -158,8 +167,6 @@ const bool LoadSettingsExt()
   SETTINGS_INFO(F("EXT: "), F("Load Settings from: "), fileName);
 
   const bool &res = LoadFile(fileName.c_str(), (byte *)&_settingsExt, sizeof(_settingsExt));  
-  
-  SETTINGS_INFO(F("EXT NotifyChatId: "), _settingsExt.NotifyChatId);
  
   if(!res)
   {    
