@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.8")
+  #define VER F("1.9")
 #endif
 
 //#define RELEASE
@@ -111,6 +111,7 @@ static uint8_t debugCommandFromSerial = 0;
 Button wifiBtn(PIN_WIFI_BTN);
 
 uint32_t storeDataTicks = 0;
+uint32_t syncTimeTicks = 0;
 Data currentData;
 
 void setup() 
@@ -137,6 +138,7 @@ void setup()
   //_settings.reset();     
   
   storeDataTicks = millis();
+  syncTimeTicks = millis();
   
   currentData = ds->begin();
 
@@ -167,13 +169,9 @@ void setup()
       SaveSettings();
     }
 
-    const auto &now = GetCurrentTime(_settings.timeZone);
-    TRACE(F("Current epochTime: "), now);
-    currentData.setDateTime(now);
-    ds->lastRecord.setDateTime(now);
-  }
-
-  InitBot();
+    SyncTime();
+    InitBot();
+  }  
 
   SendCommand(F("start"));
 }
@@ -221,10 +219,7 @@ void loop()
   {
     TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
     wifiOps->TryToConnectOrOpenConfigPortal();
-    const auto &now = GetCurrentTime(_settings.timeZone);
-    TRACE(F("Current epochTime: "), now);
-    currentData.setDateTime(now); 
-    ds->lastRecord.setDateTime(now);   
+    SyncTime();   
     InitBot();
   }
 
@@ -276,9 +271,9 @@ void loop()
 
   currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
 
-  const uint32_t &ticks = currentTicks - storeDataTicks;
-  //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
-  if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout)
+  const uint32_t &storeTicks = currentTicks - storeDataTicks;  
+  //TRACE(F("\t\t\t\t\t"), storeTicks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
+  if(storeDataTicks > 0 && storeTicks >= _settings.storeDataTimeout)
   {    
     storeDataTicks = currentTicks;
 
@@ -288,7 +283,7 @@ void loop()
     if(saveRequired)
     {
       //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
-      StoreData(ticks);    
+      StoreData(storeTicks);    
       currentData.setResetReason(F("Normal"));          
     }
     else
@@ -298,6 +293,16 @@ void loop()
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);
     TRACE(nstatTrace);
+  }
+
+  const uint32_t &syncTicks = currentTicks - syncTimeTicks;
+  if(syncTimeTicks > 0 && syncTicks >= SYNC_TIME_TIMEOUT)
+  {
+    syncTimeTicks = currentTicks;
+    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
+    {
+      SyncTime();
+    }
   }
 
   #ifdef USE_BOT
@@ -322,11 +327,21 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-void StoreData(const uint32_t &ticks)
+const uint32_t &SyncTime()
 {
-  INFO(F("\t\tStore currentData..."));
+  const auto &now = GetCurrentTime(_settings.timeZone);
+  TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
+  currentData.setDateTime(now); 
+  ds->lastRecord.setDateTime(now);
+
+  return ds->lastRecord.getDateTime();
+}
+
+void StoreData(const uint32_t &storeTicks)
+{
+  INFO(F("\t\t\t\t\t"), F("Store currentData..."));
   digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-  ds->appendData(currentData, (int)(ticks / 1000));
+  ds->appendData(currentData, (int)(storeTicks / 1000));
   ds->TraceToSerial();   
   String fsInfo;
   PrintFSInfo(fsInfo); 
@@ -460,7 +475,7 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
-    INFO(F("\t\t\tFormat..."));   
+    INFO(F("\t\t\t\t\t"), F("Format..."));   
     SPIFFS.format();
     _settings.resetFlag = 1985;
     SaveSettings();

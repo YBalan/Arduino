@@ -8,6 +8,8 @@
 #define AP_PASS       F("password")
 
 #define STORE_DATA_TIMEOUT 60000
+#define SYNC_TIME_TIMEOUT 900000 //15 mins
+#define SYNC_TIME_ATTEMPTS 10
 
 #define USE_BOT
 #define USE_BOT_FAST_MENU 

@@ -39,7 +39,24 @@ notify1 - Notify All http code result
 notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
-
+ls - List all stored data
+get - Download stored data
+rem - Remove stored data
+sync - Sync time (if WiFi is on)
+sync3 - Sync time-zone +3 (if WiFi is on)
+cmd - Send command to XYDJ device
+cmdget - Get XYDJ device status
+cmdup27_4 - Up to 27.4V (LiFePO4 25.6V batt)
+cmddw26_0 - Down to 26.0V (LiFePO4 25.6V batt)
+cmdup14_3 - Up to 14.3V (LiFePO4 12.8V batt)
+cmddw12_9 - Down to 12.9V (LiFePO4 12.8V batt)
+cmdup13_3 - Up to 13.3V (ACID 12V batt)
+cmddw12_0 - Down to 12.0V (ACID 12V batt)
+cmdon - Relay On (if possible)
+cmdoff - Relay Off (if possible)
+cmdstart - Start pulling data from XYDJ
+cmdstop - Stop pulling data from XYDJ (Pause)
+cmdop000 - Set relay time in minutes (000-999)
 */
 
 #define BOT_COMMAND_RESTART       F("/restart")
@@ -64,11 +81,13 @@ notify429 - Notify To-many Requests (429)
 #define BOT_COMMAND_REMOVE        F("/rem")
 #define BOT_COMMAND_LIST          F("/ls")
 #define BOT_COMMAND_CMD          F("/cmd")
+#define BOT_COMMAND_SYNC          F("/sync")
 
 
 //Fast Menu
 
 // From .ino file
+const uint32_t &SyncTime();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
@@ -168,19 +187,33 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       value += String(F("[")) + channel.first + F("]") + F("; ");
     }
   }
+  if(GetCommandValue(BOT_COMMAND_SYNC, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    const int &intValue = value.toInt();
+
+    if(filtered.length() > String(BOT_COMMAND_SYNC).length() && intValue >= -12 && intValue <= 14)
+    {
+      _settings.timeZone = intValue;
+      SaveSettings();    
+    }
+    const auto &now = SyncTime();    
+    value = String(F("Synced time: ")) + epochToDateTime(now);
+  }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   else if(GetCommandValue(BOT_COMMAND_CMD, filtered, value))
   {
     BOT_MENU_INFO(F("BOT CMD:"));
     bot->sendTyping(msg.chatID);
 
-    const float &intValue = value.toFloat();
+    const int &intValue = value.toInt();
     String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
     command.toLowerCase();
 
     if(command.startsWith(F("up")) || command.startsWith(F("dw")))
     {
       const String &cmd = command.substring(0, 2);
+      command.replace('_', '.');
       const float &fVal = command.substring(2).toFloat();
       if(fVal > 0 && fVal <= 80.0)
       {
