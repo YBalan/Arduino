@@ -67,7 +67,7 @@ const String GetResetReason(const bool &shortView)
   return GetResetReason(reasonCode, shortView);
 }
 
-const uint32_t GetCurrentTime(const uint8_t &timeZone)
+const uint32_t GetCurrentTime(const int8_t &timeZone)
 {
     // For GMT+1 with an additional hour for daylight saving time
     //configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
@@ -75,10 +75,15 @@ const uint32_t GetCurrentTime(const uint8_t &timeZone)
     configTime(timeZone * 3600, 0, "pool.ntp.org", "time.nist.gov");    
 
     // Wait for time to be set
-    struct tm timeInfo;
+    struct tm timeInfo;    
+    int attempt = 1;
     while (!getLocalTime(&timeInfo)) {
-        Serial.println(F("Waiting for time..."));
-        delay(1000);
+        #ifdef SYNC_TIME_ATTEMPTS
+        if (attempt >= SYNC_TIME_ATTEMPTS) break;
+        #endif    
+        Serial.print(F("Waiting for time...")); Serial.print(F("(")); Serial.print(attempt); Serial.print(F(")")); Serial.println();
+        delay(1000);    
+        attempt++;    
     }
 
     // Get the current time as epoch

@@ -1,0 +1,36 @@
+!!!!!!!!!!!!!!!! - Bot Additional Commands for Admin
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+nstat - Network Statistic
+rssi - WiFi Quality rssi db
+ver - Version Info
+fs - File System Info
+changeconfig - change configuration WiFi, tokens...
+chid - List of registered channels
+notify - Notify saved http code result
+notify0 - Notifications Off
+notify1 - Notify All http code result
+notifynot200 - Notify all http code exclude OK(200)
+notify429 - Notify To-many Requests (429)
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
+ls - List all stored data
+get - Download stored data
+rem - Remove stored data
+sync - Sync time (if WiFi is on)
+sync3 - Sync time-zone +3 (if WiFi is on)
+cmd - Send command to XYDJ device
+cmdget - Get XYDJ device status
+cmdup27_4 - Up to 27.4V (LiFePO4 25.6V batt)
+cmddw26_0 - Down to 26.0V (LiFePO4 25.6V batt)
+cmdup14_3 - Up to 14.3V (LiFePO4 12.8V batt)
+cmddw12_9 - Down to 12.9V (LiFePO4 12.8V batt)
+cmdup13_3 - Up to 13.3V (ACID 12V batt)
+cmddw12_0 - Down to 12.0V (ACID 12V batt)
+cmdon - Relay On (if possible)
+cmdoff - Relay Off (if possible)
+cmdstart - Start pulling data from XYDJ
+cmdstop - Stop pulling data from XYDJ (Pause)
+cmdop000 - Set relay time in minutes (000-999)
