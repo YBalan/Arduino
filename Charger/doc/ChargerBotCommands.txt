@@ -18,6 +18,7 @@ notify429 - Notify To-many Requests (429)
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
 ls - List all stored data
 get - Download stored data
+get0 - Current status
 rem - Remove stored data
 sync - Sync time (if WiFi is on)
 sync3 - Sync time-zone +3 (if WiFi is on)
