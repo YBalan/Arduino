@@ -417,7 +417,7 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 
         value +=
                 fileNameWithoutExtension                                                                                      // fileName without extension
-                + F(" ") + F("(") + CommonHelper::toString(fileInfo.linesCount, 4) + F(")")                                   // + lines count                
+                + F(" ") + F("(") + CommonHelper::toString(fileInfo.linesCount, 4, '0') + F(")")                                   // + lines count                
                 + (showGet ? String(F(" ")) + F("[") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F("]") : String(F("")) )          // /download or /get                
                 + (showRem ? String(F(" ")) + F("[") + BOT_COMMAND_REMOVE + fileNameCmd + F("]") : String(F("")) )            // /remove or /rem                
         ;
