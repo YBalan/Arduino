@@ -5,6 +5,16 @@
 
 namespace CommonHelper
 {
+  const String toString(const int &value, const uint8_t &digits)
+  {
+    char buffer[digits + 1];
+    String format; format = F("%");
+    for(uint8_t i = 0; i < digits; i++) format += F("0");
+    format += F("d");
+    snprintf(buffer, sizeof(buffer), format.c_str(), value);
+    return std::move(String(buffer));
+  }
+
   const String join(const std::set<String> &v, const char &delimiter)
   {
     String res;

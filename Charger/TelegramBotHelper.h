@@ -150,7 +150,8 @@ void HangleBotMessages(FB_msg& msg)
           {            
             for(const auto &r : result)
             {
-              bot->sendMessage(r, msg.chatID);
+              if(!r.isEmpty())
+                bot->sendMessage(r, msg.chatID);
             }
           }          
         }
