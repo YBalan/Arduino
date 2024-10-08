@@ -5,12 +5,10 @@
 
 namespace CommonHelper
 {
-  const String toString(const int &value, const uint8_t &digits)
+  const String toString(const int &value, const uint8_t &digits, const char &symbol = '0')
   {
-    char buffer[digits + 1];
-    String format; format = F("%");
-    for(uint8_t i = 0; i < digits; i++) format += F("0");
-    format += F("d");
+    char buffer[digits + 2];
+    String format = String(F("%")) + symbol + String(digits) + F("d");    
     snprintf(buffer, sizeof(buffer), format.c_str(), value);
     return std::move(String(buffer));
   }
