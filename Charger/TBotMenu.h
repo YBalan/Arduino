@@ -68,14 +68,17 @@ notify429 - Notify To-many Requests (429)
 
 //Fast Menu
 
+// From .ino file
 void PrintNetworkStatistic(String &str, const int& codeFilter);
-const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
-const String GetPMMenuCall(const float &voltage, const String &chatId);
-void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
 const String DeviceReceive();
 
+// internal
+const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
+const String GetPMMenuCall(const float &voltage, const String &chatId);
+void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
+void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages);
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -212,8 +215,92 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT LIST:"));
     bot->sendTyping(msg.chatID);
 
-    const size_t &last = value.toInt();
+    const int &last = value.toInt();
 
+    sendList(last, /*showGet:*/true, /*showRem:*/true, value, messages);
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT REMOVE:"));
+    bot->sendTyping(msg.chatID);
+
+    const int &last = value.toInt();    
+    if(last >= 0 && last < 2024)
+      sendList(last, /*showGet:*/false, /*showRem:*/true, value, messages);
+    else{
+      String filter = value; 
+      if(!filter.isEmpty())
+      {
+        const auto &filesRemoved = ds->removeData(filter);
+        value = (filesRemoved == 1 ? filter : String(filesRemoved)) + F(" ") + F("File(s) removed");
+        sendList(last, /*showGet:*/false, /*showRem:*/true, value, messages);
+      }else
+        value = F("File(s) not found");
+    }
+  }
+  else
+  if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT DOWNLOAD:"));
+    bot->sendTyping(msg.chatID);
+    
+    const int &last = value.toInt();    
+    if(last >= 0 && last < 2024)
+      sendList(last, /*showGet:*/true, /*showRem:*/false, value, messages);
+    else{
+      String filter = value.isEmpty() ? ds->endDate : value;
+      
+      int totalRecordsCount = 0;
+      uint32_t totalSize = 0;
+
+      uint32_t sw = millis();
+      const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
+      BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+
+      if(filesInfo.size() > 0)
+      {
+        filter = String(FILE_PATH) + F("/") + filter;      
+
+        std::vector<String> files;
+        for(const auto& fi : filesInfo)
+          files.push_back(String(FILE_PATH) + F("/") + fi.first);
+
+        // Sort vector in Ascending order using a lambda function as comparator
+        std::sort(files.begin(), files.end(), [](const String& a, const String& b) {
+            return a < b; // Ascending order
+        });     
+        
+        //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
+        String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT; 
+        BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
+
+        if(bot->sendFile(files, totalSize, outerFileName, msg.chatID) != 1)
+        {
+          value = F("Telegram error");
+        }
+        else
+          value.clear();
+      }else
+        value = F("File(s) not found");
+    }
+  }
+  
+
+  if(value.length() > 0 && !noAnswerIfFromMenu)
+      messages.push_back(value);  
+
+  if(messages.size() == 0)
+  {
+    //bot->answer("Use menu", FB_NOTIF); 
+  }
+
+  return std::move(messages);
+}
+
+void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages)
+{
+    BOT_MENU_INFO(F("BOT sendList:"));
     String filter;
     int totalRecordsCount = 0;
     uint32_t totalSize = 0;
@@ -236,122 +323,63 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
           return a > b; // Descending order
       });     
 
-      value.clear();
+      messages.push_back(value); value.clear();
 
       value += String(ds->lastRecord.voltage) + F("V") + F(" ") + F("(") + ds->lastRecord.dateTimeToString() + F(")");      
       messages.push_back(value); value.clear();      
-      value += F("\n");                                                       // NewLine
+      //value += F("\n");                                                       // NewLine
 
       value += ds->startDate + F(" - ") + ds->endDate;      
       messages.push_back(value); value.clear();      
-      value += F("\n");                                                       // NewLine
+      //value += F("\n");                                                       // NewLine
 
       value += String(F("Files: ")) + String(ds->getFilesCount()) + F(" ") + F("Records: ") + String(totalRecordsCount) + F(" ") + F("Total size: ") + String(totalSize) + F(" ") + F("Size Left: ") + String(total - used);
       messages.push_back(value); value.clear();
-      value += F("\n");                                                       // NewLine
+      //value += F("\n");                                                       // NewLine
 
       String endDateCmd = ds->endDate; endDateCmd.replace('-', '_');
 
-      value += String(F("Download All: ")) + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 4);
-      messages.push_back(value); value.clear();
-      value += F("\n");                                                       // NewLine
+      if(showGet){
+        value += String(F("Download")) + F(" Year: ") + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 4);
+        messages.push_back(value); value.clear();
+        //value += F("\n");                                                       // NewLine
 
-      value += String(F("Download Last Month: ")) + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 7);
-      messages.push_back(value); value.clear();
-      value += F("\n");                                                       // NewLine
+        value += String(F("Download")) + F(" Last Month: ") + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 7);
+        messages.push_back(value); value.clear();
+        //value += F("\n");                                                       // NewLine
+      }
 
-      const size_t &num = last > 0 ? min(files.size(), last) : files.size();
+      const int &num = last > 0 ? min((int)files.size(), last) : files.size();
       for(uint8_t idx = 0; idx < num; idx++)
       {
-        const String &fileName = files[idx].substring(0, fileName.length() - FILE_EXT_LEN);
-        if(fileName.startsWith(HEADER_FILE_NAME)) continue;
-        String fileNameCmd = fileName; fileNameCmd.replace('-', '_');
+        const String &fileName = files[idx];
         const auto &fileInfo = filesInfo.at(fileName);
+        const String &fileNameWithoutExtension = fileName.substring(0, fileName.length() - FILE_EXT_LEN);    // fileName without extension
+        if(fileName.startsWith(HEADER_FILE_NAME)) continue;
+        String fileNameCmd = fileNameWithoutExtension; fileNameCmd.replace('-', '_');        
 
         value +=
-                fileName                                                        // fileName without extension
-                + F("(") + fileInfo.linesCount + F(")")                         // + lines count
-                + F(" ")                                                        // delimeter
-                + F("(") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F(")")          // /download or /get
-                + F(" ")                                                        // delimeter
-                + F("(") + BOT_COMMAND_REMOVE + fileNameCmd + F(")")            // /remove or /rem                
+                fileNameWithoutExtension                                                                      // fileName without extension
+                + F("(") + fileInfo.linesCount + F(")")                                                       // + lines count                
+                + (showGet ? String(F(" ")) + F("[") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F("]") : String(F("")) )          // /download or /get                
+                + (showRem ? String(F(" ")) + F("[") + BOT_COMMAND_REMOVE + fileNameCmd + F("]") : String(F("")) )            // /remove or /rem                
         ;
         messages.push_back(value); value.clear();
-        value += F("\n");                                                       // NewLine        
+        //value += F("\n");                                                       // NewLine        
       }
 
-    }else
-      value = F("File(s) not found");
-  }
-  else
-  if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
-  {
-    BOT_MENU_INFO(F("BOT REMOVE:"));
-    bot->sendTyping(msg.chatID);
+      if(showRem){
+        value += String(F("Remove")) + F(" Year: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 4);
+        messages.push_back(value); value.clear();
+        //value += F("\n");                                                       // NewLine
 
-    String filter = value; 
-    if(!filter.isEmpty())
-    {
-      const auto &filesRemoved = ds->removeData(filter);
-      value = (filesRemoved == 1 ? filter : String(filesRemoved)) + F(" ") + F("File(s) removed");
-    }else
-      value = F("File(s) not found");
-  }
-  else
-  if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
-  {
-    BOT_MENU_INFO(F("BOT DOWNLOAD:"));
-    bot->sendTyping(msg.chatID);
-    
-    String filter = value.isEmpty() ? ds->endDate : value;
-    
-    int totalRecordsCount = 0;
-    uint32_t totalSize = 0;
-
-    uint32_t sw = millis();
-    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
-    BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Total size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
-
-    if(filesInfo.size() > 0)
-    {
-      filter = String(FILE_PATH) + F("/") + filter;      
-
-      std::vector<String> files;
-      for(const auto& fi : filesInfo)
-        files.push_back(String(FILE_PATH) + F("/") + fi.first);
-
-      // Sort vector in descending order using a lambda function as comparator
-      std::sort(files.begin(), files.end(), [](const String& a, const String& b) {
-          return a < b; // Ascending order
-      });     
-      
-      //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
-      String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT; 
-      BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
-
-      if(bot->sendFile(files, totalSize, outerFileName, msg.chatID) != 1)
-      {
-        value = F("Telegram error");
+        value += String(F("Remove")) + F(" Last Month: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 7);
+        messages.push_back(value); value.clear();
+        //value += F("\n");                                                       // NewLine
       }
-      else
-        value.clear();
     }else
       value = F("File(s) not found");
-  }
-  
-
-  if(value.length() > 0 && !noAnswerIfFromMenu)
-      messages.push_back(value);  
-
-  if(messages.size() == 0)
-  {
-    //bot->answer("Use menu", FB_NOTIF); 
-  }
-
-  return std::move(messages);
 }
-
-
 
 #endif //USE_BOT
 

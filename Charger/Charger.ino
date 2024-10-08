@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.7")
+  #define VER F("1.8")
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -237,9 +237,9 @@ void loop()
     TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));   
     WiFi.disconnect();
   }
-  
+  static bool saveRequired = false;
   if(XYDJ.available() > 0)
-  { 
+  {     
     digitalWrite(PIN_WIFI_LED_BTN, !digitalRead(PIN_WIFI_LED_BTN));
     const auto &received = XYDJ.readStringUntil('\n');    
 
@@ -257,8 +257,9 @@ void loop()
     }
     else
     {
+      saveRequired = true;
       currentData.readFromXYDJ(received);
-      TRACE("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+      INFO("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
     }
   }
   
@@ -281,11 +282,18 @@ void loop()
   {    
     storeDataTicks = currentTicks;
 
+    INFO(F("Is Save Data Required: "), saveRequired ? F("true") : F("false"));
     INFO(F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
 
-    //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
-    StoreData(ticks);    
-    currentData.setResetReason(F("Normal"));    
+    if(saveRequired)
+    {
+      //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+      StoreData(ticks);    
+      currentData.setResetReason(F("Normal"));          
+    }
+    else
+      currentData.setResetReason(F("Paused")); 
+    saveRequired = false;
 
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);
@@ -316,7 +324,7 @@ void loop()
 
 void StoreData(const uint32_t &ticks)
 {
-  TRACE(F("\t\tStore currentData..."));
+  INFO(F("\t\tStore currentData..."));
   digitalWrite(PIN_WIFI_LED_BTN, HIGH);
   ds->appendData(currentData, (int)(ticks / 1000));
   ds->TraceToSerial();   
@@ -479,11 +487,13 @@ void SendCommand(const String &command)
 const String DeviceReceive()
 {
   INFO(F("Waiting for device..."));  
+  String result;
   
-  if(XYDJ.available() > 0)
+  delay(100);
+  while(XYDJ.available() > 0)
   {     
-    return XYDJ.readStringUntil('\n');
+     result += XYDJ.readStringUntil('\n') + '\n';
   }  
-  return String();
+  return std::move(result);
 }
 
