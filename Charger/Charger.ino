@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.13")
+  #define VER F("1.14")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -158,7 +158,7 @@ void setup()
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
     digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-    wifiOps->TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
     if(_settings.resetFlag == 1985)
     {
       _settings.resetFlag = 200;
@@ -197,14 +197,16 @@ void InitBot()
 {
   #ifdef USE_BOT  
   LoadChannelIDs();
-  bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
-  _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
-  _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
-  bot->attach(HangleBotMessages);
-  bot->setTextMode(FB_TEXT); 
-  //bot->setPeriod(_settings.alarmsUpdateTimeout);
-  bot->setLimit(1);
-  bot->skipUpdates();
+  if(WiFi.status() == WL_CONNECTED){
+    bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
+    _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
+    _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
+    bot->attach(HangleBotMessages);
+    bot->setTextMode(FB_TEXT); 
+    //bot->setPeriod(_settings.alarmsUpdateTimeout);
+    bot->setLimit(1);
+    bot->skipUpdates();
+  }
   #endif
 }
 
@@ -218,7 +220,7 @@ void loop()
   if(wifiBtn.isPressed())
   {
     TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
-    wifiOps->TryToConnectOrOpenConfigPortal();
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT);
     const auto &now = SyncTime();   
     ds->setDateTime(now); 
     InitBot();
@@ -337,9 +339,12 @@ void loop()
 
 const uint32_t SyncTime()
 {
-  const auto &now = GetCurrentTime(_settings.timeZone);
-  TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
-  return now;
+  if(WiFi.status() == WL_CONNECTED){
+    const auto &now = GetCurrentTime(_settings.timeZone);
+    TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
+    return now;
+  }
+  return 0;
 }
 
 void StoreData(const uint32_t &storeTicks)
@@ -422,7 +427,7 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
     {  
       #ifdef ESP32     
       WiFiStatusLED();
-      TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
+      //TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
       if(WiFi.status() == WL_CONNECT_FAILED  ||  WiFi.status() == WL_CONNECTION_LOST)
       {        
         TRACE(F("\t\t\t\t\t"), F("RECONNECT"));
