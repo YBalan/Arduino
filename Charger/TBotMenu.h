@@ -75,21 +75,21 @@ cmdop000 - Set relay time in minutes (000-999)
 
 //Notify
 #ifdef USE_NOTIFY
-#define BOT_COMMAND_NOTIFY F("/notify")
+#define BOT_COMMAND_NOTIFY        F("/notify")
 #endif
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
 #define BOT_COMMAND_DOWNLOAD      F("/get")
 #define BOT_COMMAND_REMOVE        F("/rem")
 #define BOT_COMMAND_LIST          F("/ls")
-#define BOT_COMMAND_CMD          F("/cmd")
+#define BOT_COMMAND_CMD           F("/cmd")
 #define BOT_COMMAND_SYNC          F("/sync")
 
 
 //Fast Menu
 
 // From .ino file
-const uint32_t &SyncTime();
+const uint32_t SyncTime();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
@@ -200,7 +200,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       _settings.timeZone = intValue;
       SaveSettings();    
     }
-    const auto &now = SyncTime();    
+    const auto &now = SyncTime();
+    ds->setDateTime(now); 
     value = String(F("Synced time: ")) + epochToDateTime(now);
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -262,7 +263,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
 
     const int &last = value.toInt();    
-    if(last >= 0 && last < 2024){
+    if(last >= 0 && last < 2024 && !value.endsWith(FILE_EXT)){
       value.clear();
       sendList(last, /*showGet:*/false, /*showRem:*/true, value, messages);
     }
@@ -272,7 +273,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       {
         const auto &filesRemoved = ds->removeData(filter);
         value = (filesRemoved == 1 ? filter : String(filesRemoved)) + F(" ") + F("File(s) removed");
-        sendList(last, /*showGet:*/false, /*showRem:*/true, value, messages);
+        sendList(last, /*showGet:*/true, /*showRem:*/false, value, messages);
       }else
         value = F("File(s) not found");
     }
@@ -350,9 +351,16 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     if(!value.isEmpty()){
       messages.push_back(value); value.clear();}
 
-    value += String(ds->lastRecord.voltage, 1) + F("V") 
-          + F(" ") + F("[") + (ds->lastRecord.relayOn ? F("On") : F("Off")) + F("]")
-          + F("\n") + F("(") + ds->lastRecord.dateTimeToString() + F(")")
+    value += String(ds->getVoltage(), 1) + F("V") 
+          + F(" ") + F("[") + (ds->getRelayOn() ? F("On") : F("Off")) + F("]")
+          + F("\n") + F("(") + ds->getCurrentDateTimeStr() + F(")")
+    ;      
+    messages.push_back(value); value.clear();      
+    //value += F("\n");                                                       // NewLine
+
+    value += String(F("On")) + F(" -> ") + ds->getLastRelayOnStatus()
+            + F("\n")
+            + F("Off") + F(" -> ") + ds->getLastRelayOffStatus()
     ;      
     messages.push_back(value); value.clear();      
     //value += F("\n");                                                       // NewLine
@@ -361,7 +369,7 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     messages.push_back(value); value.clear();      
     //value += F("\n");                                                       // NewLine
 
-    value += String(F("Files: ")) + String(ds->getFilesCount()) 
+    value += String(F("Days: ")) + String(ds->getFilesCount()) 
           + (totalRecordsCount > 0 ? String(F("\n")) + F("Recs: ") + String(totalRecordsCount) : String(F("")))
           + (totalSize > 0 ? String(F("\n")) + F("Size: ") + String(totalSize) : String(F("")))
           + F("\n") + F("Left: ") + String(total - used);
@@ -397,11 +405,16 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
       String endDateCmd = ds->endDate; endDateCmd.replace('-', '_');
 
       if(showGet){
-        value += String(F("Download")) + F(" Year: ") + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 4);
+        const String &yearCmd = endDateCmd.substring(0, 4);
+        const String &monthCmd = endDateCmd.substring(0, 7);
+        const int &yearRecords = ds->getRecordsCount(ds->endDate.substring(0, 4));
+        const int &monthRecords = ds->getRecordsCount(ds->endDate.substring(0, 7));
+
+        value += String(F("Year: ")) + F("(") + yearRecords + F(")") + F(" ") + F("[") + BOT_COMMAND_DOWNLOAD + yearCmd + F("]");
         messages.push_back(value); value.clear();
         //value += F("\n");                                                       // NewLine
 
-        value += String(F("Download")) + F(" Last Month: ") + BOT_COMMAND_DOWNLOAD + endDateCmd.substring(0, 7);
+        value += String(F("Month: ")) + F("(") + monthRecords + F(")") + F(" ") +  F("[") + BOT_COMMAND_DOWNLOAD + monthCmd + F("]");
         messages.push_back(value); value.clear();
         //value += F("\n");                                                       // NewLine
       }
@@ -417,7 +430,7 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 
         value +=
                 fileNameWithoutExtension                                                                                      // fileName without extension
-                + F(" ") + F("(") + CommonHelper::toString(fileInfo.linesCount, 4, '0') + F(")")                                   // + lines count                
+                + F(" ") + F("(") + CommonHelper::toString(fileInfo.linesCount, 4, '0') + F(")")                              // + lines count                
                 + (showGet ? String(F(" ")) + F("[") + BOT_COMMAND_DOWNLOAD + fileNameCmd + F("]") : String(F("")) )          // /download or /get                
                 + (showRem ? String(F(" ")) + F("[") + BOT_COMMAND_REMOVE + fileNameCmd + F("]") : String(F("")) )            // /remove or /rem                
         ;
@@ -426,11 +439,11 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
       }
 
       if(showRem){
-        value += String(F("Remove")) + F(" Year: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 4);
+        value += String(F("Remove")) + F(" ") + F("Year: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 4);
         messages.push_back(value); value.clear();
         //value += F("\n");                                                       // NewLine
 
-        value += String(F("Remove")) + F(" Last Month: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 7);
+        value += String(F("Remove")) + F(" ") + F("Month: ") + BOT_COMMAND_REMOVE + endDateCmd.substring(0, 7);
         messages.push_back(value); value.clear();
         //value += F("\n");                                                       // NewLine
       }

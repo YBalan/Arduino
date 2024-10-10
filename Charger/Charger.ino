@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.11")
+  #define VER F("1.13")
 #endif
 
 //#define RELEASE
@@ -112,7 +112,6 @@ Button wifiBtn(PIN_WIFI_BTN);
 
 uint32_t storeDataTicks = 0;
 uint32_t syncTimeTicks = 0;
-Data currentData;
 
 void setup() 
 {
@@ -135,14 +134,7 @@ void setup()
 
   LoadSettings();
   LoadSettingsExt();  
-  //_settings.reset();     
-  
-  storeDataTicks = millis();
-  syncTimeTicks = millis();
-  
-  currentData = ds->begin();
-
-  currentData.setResetReason(GetResetReason(/*shortView:*/true));
+  //_settings.reset();
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -157,7 +149,11 @@ void setup()
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
   ;  
+
+  storeDataTicks = millis();
+  syncTimeTicks = millis();
   
+  uint32_t now = 0;
   if(IsWiFiOn())
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
@@ -169,10 +165,14 @@ void setup()
       SaveSettings();
     }
 
-    SyncTime();
+    now = SyncTime();
     InitBot();
-  }  
+  }    
 
+  ds->begin();  
+  ds->setResetReason(GetResetReason(/*shortView:*/true));
+
+  if(now > 0) ds->setDateTime(now);
   SendCommand(F("start"));
 }
 
@@ -219,7 +219,8 @@ void loop()
   {
     TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
     wifiOps->TryToConnectOrOpenConfigPortal();
-    SyncTime();   
+    const auto &now = SyncTime();   
+    ds->setDateTime(now); 
     InitBot();
   }
 
@@ -253,8 +254,10 @@ void loop()
     else
     {
       saveRequired = true;
-      currentData.readFromXYDJ(received);
-      INFO("      XYDJ = ", F("'"), currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+      //ds->currentData.readFromXYDJ(received);
+      ds->readFromXYDJ(received);
+      //INFO("      XYDJ = ", F("'"), ds->currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+      INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
     }
   }
   
@@ -269,8 +272,10 @@ void loop()
     }    
   }
 
-  currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+  //ds->currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+  ds->setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
 
+  currentTicks = millis();
   const uint32_t &storeTicks = currentTicks - storeDataTicks;  
   //TRACE(F("\t\t\t\t\t"), storeTicks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
   if(storeDataTicks > 0 && storeTicks >= _settings.storeDataTimeout)
@@ -281,13 +286,15 @@ void loop()
     INFO(F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
 
     if(saveRequired)
-    {
-      //currentData.setWiFiStatus(statusMsg.length() > 6 ? String(httpCode) : statusMsg);
+    {      
       StoreData(storeTicks);    
-      currentData.setResetReason(F("Normal"));          
+      //ds->currentData.setResetReason(F("Normal"));
+      ds->setResetReason(F("Normal"));
     }
-    else
-      currentData.setResetReason(F("Paused")); 
+    else{
+      //ds->currentData.setResetReason(F("Paused")); 
+      ds->setResetReason(F("Paused")); 
+    }
     saveRequired = false;
 
     String nstatTrace;
@@ -295,13 +302,14 @@ void loop()
     TRACE(nstatTrace);
   }
 
-  const uint32_t &syncTicks = currentTicks - syncTimeTicks;
-  if(syncTimeTicks > 0 && syncTicks >= SYNC_TIME_TIMEOUT)
+  if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
   {
-    syncTimeTicks = currentTicks;
-    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
+    const uint32_t &syncTicks = currentTicks - syncTimeTicks;
+    if(syncTimeTicks > 0 && syncTicks >= SYNC_TIME_TIMEOUT)
     {
-      SyncTime();
+      syncTimeTicks = currentTicks;      
+      const auto &now = SyncTime();      
+      ds->setDateTime(now); 
     }
   }
 
@@ -327,22 +335,19 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-const uint32_t &SyncTime()
+const uint32_t SyncTime()
 {
   const auto &now = GetCurrentTime(_settings.timeZone);
   TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
-  currentData.setDateTime(now); 
-  ds->lastRecord.setDateTime(now);
-
-  return ds->lastRecord.getDateTime();
+  return now;
 }
 
 void StoreData(const uint32_t &storeTicks)
 {
   INFO(F("\t\t\t\t\t"), F("Store currentData..."));
   digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-  ds->appendData(currentData, (int)(storeTicks / 1000));
-  ds->TraceToSerial();   
+  ds->appendData((int)(storeTicks / 1000));
+  ds->traceToSerial();   
   String fsInfo;
   PrintFSInfo(fsInfo); 
   TRACE(fsInfo);
@@ -441,7 +446,7 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 2) // Show currentData
   { 
-    ds->TraceToSerial();
+    ds->traceToSerial();
   }
 
   if(debugCommandFromSerial == 3) // Extract all
@@ -468,8 +473,10 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 5) // Store currentData
   { 
-    currentData.setResetReason(F("Test"));  
-    currentData.setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
+    //ds->currentData.setResetReason(F("Test"));  
+    //ds->currentData.setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
+    ds->setResetReason(F("Test"));  
+    ds->setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
     StoreData(millis() - storeDataTicks);      
   }
 
