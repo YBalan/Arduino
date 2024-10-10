@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.13")
+  #define VER F("1.15")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -135,6 +135,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
+  //loadMonitorChats(MONITOR_CHATS_FILE_NAME);
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -148,17 +149,14 @@ void setup()
   .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
-  ;  
-
-  storeDataTicks = millis();
-  syncTimeTicks = millis();
+  ;    
   
   uint32_t now = 0;
   if(IsWiFiOn())
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
     digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-    wifiOps->TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
     if(_settings.resetFlag == 1985)
     {
       _settings.resetFlag = 200;
@@ -174,6 +172,9 @@ void setup()
 
   if(now > 0) ds->setDateTime(now);
   SendCommand(F("start"));
+
+  storeDataTicks = millis();
+  syncTimeTicks = millis();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -197,14 +198,16 @@ void InitBot()
 {
   #ifdef USE_BOT  
   LoadChannelIDs();
-  bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
-  _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
-  _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
-  bot->attach(HangleBotMessages);
-  bot->setTextMode(FB_TEXT); 
-  //bot->setPeriod(_settings.alarmsUpdateTimeout);
-  bot->setLimit(1);
-  bot->skipUpdates();
+  if(WiFi.status() == WL_CONNECTED){
+    bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
+    _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
+    _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
+    bot->attach(HangleBotMessages);
+    bot->setTextMode(FB_TEXT); 
+    //bot->setPeriod(_settings.alarmsUpdateTimeout);
+    bot->setLimit(1);
+    bot->skipUpdates();
+  }
   #endif
 }
 
@@ -218,7 +221,7 @@ void loop()
   if(wifiBtn.isPressed())
   {
     TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
-    wifiOps->TryToConnectOrOpenConfigPortal();
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT);
     const auto &now = SyncTime();   
     ds->setDateTime(now); 
     InitBot();
@@ -253,11 +256,12 @@ void loop()
     }
     else
     {
-      saveRequired = true;
-      //ds->currentData.readFromXYDJ(received);
-      ds->readFromXYDJ(received);
-      //INFO("      XYDJ = ", F("'"), ds->currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
-      INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+      saveRequired = true;      
+      const bool isRelayStatusChanged = ds->readFromXYDJ(received);            
+      INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
+      if(isRelayStatusChanged){
+        sendUpdateMonitorAllMenu(_settings.DeviceName);
+      }
     }
   }
   
@@ -296,6 +300,8 @@ void loop()
       ds->setResetReason(F("Paused")); 
     }
     saveRequired = false;
+
+    sendUpdateMonitorAllMenu(_settings.DeviceName);
 
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);
@@ -337,9 +343,12 @@ void loop()
 
 const uint32_t SyncTime()
 {
-  const auto &now = GetCurrentTime(_settings.timeZone);
-  TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
-  return now;
+  if(WiFi.status() == WL_CONNECTED){
+    const auto &now = GetCurrentTime(_settings.timeZone);
+    TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
+    return now;
+  }
+  return 0;
 }
 
 void StoreData(const uint32_t &storeTicks)
@@ -422,7 +431,7 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
     {  
       #ifdef ESP32     
       WiFiStatusLED();
-      TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
+      //TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
       if(WiFi.status() == WL_CONNECT_FAILED  ||  WiFi.status() == WL_CONNECTION_LOST)
       {        
         TRACE(F("\t\t\t\t\t"), F("RECONNECT"));

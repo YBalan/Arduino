@@ -7,6 +7,8 @@
 #include "CommonHelper.h"
 #include "Settings.h"
 
+#define MONITOR_CHATS_FILE_NAME F("/monitorChats")
+
 #ifdef USE_BOT
 
 #ifdef ENABLE_INFO_BOT_MENU
@@ -59,6 +61,8 @@ cmdoff - Relay Off (if possible)
 cmdstart - Start pulling data from XYDJ
 cmdstop - Stop pulling data from XYDJ (Pause)
 cmdop000 - Set relay time in minutes (000-999)
+name - Set/Get Device Name
+monitor - Show updatable monitor menu
 */
 
 #define BOT_COMMAND_RESTART       F("/restart")
@@ -84,7 +88,8 @@ cmdop000 - Set relay time in minutes (000-999)
 #define BOT_COMMAND_LIST          F("/ls")
 #define BOT_COMMAND_CMD           F("/cmd")
 #define BOT_COMMAND_SYNC          F("/sync")
-
+#define BOT_COMMAND_NAME          F("/name")
+#define BOT_COMMAND_MONITOR       F("/monitor")
 
 //Fast Menu
 
@@ -102,6 +107,15 @@ void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage,
 void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages);
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalSize = 0);
 
+// Monitor
+struct PMChatInfo { int32_t msgId = -1; float alarmValue = 0.0; float currentValue = 0.0; };
+static std::map<String, PMChatInfo> pmChatIds;
+void loadMonitorChats(const String &fileName);
+void saveMonitorChats(const String &fileName);
+void sendUpdateMonitorAllMenu(String &deviceName);
+const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId);
+
+
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
   std::vector<String> messages;    
@@ -118,9 +132,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    bot->sendTyping(msg.chatID);    
-
-    
+    bot->sendTyping(msg.chatID);   
     
   } else
   #ifdef USE_NOTIFY
@@ -181,7 +193,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_CHID, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT Channels:"));
+    BOT_MENU_INFO(F("BOT "), F("Channels:"));
     value.clear();
     value = String(F("BOT Channels:")) + F(" ") + String(_botSettings.toStore.registeredChannelIDs.size()) + F(" -> ");
     for(const auto &channel : _botSettings.toStore.registeredChannelIDs)  
@@ -205,9 +217,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(F("Synced time: ")) + epochToDateTime(now);
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  else if(GetCommandValue(BOT_COMMAND_NAME, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("NAME:"));
+    bot->sendTyping(msg.chatID);
+
+    if(!value.isEmpty() && value.length() < MAX_DEVICE_NAME_LENGTH){
+      strcpy(_settings.DeviceName, value.c_str());
+      SaveSettings();
+    }
+    value = _settings.DeviceName;
+  }
+  else if(GetCommandValue(BOT_COMMAND_MONITOR, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("MONITOR:"));
+    bot->sendTyping(msg.chatID);
+
+    #ifdef DEBUG
+    //loadMonitorChats(MONITOR_CHATS_FILE_NAME);
+    #endif
+
+    auto &chatInfo = pmChatIds[msg.chatID];
+    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, -1);
+    if(msgId != -1){
+      chatInfo.msgId = msgId;
+      //saveMonitorChats(MONITOR_CHATS_FILE_NAME);
+    }
+
+    value.clear();
+  }
   else if(GetCommandValue(BOT_COMMAND_CMD, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT CMD:"));
+    BOT_MENU_INFO(F("BOT "), F("CMD:"));
     bot->sendTyping(msg.chatID);
 
     const int &intValue = value.toInt();
@@ -225,7 +266,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       }else
       {
         command.clear();      
-        value = String(F("'")) + value + F("'") + F(" ") + F(" Wrong command");
+        value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
       }
     }
 
@@ -249,7 +290,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   else 
   if(GetCommandValue(BOT_COMMAND_LIST, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT LIST:"));
+    BOT_MENU_INFO(F("BOT "), F("LIST:"));
     bot->sendTyping(msg.chatID);
 
     const int &last = value.toInt();
@@ -259,7 +300,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   else
   if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT REMOVE:"));
+    BOT_MENU_INFO(F("BOT"), F("REMOVE:"));
     bot->sendTyping(msg.chatID);
 
     const int &last = value.toInt();    
@@ -281,7 +322,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   else
   if(GetCommandValue(BOT_COMMAND_DOWNLOAD, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT DOWNLOAD:"));
+    BOT_MENU_INFO(F("BOT "), F("DOWNLOAD:"));
     bot->sendTyping(msg.chatID);
     
     const int &last = value.toInt(); 
@@ -343,8 +384,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
-void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalSize)
-{  
+void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalSize){  
     const auto &total = SPIFFS.totalBytes();
     const auto &used = SPIFFS.usedBytes();
 
@@ -377,9 +417,8 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     //value += F("\n");                                                       // NewLine
 }
 
-void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages)
-{
-    BOT_MENU_INFO(F("BOT sendList:"));       
+void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages){
+    BOT_MENU_INFO(F("BOT "), F("sendList:"));       
 
     String filter;
     int totalRecordsCount = 0;
@@ -452,6 +491,124 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
       value = F("File(s) not found");
       messages.push_back(value);
     }
+}
+
+const String getMonitorMenu(){
+  String menu = String(ds->getVoltage(), 1) + F("V") 
+                + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️"))
+                + F("\n") + ds->getLastRecordDateTimeStr()
+                + F("\n") + F("On") + F(" -> ") + ds->getLastRelayOnStatus()
+                + F("\n") + F("Off") + F(" -> ") + ds->getLastRelayOffStatus()                
+      ;
+  BOT_MENU_TRACE(menu);
+  return std::move(menu);
+}
+
+const String getMonitorMenuCallback(){
+  String call = String(BOT_COMMAND_MONITOR) 
+              + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )
+              + F(",") + BOT_COMMAND_DOWNLOAD
+              + F(",") + BOT_COMMAND_CMD + F("get")
+              + F(",") + BOT_COMMAND_CMD + F("get")
+      ;
+  BOT_MENU_TRACE(call);
+  return std::move(call);
+}
+
+const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId){
+  const String &menu = getMonitorMenu();
+  const String &call = getMonitorMenuCallback();
+  int32_t resMsgId = -1;
+
+  if(messageId == -1){
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + deviceName, menu, call, chatId);
+    resMsgId = bot->lastBotMsg(); 
+  }
+  else{
+    bot->editMenuCallback(messageId, menu, call, chatId);    
+  }
+  return resMsgId;
+}
+
+void sendUpdateMonitorAllMenu(const String &deviceName){
+  for(const auto &[key, value] : pmChatIds){
+    sendUpdateMonitorMenu(deviceName, key, value.msgId);
+  }
+}
+
+void saveMonitorChats(const String &fileName){
+  BOT_MENU_TRACE(F("saveMonitorChats"));
+  File file = SPIFFS.open(fileName.c_str(), "w");
+  //CommonHelper::saveMap(file, pmChatIds);  
+  
+  auto &map = pmChatIds;
+  if (file) { 
+    // Save the size of the map
+    int mapSize = map.size();
+    BOT_MENU_TRACE(F("mapSize: "), mapSize);
+    file.write((const uint8_t*)(&mapSize), sizeof(mapSize));
+
+    // Save each key-value pair
+    for (const auto& [key, value] : map) {
+        // Save the key
+        String keyStr = key + '\n';   
+        file.write((const uint8_t*)(key.c_str()), keyStr.length());
+
+        // Save the struct (value)
+        file.write((const uint8_t*)(&value), sizeof(value));   
+    }
+  }
+
+  file.close();
+
+  #ifdef DEBUG
+  file = SPIFFS.open(fileName.c_str(), "r");  
+  BOT_MENU_INFO(file.readString());
+  file.close();
+  #endif
+}
+
+void loadMonitorChats(const String &fileName){
+  BOT_MENU_TRACE(F("loadMonitorChats"));
+
+  #ifdef DEBUG
+  {
+    File file = SPIFFS.open(fileName.c_str(), "r"); 
+    file.seek(0);
+    BOT_MENU_INFO(file.readString());
+    file.close();
+  }
+  #endif
+
+  File file = SPIFFS.open(fileName.c_str(), "r");
+  //CommonHelper::loadMap(file, pmChatIds);
+
+  if (file) {        
+    int mapSize = 0;
+    file.read((uint8_t*)(&mapSize), sizeof(mapSize));
+
+    BOT_MENU_TRACE(F("mapSize: "), mapSize);
+    auto &map = pmChatIds;
+    map.clear();  // Clear the map before loading new data
+
+    if(mapSize < 100) {
+      for (int i = 0; i < mapSize; ++i) {
+        if(file.available()){
+          // Load the key
+          const String &key = file.readStringUntil('\n');
+
+          // Load the struct (value)
+          PMChatInfo value;
+          file.read((uint8_t*)(&value), sizeof(value));       
+
+          // Insert into map
+          map[key] = value;
+        }
+      }
+    }
+  }
+    
+  file.close();
 }
 
 #endif //USE_BOT
