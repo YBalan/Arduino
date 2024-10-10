@@ -19,6 +19,7 @@
 
 #define MAX_BASE_URI_LENGTH 50
 #define MAX_CHAT_ID_LENGTH  20
+#define MAX_DEVICE_NAME_LENGTH 20
 
 namespace UAMap
 {
@@ -35,9 +36,12 @@ namespace UAMap
     int8_t timeZone = 3;
     uint32_t storeDataTimeout = STORE_DATA_TIMEOUT;
 
+    char DeviceName[MAX_DEVICE_NAME_LENGTH];
+
     void init()
     {      
       memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
+      memset(DeviceName, 0, MAX_DEVICE_NAME_LENGTH);
       resetFlag = 200;
       notifyHttpCode = 0;      
       timeZone = 3;

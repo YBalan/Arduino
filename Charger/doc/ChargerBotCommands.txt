@@ -35,3 +35,5 @@ cmdoff - Relay Off (if possible)
 cmdstart - Start pulling data from XYDJ
 cmdstop - Stop pulling data from XYDJ (Pause)
 cmdop000 - Set relay time in minutes (000-999)
+name - Set/Get Device Name
+monitor - Show updatable monitor menu

@@ -5,6 +5,56 @@
 
 namespace CommonHelper
 {
+
+  template <typename V>
+  const bool saveMap(File &file, const std::map<String, V> &map) {
+    if (!file) {        
+        return false;
+    }
+
+    // Save the size of the map
+    int mapSize = map.size();
+    file.write((const uint8_t*)(&mapSize), sizeof(mapSize));
+
+    // Save each key-value pair
+    for (const auto& [key, value] : map) {
+        // Save the key
+        String keyStr = key + '\n';   
+        file.write((const uint8_t*)(key.c_str()), keyStr.length());
+
+        // Save the struct (value)
+        file.write((const uint8_t*)(&value), sizeof(value));   
+    }
+
+    return true;
+  }
+
+  template <typename V>
+  const bool loadMap(File &file, std::map<String, V> &map) {
+    if (!file) {        
+        return false;
+    }
+
+    size_t mapSize;
+    file.read(reinterpret_cast<uint8_t*>(&mapSize), sizeof(mapSize));
+
+    map.clear();  // Clear the map before loading new data
+
+    for (size_t i = 0; i < mapSize; ++i) {
+        // Load the key
+        const String &key = file.readStringUntil('\n');
+
+        // Load the struct (value)
+        V value;
+        file.read(reinterpret_cast<uint8_t*>(&value), sizeof(value));       
+
+        // Insert into map
+        map[key] = value;
+    }
+
+    return true;
+  }
+
   const String toString(const int &value, const uint8_t &digits, const char &symbol = '0')
   {
     char buffer[digits + 2];

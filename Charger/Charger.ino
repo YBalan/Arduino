@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.14")
+  #define VER F("1.15")
 #endif
 
 //#define RELEASE
@@ -135,6 +135,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
+  //loadMonitorChats(MONITOR_CHATS_FILE_NAME);
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -148,10 +149,7 @@ void setup()
   .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
-  ;  
-
-  storeDataTicks = millis();
-  syncTimeTicks = millis();
+  ;    
   
   uint32_t now = 0;
   if(IsWiFiOn())
@@ -174,6 +172,9 @@ void setup()
 
   if(now > 0) ds->setDateTime(now);
   SendCommand(F("start"));
+
+  storeDataTicks = millis();
+  syncTimeTicks = millis();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -255,11 +256,12 @@ void loop()
     }
     else
     {
-      saveRequired = true;
-      //ds->currentData.readFromXYDJ(received);
-      ds->readFromXYDJ(received);
-      //INFO("      XYDJ = ", F("'"), ds->currentData.writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
-      INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);    
+      saveRequired = true;      
+      const bool isRelayStatusChanged = ds->readFromXYDJ(received);            
+      INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
+      if(isRelayStatusChanged){
+        sendUpdateMonitorAllMenu(_settings.DeviceName);
+      }
     }
   }
   
@@ -298,6 +300,8 @@ void loop()
       ds->setResetReason(F("Paused")); 
     }
     saveRequired = false;
+
+    sendUpdateMonitorAllMenu(_settings.DeviceName);
 
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);

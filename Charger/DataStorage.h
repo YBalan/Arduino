@@ -51,6 +51,7 @@ typedef std::map<String, FileInfo> FilesInfo;
 
 #define RELAY_FILE_NAME            F("relayStatus")
 #define RELAY_FORMAT               "%s,%.1f,%03d:%02d:%02d"
+#define RELAY_FORMAT_EXT           "[%s] %.1fV (%03dh:%02dm:%02ds)"
 #define RELAY_FORMAT_SCANF         "%d-%d-%d %d:%d:%d,%f,%d:%d:%d"
 
 struct Data {
@@ -230,16 +231,16 @@ struct RelayStatus{
       voltage = data.voltage;
   }
 
-  const String writeToCsv(size_t &realDataSize) const {        
+  const String writeToCsv(size_t &realDataSize, const bool &extended = false) const {        
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);        
-        snprintf(buffer, sizeof(buffer), RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
+        snprintf(buffer, sizeof(buffer), extended ? RELAY_FORMAT_EXT : RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
         auto res = String(buffer);
         realDataSize = res.length();        
         return std::move(res);
   }
 
-   const String writeToCsv() const { size_t realDataSize = 0; return writeToCsv(realDataSize); }
+   const String writeToCsv(const bool &extended = false) const { size_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
 
   void readFromCsv(const String& str) {
         DS_TRACE(F("readFromCsv"));        
@@ -309,7 +310,7 @@ public:
     void setWiFiStatus(const String &wifistatus) { currentData.setWiFiStatus(wifistatus); }
     const String &getWiFiStatus() const { return currentData.getWiFiStatus(); }
 
-    void readFromXYDJ(const String &str) {      
+    const bool readFromXYDJ(const String &str) {      
       Data prevData = currentData;
       currentData.readFromXYDJ(str); 
       isRelayStatusChanged = prevData.relayOn != currentData.relayOn;
@@ -321,7 +322,8 @@ public:
           lastRelayOn.set(currentData);
         }  
         writeRelayStatus();
-      }      
+      }
+      return isRelayStatusChanged;
     }
 
     void readFromCsv(const String& str) { currentData.readFromCsv(str, _shortRecord); }
@@ -334,8 +336,8 @@ public:
     const String getCurrentDateTimeStr() const { return currentData.dateTimeToString(); }
     const String getLastRecordDateTimeStr() const { return lastRecord.dateTimeToString(); }   
 
-    const String getLastRelayOnStatus() const { return lastRelayOn.writeToCsv(); }
-    const String getLastRelayOffStatus() const { return lastRelayOff.writeToCsv(); }
+    const String getLastRelayOnStatus() const { return lastRelayOn.writeToCsv(/*extended:*/true); }
+    const String getLastRelayOffStatus() const { return lastRelayOff.writeToCsv(/*extended:*/true); }
 
     const int &getFilesCount() { return filesCount; }
 
