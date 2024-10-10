@@ -20,7 +20,7 @@
 #define DS_TRACE(...) {}
 #endif
 
-struct FileInfo { size_t size; int linesCount; };
+struct FileInfo { size_t size = 0; int linesCount = 0; };
 typedef std::map<String, FileInfo> FilesInfo;
 
 #define fileSystem SPIFFS // LittleFS
@@ -41,10 +41,17 @@ typedef std::map<String, FileInfo> FilesInfo;
 
 #define HEADER_FILE_NAME    F("0000header")
 #define RECORD_HEADER       String(F("DateTime"))+F(",")+F("Voltage")+F(",")+F("RelayOnOff")+F(",")+F("RelayTime")+F(",")+F("Temperature")+F(",")+F("Num")+F(",")+F("ESP")+F(",")+F("R1")+F(",")+F("WiFi")+F(",")+F("R2")
-#define RECORD_FORMAT       "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%04d,%s,%01d,%s,%01d"
-#define RECORD_FORMAT_SCANF "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%d,%s,%d,%s,%d"
+#define RECORD_FORMAT               "%s,%.1f,%d,%03d:%02d:%02d,%.1f,%04d,%s,%01d,%s,%01d"
+#define RECORD_FORMAT_SHORT         "%s,%.1f,%d"
 
-#define EXCEL_DATE_FORMAT F("%Y-%m-%d %H:%M:%S")
+#define RECORD_FORMAT_SCANF        "%d-%d-%d %d:%d:%d,%f,%d,%d:%d:%d,%f,%d,%s,%d,%s,%d"
+#define RECORD_FORMAT_SCANF_SHORT  "%d-%d-%d %d:%d:%d,%f,%d"
+
+#define EXCEL_DATE_FORMAT           F("%Y-%m-%d %H:%M:%S")
+
+#define RELAY_FILE_NAME            F("relayStatus")
+#define RELAY_FORMAT               "%s,%.1f,%03d:%02d:%02d"
+#define RELAY_FORMAT_SCANF         "%d-%d-%d %d:%d:%d,%f,%d:%d:%d"
 
 struct Data {
   private:
@@ -52,15 +59,15 @@ struct Data {
     String resetReason;
     String wifiStatus;
   public:
-    float voltage;
-    bool relayOn;
-    uint16_t relayOnHH;
-    uint8_t relayOnMM;
-    uint8_t relayOnSS;
+    float voltage = 0.0;
+    bool relayOn = false;
+    uint16_t relayOnHH = 0;
+    uint8_t relayOnMM = 0;
+    uint8_t relayOnSS = 0;
     float temperature = 22.1; 
-    uint16_t reserv1; 
-    uint16_t reserv2;
-    uint16_t count; 
+    uint16_t reserv1 = 0; 
+    uint16_t reserv2 = 0;
+    uint16_t count = 0; 
     static constexpr size_t recordLength = MAX_RECORD_LENGTH;
 
     // Default constructor
@@ -82,7 +89,7 @@ struct Data {
           count(other.count)
     {
         // Optionally, you can add some logging or custom logic here.
-        DS_TRACE(F("Data copy ctor"));
+        //DS_TRACE(F("Data copy ctor"));
     }
 
     // Assignment operator
@@ -113,7 +120,7 @@ struct Data {
     }
 
     const String dateTimeToString(const String &format = EXCEL_DATE_FORMAT) const{
-      return epochToDateTime(dateTime, format);
+      return std::move(epochToDateTime(dateTime, format));
     }
 
     void setDateTime(const uint32_t &datetime) { dateTime = datetime < MILLIS_MAX_SECONDS ? dateTime + datetime : datetime;  }
@@ -125,22 +132,27 @@ struct Data {
     void setWiFiStatus(const String &wifistatus) { wifiStatus = wifistatus; }
     const String &getWiFiStatus() const { return wifiStatus; }
 
-    const String writeToCsv(size_t &realDataSize) const {
+    const String writeToCsv(size_t &realDataSize, const bool &shortRecord = false) const {
         //DS_TRACE(F("writeToCsv"));
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);
         //DS_TRACE(dateTimeStr);
 
-        snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, count, resetReason.c_str(), reserv1, wifiStatus.c_str(), reserv2);
+        if(shortRecord){
+          snprintf(buffer, sizeof(buffer), RECORD_FORMAT_SHORT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0);
+        }else{
+          snprintf(buffer, sizeof(buffer), RECORD_FORMAT, dateTimeStr.c_str(), voltage, relayOn ? 1 : 0, relayOnHH, relayOnMM, relayOnSS, temperature, count, resetReason.c_str(), reserv1, wifiStatus.c_str(), reserv2);
+        }
         auto res = String(buffer);
         realDataSize = res.length();
-        for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
-        return res;
+        if(!shortRecord)
+          for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
+        return std::move(res);
     }
 
-    const String writeToCsv() const { size_t s; return writeToCsv(s); }
+    const String writeToCsv(const bool &shortRecord = false) const { size_t s; return writeToCsv(s, shortRecord); }
 
-    void readFromCsv(const String& str) {
+    void readFromCsv(const String& str, const bool &shortRecord = false) {
         DS_TRACE(F("readFromCsv"));
         char startReasonBuff[6];
         char wifiStatusBuff[6];        
@@ -148,7 +160,11 @@ struct Data {
         struct tm tm;             // Struct to hold decomposed time
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
 
-        sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+        if(shortRecord){
+          sscanf(str.c_str(), RECORD_FORMAT_SCANF_SHORT, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn);        
+        } else{       
+          sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+        }
 
         resetReason = String(startReasonBuff);
         wifiStatus = String(wifiStatusBuff);  
@@ -199,52 +215,187 @@ struct Data {
 
 };
 
+struct RelayStatus{
+  uint32_t dateTime = YEAR_2024_SECONDS;
+  float voltage = 0.0;
+  uint16_t relayOnHH = 0;
+  uint8_t relayOnMM = 0;
+  uint8_t relayOnSS = 0;  
+
+  void set(const Data &data){
+      dateTime = data.getDateTime();
+      relayOnHH = data.relayOnHH;
+      relayOnMM = data.relayOnMM;
+      relayOnSS = data.relayOnSS;
+      voltage = data.voltage;
+  }
+
+  const String writeToCsv(size_t &realDataSize) const {        
+        char buffer[MAX_RECORD_LENGTH];        
+        const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);        
+        snprintf(buffer, sizeof(buffer), RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
+        auto res = String(buffer);
+        realDataSize = res.length();        
+        return std::move(res);
+  }
+
+   const String writeToCsv() const { size_t realDataSize = 0; return writeToCsv(realDataSize); }
+
+  void readFromCsv(const String& str) {
+        DS_TRACE(F("readFromCsv"));        
+        struct tm tm;             // Struct to hold decomposed time
+        memset(&tm, 0, sizeof(tm));  // Initialize tm structure
+        sscanf(str.c_str(), RELAY_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, &relayOnHH, &relayOnMM, &relayOnSS);        
+        DS_TRACE("dateTimeToEpoch: ", tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        // Adjust year and month values to fit struct tm conventions
+        tm.tm_year -= 1900;   // Convert year to years since 1900
+        tm.tm_mon--;          // Convert month from 1-12 to 0-11              
+        dateTime = mktime(&tm);
+        DS_TRACE(F("From str: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT), F(" "), F("Voltage: "), voltage);              
+    }
+};
+
 class DataStorage {
 private:
+  bool _shortRecord = false;
   FilesInfo filesInfo;
-  int filesCount;
+  int filesCount = 0;
+  Data lastRecord;
+  Data currentData;
+  RelayStatus lastRelayOn;
+  RelayStatus lastRelayOff;
+  bool isRelayStatusChanged = false;
 public:
-    String currentFileName;
-    Data lastRecord;
+    String currentFileName;    
     String startDate;
     String endDate;    
-
 public:
+    DataStorage(const bool &shortRecord = false) : _shortRecord(shortRecord) {}
+
     const Data& begin() {
         if (!fileSystem.begin()) {
             DS_INFO(F("fileSystem initialization failed"));
             return Data();
         }
         readLastFileRecord();
-        fileSystem.mkdir(FILE_PATH);
+        fileSystem.mkdir(FILE_PATH); 
 
-        String headerName = String(HEADER_FILE_NAME) + FILE_EXT;
-        String headerPath = String(FILE_PATH) + F("/") + headerName;        
-        File header = fileSystem.open(headerPath.c_str(), "w");
-        if(!header) TraceOpenFileFailed(headerPath);        
-        else 
-        { 
-          String headerContent = RECORD_HEADER + '\n';
-          header.write((uint8_t*)headerContent.c_str(), headerContent.length() + 1);          
-          header.close();
-          filesInfo[headerName] = { headerContent.length(), 1 };
+        writeHeader();
+        if(!readRelayStatus()){
+          lastRelayOn.set(lastRecord);
+          lastRelayOff.set(lastRecord);
         }
 
-        TraceToSerial();
-
+        traceToSerial();
+        currentData = lastRecord;
         return lastRecord;
     }
 
-    void TraceToSerial() const
+    void traceToSerial() const
     {
       DS_TRACE(F("CurrentFile: "), currentFileName);
       DS_TRACE(F("Last Record: "), lastRecord.writeToCsv(), F(" "), F("Count: "), lastRecord.count);
-      DS_TRACE(F("startDate: "), startDate, F(" "), F("endDate: "), endDate, F(" "), F("Files: "), filesCount);
+      DS_TRACE(F("startDate: "), startDate, F(" "), F("endDate: "), endDate, F(" "), F("Days: "), filesCount);
+      DS_TRACE(F("On"), F(" -> "), lastRelayOn.writeToCsv());
+      DS_TRACE(F("Off"), F(" -> "), lastRelayOff.writeToCsv());
     }
 
-    const int &getFilesCount()
-    {
-      return filesCount;
+    void setDateTime(const uint32_t &datetime) { currentData.setDateTime(datetime); /*lastRecord.setDateTime(dateTime);*/  }
+    const uint32_t &getDateTime() const { return currentData.getDateTime(); }
+
+    void setResetReason(const String &resetreason) { currentData.setResetReason(resetreason); }
+    const String &getResetReason() const { return currentData.getResetReason(); }
+
+    void setWiFiStatus(const String &wifistatus) { currentData.setWiFiStatus(wifistatus); }
+    const String &getWiFiStatus() const { return currentData.getWiFiStatus(); }
+
+    void readFromXYDJ(const String &str) {      
+      Data prevData = currentData;
+      currentData.readFromXYDJ(str); 
+      isRelayStatusChanged = prevData.relayOn != currentData.relayOn;
+      if (isRelayStatusChanged){
+        DS_TRACE(F("\t\t\t\t\t"), F("Relay status changed..."));
+        if(prevData.relayOn == true){ //Relay OFF
+          lastRelayOff.set(prevData);
+        }else{                        //Relay On
+          lastRelayOn.set(currentData);
+        }  
+        writeRelayStatus();
+      }      
+    }
+
+    void readFromCsv(const String& str) { currentData.readFromCsv(str, _shortRecord); }
+
+    const String writeToCsv(size_t &realDataSize) const { return currentData.writeToCsv(realDataSize, _shortRecord); }
+    const String writeToCsv() const { size_t realDataSize = 0; return currentData.writeToCsv(realDataSize, _shortRecord); }
+
+    const float &getVoltage() const { return currentData.voltage; } 
+    const bool &getRelayOn() const { return currentData.relayOn; }
+    const String getCurrentDateTimeStr() const { return currentData.dateTimeToString(); }
+    const String getLastRecordDateTimeStr() const { return lastRecord.dateTimeToString(); }   
+
+    const String getLastRelayOnStatus() const { return lastRelayOn.writeToCsv(); }
+    const String getLastRelayOffStatus() const { return lastRelayOff.writeToCsv(); }
+
+    const int &getFilesCount() { return filesCount; }
+
+    const bool writeHeader() {
+      String headerName = String(HEADER_FILE_NAME) + FILE_EXT;
+      String headerPath = String(FILE_PATH) + F("/") + headerName;        
+      File header = fileSystem.open(headerPath.c_str(), "w");
+      if(!header) { TraceOpenFileFailed(headerPath); return false; }
+      else 
+      { 
+        String headerContent = RECORD_HEADER + '\n';
+        header.write((uint8_t*)headerContent.c_str(), headerContent.length() + 1);
+        header.close();
+        filesInfo[headerName] = { headerContent.length(), 1 };
+        return true;
+      }
+    }
+
+    const bool writeRelayStatus() const {
+      DS_TRACE(F("Write "), F("relayStatus"));  
+      String path = String(F("/")) + RELAY_FILE_NAME;
+      File file = fileSystem.open(path.c_str(), "w");
+      if(!file) { TraceOpenFileFailed(path); return false; }
+      else 
+      { 
+        size_t realDataSize = 0;
+        const String lastRelayOnStatus = lastRelayOn.writeToCsv(realDataSize) + '\n';
+        file.write((uint8_t*)lastRelayOnStatus.c_str(), lastRelayOnStatus.length());
+
+        const String lastRelayOffStatus = lastRelayOff.writeToCsv(realDataSize) + '\n';
+        file.write((uint8_t*)lastRelayOffStatus.c_str(), lastRelayOffStatus.length());
+        
+        file.close();
+        return true;
+      }
+    }
+
+    const bool readRelayStatus(){
+      DS_TRACE(F("Read "), F("relayStatus"));
+      String path = String(F("/")) + RELAY_FILE_NAME;
+      File file = fileSystem.open(path.c_str(), "r");
+      if(!file) { TraceOpenFileFailed(path); return false; }
+      else 
+      {
+        String read;
+        if(file.available()){
+          read = file.readStringUntil('\n');
+          DS_TRACE(read);
+          if(!read.isEmpty())
+            lastRelayOn.readFromCsv(read);
+        }
+        if(file.available()){
+          read = file.readStringUntil('\n');
+          DS_TRACE(read);
+          if(!read.isEmpty())
+            lastRelayOff.readFromCsv(read);
+        }
+        file.close();
+        return true; 
+      }
     }
 
     void readLastFileRecord() {
@@ -295,6 +446,10 @@ public:
         extractDates(firstFile, lastFile);
     }
 
+    public:
+    void appendData(const uint32_t &dateTime) { appendData(currentData, dateTime); }
+
+    private:
     void appendData(Data &data, const uint32_t &dateTime) {
         data.setDateTime(dateTime);        
         const String &fileName = generateFileName(data.getDateTime());
@@ -317,9 +472,10 @@ public:
         const auto &size = file.write((uint8_t*)csv.c_str(), csv.length());
         DS_TRACE(F("Real data size: "), realDataSize, F(" "), F("Wrote: "), size);        
         file.close();
-        lastRecord = data;
+        lastRecord = data;        
     }    
-
+    
+    public:
     const bool fileFilterPrepare(String &filter){      
         filter.replace('_', '-');
         return true;
@@ -379,6 +535,22 @@ public:
         root.close();
 
         return std::move(result);
+    }
+
+    const int getRecordsCount(const String& filter)
+    {
+      int res = 0;
+      for(const auto& kvp : filesInfo)
+      {
+        const auto& fileName = kvp.first;
+        const auto& fileInfo = kvp.second;
+        
+        if(filter.isEmpty() || fileName.startsWith(filter))
+        {
+          res += fileInfo.linesCount;
+        }
+      }
+      return res;
     }
 
     const int removeAllExceptLast()
