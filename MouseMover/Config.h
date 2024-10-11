@@ -2,10 +2,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define CONFIG_PORTAL_TIMEOUT 60
+
 //#define USE_BOT
 #define USE_API
 //#define USE_API_KEY
-#define USE_BUZZER
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
 

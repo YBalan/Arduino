@@ -14,13 +14,13 @@
 #include "WiFiParameters.h"
 
 #ifdef ENABLE_INFO_WIFI
-#define WIFI_INFO(...) SS_TRACE(F("[WiFi OPS INFO] "), __VA_ARGS__)
+#define WIFI_INFO(...) SS_TRACE("[WiFi OPS INFO] ", __VA_ARGS__)
 #else
 #define WIFI_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_WIFI
-#define WIFI_TRACE(...) SS_TRACE(F("[WiFi OPS TRACE] "), __VA_ARGS__)
+#define WIFI_TRACE(...) SS_TRACE("[WiFi OPS TRACE] ", __VA_ARGS__)
 #else
 #define WIFI_TRACE(...) {}
 #endif
@@ -119,7 +119,7 @@ class WiFiOps
       return _parameters.Count();
     }
 
-    const WiFiParameters &TryToConnectOrOpenConfigPortal(const bool &resetSettings = false)
+    const WiFiParameters &TryToConnectOrOpenConfigPortal(const int &portalTimeOut = 180, const bool &resetSettings = false)
     {
       WIFI_TRACE(F("TryToConnectOrOpenConfigPortal..."));
 
@@ -173,14 +173,20 @@ class WiFiOps
       //defaults to 8%
       wifiManager.setMinimumSignalQuality();
 
+      WiFi.setAutoReconnect(true);
+      #ifdef ESP8266
+      WiFi.setAutoConnect(true); 
+      #endif
+
       //sets timeout until configuration portal gets turned off
       //useful to make it all retry or go to sleep
       //in seconds
       //wifiManager.setTimeout(120);
 
       WiFi.begin();
-      auto mac = WiFi.macAddress();
-      mac = mac.substring(mac.length() - 5, mac.length());
+      const auto &mac = WiFi.macAddress();
+      WIFI_TRACE(F("MAC: "), mac);
+      String apmac = mac.substring(mac.length() - 5, mac.length());
       //fetches ssid and pass and tries to connect
       //if it does not connect it starts an access point with the specified name
       //here  "AutoConnectAP"
@@ -188,37 +194,36 @@ class WiFiOps
       /*WiFi.enableInsecureWEP();
       WiFi.encryptionType(int networkItem);*/
 
-      const String apName = (_APName + (_addMacToAPName ? "_" + mac : ""));
+      // Set the portal timeout to 180 seconds (3 minutes)
+      if(portalTimeOut > 0)
+        wifiManager.setConfigPortalTimeout(portalTimeOut);
+
+      const String apName = (_APName + (_addMacToAPName ? "_" + apmac : ""));
       WIFI_INFO(F("Autoconnect: "), apName);
       if (!wifiManager.autoConnect(apName.c_str(), _APPass.c_str())) {
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
-        ESP.restart();
-        delay(5000);
+        if(portalTimeOut == 0)
+          ESP.restart();        
+      }else{
+        //if you get here you have connected to the WiFi
+        WIFI_INFO(F("connected...yeey :)"));
+
+        SaveFSSettings(_parameters);
+
+        WIFI_TRACE(F("The values in the file are: "));
+        for(uint8_t pIdx = 0; pIdx < _parameters.Count();  pIdx++)
+        {
+          const auto &p = _parameters.GetAt(pIdx);
+          WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
+        }
+
+        WIFI_INFO(F("IP: "));
+        WIFI_INFO(WiFi.localIP());
+        WIFI_INFO(F("MAC: "));
+        WIFI_INFO(WiFi.macAddress());
       }
-
-      WiFi.setAutoReconnect(true);
-      #ifdef ESP8266
-      WiFi.setAutoConnect(true); 
-      #endif
-
-      //if you get here you have connected to the WiFi
-      WIFI_INFO(F("connected...yeey :)"));
-
-      SaveFSSettings(_parameters);
-
-      WIFI_TRACE(F("The values in the file are: "));
-      for(uint8_t pIdx = 0; pIdx < _parameters.Count();  pIdx++)
-      {
-        const auto &p = _parameters.GetAt(pIdx);
-        WIFI_TRACE(F("\tParameter: "), p.GetId(), F(" json property: "), p.GetJson(), F(" value: "), p.GetValue());
-      }
-
-      WIFI_INFO(F("IP: "));
-      WIFI_INFO(WiFi.localIP());
-      WIFI_INFO(F("MAC: "));
-      WIFI_INFO(WiFi.macAddress());
 
       return _parameters;
     }
