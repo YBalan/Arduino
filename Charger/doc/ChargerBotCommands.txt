@@ -37,3 +37,7 @@ cmdstop - Stop pulling data from XYDJ (Pause)
 cmdop000 - Set relay time in minutes (000-999)
 name - Set/Get Device Name
 monitor - Show updatable monitor menu
+short - Get short record status
+short0 - Use long record format (Less days in storage)
+short1 - Use short record format (More days in storage)
+interval - Interval to store in Mins (1-15)
