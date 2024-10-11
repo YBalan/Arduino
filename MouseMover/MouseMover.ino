@@ -3,13 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.3")
 #else //ESP32
-  #define VER F("1.3")
+  #define VER F("1.4")
 #endif
 
-#define AVOID_FLICKERING
-
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -19,7 +17,8 @@
 
 #define VER_POSTFIX F("D")
 
-#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+//#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+#undef WM_DEBUG_LEVEL
 
 #define ENABLE_TRACE_MAIN
 
@@ -184,7 +183,17 @@ void setup()
     const auto &resetButtonState = btnRt.getState();
     INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
     INFO(F("ResetFlag: "), _settings.resetFlag);
-    wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("WiFi Connecting."));
+
+    wifiOps.TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("WiFi Connected."));
+
     if(_settings.resetFlag == 1985)
     {
       _settings.resetFlag = 200;
@@ -207,20 +216,20 @@ void setup()
 
 void LCDPrintVersion()
 {
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(String(F("V")) + VER + VER_POSTFIX + F(" ") + F("MouseMover"));
   lcd.setCursor(0, 1);
   lcd.print(__DATE__);
-  delay(3000);
-  lcd.clear();
+  delay(3000);  
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
-  INFO(F("WiFi Portal: "), manager->getConfigPortalSSID());  
+  INFO(F("WiFiPortal: "), manager->getConfigPortalSSID());  
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(F("WiFi Portal: "));
+  lcd.print(F("WiFiPortal: ")); lcd.print(CONFIG_PORTAL_TIMEOUT); lcd.print(F("s"));
   lcd.setCursor(0, 1);
   lcd.print(manager->getConfigPortalSSID());
 }
@@ -437,7 +446,7 @@ void HandleMenuAndActions(const unsigned long &currentTicks, int &status, String
         lcd.setCursor(0, 1);
         lcd.print(F("SSID:")); lcd.print(WiFi.SSID());   
         #ifdef ESP32     
-        WiFi.disconnect();
+        //WiFi.disconnect();
         WiFi.reconnect();
         #endif
         delay(1000);
