@@ -8,51 +8,61 @@ namespace CommonHelper
 
   template <typename V>
   const bool saveMap(File &file, const std::map<String, V> &map) {
-    if (!file) {        
-        return false;
+      if (file) { 
+      // Save the size of the map
+      int mapSize = map.size();      
+      file.write((const uint8_t*)(&mapSize), sizeof(mapSize));
+
+      // Save each key-value pair
+      for (const auto& [key, value] : map) {
+          // Save the key
+          int keyLength = key.length();  // Get the length of the key
+          file.write((const uint8_t*)(&keyLength), sizeof(keyLength));
+          file.write((const uint8_t*)(key.c_str()), keyLength);
+
+          // Save the struct (value)
+          file.write((const uint8_t*)(&value), sizeof(value));   
+      }
+      return true;
     }
-
-    // Save the size of the map
-    int mapSize = map.size();
-    file.write((const uint8_t*)(&mapSize), sizeof(mapSize));
-
-    // Save each key-value pair
-    for (const auto& [key, value] : map) {
-        // Save the key
-        String keyStr = key + '\n';   
-        file.write((const uint8_t*)(key.c_str()), keyStr.length());
-
-        // Save the struct (value)
-        file.write((const uint8_t*)(&value), sizeof(value));   
-    }
-
-    return true;
+    return false;
   }
 
   template <typename V>
-  const bool loadMap(File &file, std::map<String, V> &map) {
-    if (!file) {        
-        return false;
-    }
+  const bool loadMap(File &file, std::map<String, V> &map, const int &maxElements = 100, const int &maxKeySize = 500) {
+      if (file) {        
+      int mapSize = 0;
+      file.read((uint8_t*)(&mapSize), sizeof(mapSize));    
+      map.clear();  // Clear the map before loading new data
 
-    size_t mapSize;
-    file.read(reinterpret_cast<uint8_t*>(&mapSize), sizeof(mapSize));
+      if(maxElements == 0 || mapSize <= maxElements) {
+        for (int i = 0; i < mapSize; ++i) {
+          if(file.available()){
+            // Load the key
+            int keyLength = 0;
+            file.read((uint8_t*)(&keyLength), sizeof(keyLength));
 
-    map.clear();  // Clear the map before loading new data
+            if(keyLength > maxKeySize) continue;
 
-    for (size_t i = 0; i < mapSize; ++i) {
-        // Load the key
-        const String &key = file.readStringUntil('\n');
+            char* keyBuffer = new char[keyLength + 1];  // +1 for null terminator
+            file.read((uint8_t*)(keyBuffer), keyLength);
+            keyBuffer[keyLength] = '\0';  // Null-terminate the key string
 
-        // Load the struct (value)
-        V value;
-        file.read(reinterpret_cast<uint8_t*>(&value), sizeof(value));       
+            String key(keyBuffer);  // Convert char* to String
+            delete[] keyBuffer;
 
-        // Insert into map
-        map[key] = value;
-    }
+            // Load the struct (value)
+            V value;
+            file.read((uint8_t*)(&value), sizeof(value));       
 
-    return true;
+            // Insert into map
+            map[key] = value;
+          }
+        }
+        return true;
+      }
+    } 
+    return false;   
   }
 
   const String toString(const int &value, const uint8_t &digits, const char &symbol = '0')
