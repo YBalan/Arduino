@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.15")
+  #define VER F("1.16")
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -135,7 +135,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
-  //loadMonitorChats(MONITOR_CHATS_FILE_NAME);
+  loadMonitorChats(MONITOR_CHATS_FILE_NAME);
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -164,6 +164,7 @@ void setup()
     }
 
     now = SyncTime();
+    StartTimers();
     InitBot();
   }    
 
@@ -171,8 +172,12 @@ void setup()
   ds->setResetReason(GetResetReason(/*shortView:*/true));
 
   if(now > 0) ds->setDateTime(now);
-  SendCommand(F("start"));
+  StartTimers();
+  SendCommand(F("start"));  
+}
 
+void StartTimers()
+{
   storeDataTicks = millis();
   syncTimeTicks = millis();
 }
@@ -224,6 +229,7 @@ void loop()
     wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT);
     const auto &now = SyncTime();   
     ds->setDateTime(now); 
+    StartTimers();
     InitBot();
   }
 
@@ -257,7 +263,7 @@ void loop()
     else
     {
       saveRequired = true;      
-      const bool isRelayStatusChanged = ds->readFromXYDJ(received);            
+      const bool isRelayStatusChanged = ds->updateCurrentData(received, millis() - storeDataTicks);            
       INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
       if(isRelayStatusChanged){
         sendUpdateMonitorAllMenu(_settings.DeviceName);

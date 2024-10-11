@@ -153,7 +153,7 @@ struct Data {
 
     const String writeToCsv(const bool &shortRecord = false) const { size_t s; return writeToCsv(s, shortRecord); }
 
-    void readFromCsv(const String& str, const bool &shortRecord = false) {
+    void readFromCsv(const String& receivedFromXYDJ, const bool &shortRecord = false) {
         DS_TRACE(F("readFromCsv"));
         char startReasonBuff[6];
         char wifiStatusBuff[6];        
@@ -162,9 +162,9 @@ struct Data {
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
 
         if(shortRecord){
-          sscanf(str.c_str(), RECORD_FORMAT_SCANF_SHORT, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn);        
+          sscanf(receivedFromXYDJ.c_str(), RECORD_FORMAT_SCANF_SHORT, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn);        
         } else{       
-          sscanf(str.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+          sscanf(receivedFromXYDJ.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
         }
 
         resetReason = String(startReasonBuff);
@@ -177,13 +177,13 @@ struct Data {
         tm.tm_mon--;          // Convert month from 1-12 to 0-11      
         
         dateTime = mktime(&tm);
-        DS_TRACE(F("From str: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT));        
+        DS_TRACE(F("From receivedFromXYDJ: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT));        
     }
 
     //00.3,00:00:00,CL
-    void readFromXYDJ(const String &str){
+    void readFromXYDJ(const String &receivedFromXYDJ){
       char relayOnBuff[3];
-      sscanf(str.c_str(), "%f,%d:%d:%d,%s", &voltage, &relayOnHH, &relayOnMM, &relayOnSS, relayOnBuff);
+      sscanf(receivedFromXYDJ.c_str(), "%f,%d:%d:%d,%s", &voltage, &relayOnHH, &relayOnMM, &relayOnSS, relayOnBuff);
       relayOn = !String(relayOnBuff).startsWith(F("CL"));
     }
 
@@ -217,11 +217,15 @@ struct Data {
 };
 
 struct RelayStatus{
+  private:
   uint32_t dateTime = YEAR_2024_SECONDS;
   float voltage = 0.0;
   uint16_t relayOnHH = 0;
   uint8_t relayOnMM = 0;
   uint8_t relayOnSS = 0;  
+  public:
+  float voltagePrev = 0.0;
+  float voltagePost = 0.0;
 
   void set(const Data &data){
       dateTime = data.getDateTime();
@@ -231,28 +235,40 @@ struct RelayStatus{
       voltage = data.voltage;
   }
 
+  void setRelayTime(const Data &data){      
+      relayOnHH = data.relayOnHH;
+      relayOnMM = data.relayOnMM;
+      relayOnSS = data.relayOnSS;      
+  }
+
+  void addDateTime(const uint32_t additionalTime) { dateTime + additionalTime; }
+  void clearRelayTime() { relayOnHH = 0; relayOnMM = 0; relayOnSS = 0; }
+  void setVoltage(const float &volt) { voltage = volt; }
+
   const String writeToCsv(size_t &realDataSize, const bool &extended = false) const {        
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);        
         snprintf(buffer, sizeof(buffer), extended ? RELAY_FORMAT_EXT : RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
-        auto res = String(buffer);
+        auto res = String(buffer) 
+                  + (extended ? String(F("(")) + String(voltagePrev, 1) + F(",") + String(voltagePost, 1) + F(")") : String(F("")) )
+            ;
         realDataSize = res.length();        
         return std::move(res);
   }
 
    const String writeToCsv(const bool &extended = false) const { size_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
 
-  void readFromCsv(const String& str) {
+  void readFromCsv(const String& receivedFromXYDJ) {
         DS_TRACE(F("readFromCsv"));        
         struct tm tm;             // Struct to hold decomposed time
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
-        sscanf(str.c_str(), RELAY_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, &relayOnHH, &relayOnMM, &relayOnSS);        
+        sscanf(receivedFromXYDJ.c_str(), RELAY_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, &relayOnHH, &relayOnMM, &relayOnSS);        
         DS_TRACE("dateTimeToEpoch: ", tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
         // Adjust year and month values to fit struct tm conventions
         tm.tm_year -= 1900;   // Convert year to years since 1900
         tm.tm_mon--;          // Convert month from 1-12 to 0-11              
         dateTime = mktime(&tm);
-        DS_TRACE(F("From str: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT), F(" "), F("Voltage: "), voltage);              
+        DS_TRACE(F("From receivedFromXYDJ: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT), F(" "), F("Voltage: "), voltage);              
     }
 };
 
@@ -310,23 +326,41 @@ public:
     void setWiFiStatus(const String &wifistatus) { currentData.setWiFiStatus(wifistatus); }
     const String &getWiFiStatus() const { return currentData.getWiFiStatus(); }
 
-    const bool readFromXYDJ(const String &str) {      
+    const bool updateCurrentData(const String &receivedFromXYDJ, const uint32_t &additionalTime = 0) {      
       Data prevData = currentData;
-      currentData.readFromXYDJ(str); 
+      currentData.readFromXYDJ(receivedFromXYDJ); 
+
+      if(isRelayStatusChanged){
+        if(getRelayOn())
+          lastRelayOn.voltagePost = currentData.voltage;
+        else
+          lastRelayOff.voltagePost = currentData.voltage;
+        //lastRelayOn.setRelayTime(currentData);  
+        //lastRelayOff.setVoltage(currentData.voltage);           
+        isRelayStatusChanged = false;
+        //writeRelayStatus();
+      }
+
       isRelayStatusChanged = prevData.relayOn != currentData.relayOn;
       if (isRelayStatusChanged){
         DS_TRACE(F("\t\t\t\t\t"), F("Relay status changed..."));
-        if(prevData.relayOn == true){ //Relay OFF
+        if(currentData.relayOn == false){ //Relay OFF
           lastRelayOff.set(prevData);
+          lastRelayOff.addDateTime(additionalTime);
+          lastRelayOff.voltagePrev = currentData.voltage;
+          lastRelayOn.clearRelayTime();
         }else{                        //Relay On
-          lastRelayOn.set(currentData);
+          lastRelayOn.set(prevData);
+          lastRelayOn.addDateTime(additionalTime);
+          lastRelayOn.voltagePrev = currentData.voltage;
         }  
         writeRelayStatus();
       }
+      if(getRelayOn()) lastRelayOn.setRelayTime(currentData);
       return isRelayStatusChanged;
     }
 
-    void readFromCsv(const String& str) { currentData.readFromCsv(str, _shortRecord); }
+    void readFromCsv(const String& receivedFromXYDJ) { currentData.readFromCsv(receivedFromXYDJ, _shortRecord); }
 
     const String writeToCsv(size_t &realDataSize) const { return currentData.writeToCsv(realDataSize, _shortRecord); }
     const String writeToCsv() const { size_t realDataSize = 0; return currentData.writeToCsv(realDataSize, _shortRecord); }
