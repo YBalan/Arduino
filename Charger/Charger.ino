@@ -322,6 +322,7 @@ void loop()
       syncTimeTicks = currentTicks;      
       const auto &now = SyncTime();      
       ds->setDateTime(now); 
+      StartTimers();
     }
   }
 
