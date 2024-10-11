@@ -57,10 +57,10 @@ typedef std::map<String, FileInfo> FilesInfo;
 struct Data {
   private:
     uint32_t dateTime = YEAR_2024_SECONDS;
-    String resetReason;
-    String wifiStatus;
+    String resetReason = F("Normal");
+    String wifiStatus = F("OK");
   public:
-    float voltage = 0.0;
+    float voltage = 60.1;
     bool relayOn = false;
     uint16_t relayOnHH = 0;
     uint8_t relayOnMM = 0;
@@ -68,8 +68,7 @@ struct Data {
     float temperature = 22.1; 
     uint16_t reserv1 = 0; 
     uint16_t reserv2 = 0;
-    uint16_t count = 0; 
-    static constexpr size_t recordLength = MAX_RECORD_LENGTH;
+    uint16_t count = 0;     
 
     // Default constructor
     Data() = default;
@@ -133,7 +132,7 @@ struct Data {
     void setWiFiStatus(const String &wifistatus) { wifiStatus = wifistatus; }
     const String &getWiFiStatus() const { return wifiStatus; }
 
-    const String writeToCsv(size_t &realDataSize, const bool &shortRecord = false) const {
+    const String writeToCsv(uint16_t &realDataSize, const bool &shortRecord) const {
         //DS_TRACE(F("writeToCsv"));
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);
@@ -146,14 +145,17 @@ struct Data {
         }
         auto res = String(buffer);
         realDataSize = res.length();
-        if(!shortRecord)
-          for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
+        // if(!shortRecord)
+        //   for(uint8_t i = realDataSize; i < MAX_RECORD_LENGTH; i++){ res += ' '; }
         return std::move(res);
+    }    
+
+    static const int getRecordSize(const bool &shortRecord) { 
+      uint16_t size = 0;     
+      return Data().writeToCsv(size, shortRecord).length();
     }
 
-    const String writeToCsv(const bool &shortRecord = false) const { size_t s; return writeToCsv(s, shortRecord); }
-
-    void readFromCsv(const String& receivedFromXYDJ, const bool &shortRecord = false) {
+    void readFromCsv(const String& receivedFromXYDJ, const bool &shortRecord) {
         DS_TRACE(F("readFromCsv"));
         char startReasonBuff[6];
         char wifiStatusBuff[6];        
@@ -245,7 +247,7 @@ struct RelayStatus{
   void clearRelayTime() { relayOnHH = 0; relayOnMM = 0; relayOnSS = 0; }
   void setVoltage(const float &volt) { voltage = volt; }
 
-  const String writeToCsv(size_t &realDataSize, const bool &extended = false) const {        
+  const String writeToCsv(uint16_t &realDataSize, const bool &extended = false) const {        
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);        
         snprintf(buffer, sizeof(buffer), extended ? RELAY_FORMAT_EXT : RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
@@ -256,7 +258,7 @@ struct RelayStatus{
         return std::move(res);
   }
 
-   const String writeToCsv(const bool &extended = false) const { size_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
+   const String writeToCsv(const bool &extended = false) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
 
   void readFromCsv(const String& receivedFromXYDJ) {
         DS_TRACE(F("readFromCsv"));        
@@ -287,9 +289,10 @@ public:
     String startDate;
     String endDate;    
 public:
-    DataStorage(const bool &shortRecord = false) : _shortRecord(shortRecord) {}
+    DataStorage() = default;
 
-    const Data& begin() {
+    const Data& begin(const bool &shortRecord) {
+        _shortRecord = shortRecord;
         if (!fileSystem.begin()) {
             DS_INFO(F("fileSystem initialization failed"));
             return Data();
@@ -310,8 +313,9 @@ public:
 
     void traceToSerial() const
     {
+      uint16_t size = 0;
       DS_TRACE(F("CurrentFile: "), currentFileName);
-      DS_TRACE(F("Last Record: "), lastRecord.writeToCsv(), F(" "), F("Count: "), lastRecord.count);
+      DS_TRACE(F("Last Record: "), lastRecord.writeToCsv(size, _shortRecord), F(" "), F("Count: "), lastRecord.count);
       DS_TRACE(F("startDate: "), startDate, F(" "), F("endDate: "), endDate, F(" "), F("Days: "), filesCount);
       DS_TRACE(F("On"), F(" -> "), lastRelayOn.writeToCsv());
       DS_TRACE(F("Off"), F(" -> "), lastRelayOff.writeToCsv());
@@ -362,8 +366,8 @@ public:
 
     void readFromCsv(const String& receivedFromXYDJ) { currentData.readFromCsv(receivedFromXYDJ, _shortRecord); }
 
-    const String writeToCsv(size_t &realDataSize) const { return currentData.writeToCsv(realDataSize, _shortRecord); }
-    const String writeToCsv() const { size_t realDataSize = 0; return currentData.writeToCsv(realDataSize, _shortRecord); }
+    const String writeToCsv(uint16_t &realDataSize) const { return currentData.writeToCsv(realDataSize, _shortRecord); }
+    const String writeToCsv() const { uint16_t realDataSize = 0; return currentData.writeToCsv(realDataSize, _shortRecord); }
 
     const float &getVoltage() const { return currentData.voltage; } 
     const bool &getRelayOn() const { return currentData.relayOn; }
@@ -373,7 +377,31 @@ public:
     const String getLastRelayOnStatus() const { return lastRelayOn.writeToCsv(/*extended:*/true); }
     const String getLastRelayOffStatus() const { return lastRelayOff.writeToCsv(/*extended:*/true); }
 
-    const int &getFilesCount() { return filesCount; }
+    const int &getFilesCount() const { return filesCount; }
+
+    const int getDaySize(const int &intervalMin) const { return getDaySize(intervalMin, _shortRecord);  }
+    static const int getDaySize(const int &intervalMin, const bool &shortRecord) { return (int)((1440 / intervalMin) * (Data::getRecordSize(shortRecord) + 1));  }
+
+    static float getDaysLeft(const int &intervalMin, const bool &shortRecord, const int &totalSize, const int &usedSize, int &percentage){
+      // Calculate the size of data recorded each day
+      int daySize = getDaySize(intervalMin, shortRecord);
+      
+      // Calculate remaining storage size
+      int remainingSize = totalSize - usedSize;
+
+      // Calculate how many more days of storage capacity exist
+      float daysLeft = remainingSize / daySize;
+
+      // Calculate the percentage of storage already used
+      percentage = (int)(((double)(usedSize) / totalSize) * 100);
+
+      DS_TRACE(F("Day: "), daySize, F(" "), F("Rem: "), remainingSize, F(" "), F("Days: "), daysLeft);
+      
+      return daysLeft;
+    }
+
+    const bool getShortRecord() const { return _shortRecord; }
+    void setShortRecord(const bool &value) { _shortRecord = value; }
 
     const bool writeHeader() {
       String headerName = String(HEADER_FILE_NAME) + FILE_EXT;
@@ -397,7 +425,7 @@ public:
       if(!file) { TraceOpenFileFailed(path); return false; }
       else 
       { 
-        size_t realDataSize = 0;
+        uint16_t realDataSize = 0;
         const String lastRelayOnStatus = lastRelayOn.writeToCsv(realDataSize) + '\n';
         file.write((uint8_t*)lastRelayOnStatus.c_str(), lastRelayOnStatus.length());
 
@@ -465,7 +493,7 @@ public:
             file = fileSystem.open(lastFile, "r");
             if (!file) { TraceOpenFileFailed(lastFile); return; }
 
-            int seek = file.size() - ((Data::recordLength + 1) * 2);
+            int seek = file.size() - ((MAX_RECORD_LENGTH + 1) * 2);
             seek = seek < 0 ? 0 : seek;
             DS_TRACE(F("FileSize: "), file.size(), F(" "), F("Seek: "), seek);
             file.seek(seek);
@@ -473,7 +501,7 @@ public:
             while(file.available() > 0)
               lastString = file.readStringUntil('\n');
             DS_TRACE(F("Last Record: "), F("'"), lastString, F("'"), F(" "), F("Size: "), lastString.length());
-            lastRecord.readFromCsv(lastString);
+            lastRecord.readFromCsv(lastString, _shortRecord);
             currentFileName = lastFile;
             file.close();            
         }
@@ -502,17 +530,17 @@ public:
         File file = fileSystem.open(fileName, "a");
         if (!file) { TraceOpenFileFailed(fileName); return; }
         
-        size_t realDataSize = 0;
+        uint16_t realDataSize = 0;
         data.count++;
-        String csv = data.writeToCsv(realDataSize) + '\n';
+        String csv = data.writeToCsv(realDataSize, _shortRecord) + '\n';
         const auto &size = file.write((uint8_t*)csv.c_str(), csv.length());
-        DS_TRACE(F("Real data size: "), realDataSize, F(" "), F("Wrote: "), size);        
+        DS_TRACE(F("Size: "), realDataSize, F(" "), F("Wrote: "), size);        
         file.close();
         lastRecord = data;        
     }    
     
     public:
-    const bool fileFilterPrepare(String &filter){      
+    static const bool fileFilterPrepare(String &filter){      
         filter.replace('_', '-');
         return true;
     }

@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.16")
+  #define VER F("1.17")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -168,7 +168,7 @@ void setup()
     InitBot();
   }    
 
-  ds->begin();  
+  ds->begin(_settings.shortRecord);  
   ds->setResetReason(GetResetReason(/*shortView:*/true));
 
   if(now > 0) ds->setDateTime(now);

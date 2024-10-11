@@ -63,6 +63,10 @@ cmdstop - Stop pulling data from XYDJ (Pause)
 cmdop000 - Set relay time in minutes (000-999)
 name - Set/Get Device Name
 monitor - Show updatable monitor menu
+short - Get short record status
+short0 - Use long record format (Less days in storage)
+short1 - Use short record format (More days in storage)
+interval - Interval to store in Mins (1-15)
 */
 
 #define BOT_COMMAND_RESTART       F("/restart")
@@ -90,6 +94,8 @@ monitor - Show updatable monitor menu
 #define BOT_COMMAND_SYNC          F("/sync")
 #define BOT_COMMAND_NAME          F("/name")
 #define BOT_COMMAND_MONITOR       F("/monitor")
+#define BOT_COMMAND_SHORT         F("/short")
+#define BOT_COMMAND_INTERVAL      F("/interval")
 
 //Fast Menu
 
@@ -105,7 +111,7 @@ const String GetPMMenu(const float &voltage, const String &chatId, const float& 
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages);
-void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalSize = 0);
+void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalRecordsSize = 0);
 
 // Monitor
 struct PMChatInfo { int32_t msgId = -1; float alarmValue = 0.0; float currentValue = 0.0; };
@@ -201,13 +207,13 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       BOT_MENU_INFO(F("\t"), channel.first);
       value += String(F("[")) + channel.first + F("]") + F("; ");
     }
-  }
+  }else
   if(GetCommandValue(BOT_COMMAND_SYNC, filtered, value))
   {
     bot->sendTyping(msg.chatID);
     const int &intValue = value.toInt();
 
-    if(filtered.length() > String(BOT_COMMAND_SYNC).length() && intValue >= -12 && intValue <= 14)
+    if(value.length() > 0 && intValue >= -12 && intValue <= 14)
     {
       _settings.timeZone = intValue;
       SaveSettings();    
@@ -217,6 +223,31 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(F("Synced time: ")) + epochToDateTime(now);
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  else if(GetCommandValue(BOT_COMMAND_SHORT, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    const int &intValue = value.toInt();
+
+    if(value.length() > 0 && intValue >= 0)
+    {
+      _settings.shortRecord = intValue > 0;
+      SaveSettings();    
+    }    
+    ds->setShortRecord(_settings.shortRecord); 
+    value = String(F("Short record: ")) + (_settings.shortRecord ? F("true") : F("false"));
+  }
+  else if(GetCommandValue(BOT_COMMAND_INTERVAL, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    const int &intValue = value.toInt();
+
+    if(value.length() > 0 && intValue >= 1 && intValue <= 15)
+    {
+      _settings.storeDataTimeout = intValue * 60000;
+      SaveSettings();    
+    }
+    value = String(F("Interval: ")) + String((int)(_settings.storeDataTimeout / 60000)) + F("min.");
+  }
   else if(GetCommandValue(BOT_COMMAND_NAME, filtered, value))
   {
     BOT_MENU_INFO(F("BOT "), F("NAME:"));
@@ -326,7 +357,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     
     const int &last = value.toInt(); 
-    if(filtered.length() > String(BOT_COMMAND_DOWNLOAD).length() && last == 0){
+    if(value.length() > 0 && last == 0){
       value.clear();
       sendStatus(value, messages);
     }else
@@ -338,11 +369,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       String filter = value.isEmpty() ? ds->endDate : value;
       
       int totalRecordsCount = 0;
-      uint32_t totalSize = 0;
+      uint32_t totalRecordsSize = 0;
 
       uint32_t sw = millis();
-      const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
-      BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+      const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize); 
+      BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Size: "), totalRecordsSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 
       if(filesInfo.size() > 0)
       {
@@ -361,7 +392,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
         String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT; 
         BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
 
-        if(bot->sendFile(files, totalSize, outerFileName, msg.chatID) != 1)
+        if(bot->sendFile(files, totalRecordsSize, outerFileName, msg.chatID) != 1)
         {
           value = F("Telegram error");
         }
@@ -384,7 +415,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
-void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalSize){  
+void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalRecordsSize){  
     const auto &total = SPIFFS.totalBytes();
     const auto &used = SPIFFS.usedBytes();
 
@@ -409,10 +440,13 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     messages.push_back(value); value.clear();      
     //value += F("\n");                                                       // NewLine
 
-    value += String(F("Days: ")) + String(ds->getFilesCount()) 
+    int percentage = 100;
+    float daysLeft = DataStorage::getDaysLeft(_settings.storeDataTimeout / 60000, _settings.shortRecord, total, used, percentage);
+
+    value += String(F("Day(s): ")) + String(ds->getFilesCount()) 
           + (totalRecordsCount > 0 ? String(F("\n")) + F("Recs: ") + String(totalRecordsCount) : String(F("")))
-          + (totalSize > 0 ? String(F("\n")) + F("Size: ") + String(totalSize) : String(F("")))
-          + F("\n") + F("Left: ") + String(total - used);
+          + (totalRecordsSize > 0 ? String(F("\n")) + F("Size: ") + String(totalRecordsSize) + F("bytes") : String(F("")))
+          + F("\n") + F("Left: ") + String(daysLeft, 1) + F("Day(s)") + F(" ") + F("(") + String(percentage) + F("%") + F(")");
     messages.push_back(value); value.clear();
     //value += F("\n");                                                       // NewLine
 }
@@ -422,13 +456,13 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 
     String filter;
     int totalRecordsCount = 0;
-    uint32_t totalSize = 0;
+    uint32_t totalRecordsSize = 0;
 
     uint32_t sw = millis();
-    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalSize); 
-    BOT_MENU_TRACE(F("Recs: "), totalRecordsCount, F(" "), F("Size: "), totalSize, F(" "), F("SW:"), millis() - sw, F("ms."));
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize); 
+    BOT_MENU_TRACE(F("Recs: "), totalRecordsCount, F(" "), F("Size: "), totalRecordsSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 
-    sendStatus(value, messages, totalRecordsCount, totalSize);
+    sendStatus(value, messages, totalRecordsCount, totalRecordsSize);
 
     if(filesInfo.size() > 0)
     {

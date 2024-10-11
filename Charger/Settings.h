@@ -37,6 +37,7 @@ namespace UAMap
     uint32_t storeDataTimeout = STORE_DATA_TIMEOUT;
 
     char DeviceName[MAX_DEVICE_NAME_LENGTH];
+    bool shortRecord = false;
 
     void init()
     {      
@@ -46,6 +47,7 @@ namespace UAMap
       notifyHttpCode = 0;      
       timeZone = 3;
       storeDataTimeout = STORE_DATA_TIMEOUT;
+      shortRecord = false;
     }
 
     void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
