@@ -5,7 +5,7 @@
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VER 1.13
+#define VER 1.11
 #define RELEASE
 
 #define ENABLE_TRACE
@@ -18,7 +18,6 @@
 #define USE_DHT
 
 #include "DEBUGHelper.h"
-#include "Helpers.h"
 
 #include "../../Shares/Button.h"
 #include "FeedStatusInfo.h"
@@ -95,10 +94,29 @@ ezButton btnRemoteFeed(REMOTE_FEED_PIN);
 ezButton btnPawFeed(PAW_FEED_PIN);
 
 //Menus Functions
-int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = FEEDS_STATUS_HISTORY_COUNT, const int8_t &step = 1);
-int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = Feed::ScheduleSet::MAX, const int8_t &step = 1);
-int8_t &ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MOTOR_MAX_POS / 2, const int8_t &step = MOTOR_START_POS_INCREMENT);
-int8_t &ShowRotateCount(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MAX_FEED_COUNT, const int8_t &step = 1);
+const bool ShowHistory(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = FEEDS_STATUS_HISTORY_COUNT, const int8_t &step = 1);
+const bool ShowSchedule(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = Feed::ScheduleSet::MAX, const int8_t &step = 1);
+const bool ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MOTOR_MAX_POS / 2, const int8_t &step = MOTOR_START_POS_INCREMENT);
+const bool ShowRotateCount(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions = MAX_FEED_COUNT, const int8_t &step = 1);
+
+const bool ShowMainMenu(int8_t &pos) { TRACE("Main"); return ShowLastAction(); }
+const bool ShowDhtMenu(int8_t &pos){ TRACE("DHT"); return ShowDht(); }
+const bool CanDhtBeShown(int8_t &pos) { TRACE("CanDHT"); return ShowDht(); }
+const bool ShowHistoryMenu(int8_t &pos) { TRACE("Hist"); return ShowHistory(pos); }
+const bool ShowScheduleMenu(int8_t &pos) { TRACE("Sched"); return ShowSchedule(pos); }
+const bool ShowScheduleRangeMenu(int8_t &posLeft, int8_t &posRight) { TRACE("Sched Range"); return true; }
+const bool ShowStartAngleMenu(int8_t &pos) { TRACE("StartAngle"); return ShowStartAngle(pos); }
+const bool ShowRotateCountMenu(int8_t &pos) { TRACE("RotateCount"); return ShowRotateCount(pos); }
+
+MenuMainItem mainMenuItem(ShowMainMenu);
+MenuDhtItem dhtMenuItem(ShowDhtMenu, CanDhtBeShown); 
+MenuHistoryItem historyMenuItem(ShowHistoryMenu);
+MenuScheduleItem scheduleMenuItem(ShowScheduleMenu);
+MenuScheduleRangeItem scheduleRangeMenuItem(ShowScheduleRangeMenu);
+MenuStartAngleItem startAngleMenuItem(ShowStartAngleMenu);
+MenuRotateCountItem rotateCountMenuItem(ShowRotateCountMenu);
+
+MenuItemBase *currentMenuItem = &mainMenuItem;
 
 void setup() 
 {
@@ -108,7 +126,7 @@ void setup()
   Serial.println();
   Serial.println();
   Serial.println("!!!! Start Auto Feeder !!!!");
-  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(' '); Serial.print(__TIME__); Serial.print(' '); Serial.print("V:"); Serial.println(VER);
+  Serial.print("Flash Date: "); Serial.print(__DATE__); Serial.print(" "); Serial.print(__TIME__); Serial.print(" Version: "); Serial.println(VER);
 
   lcd.init();
   lcd.init();
@@ -119,6 +137,15 @@ void setup()
 
   Wire.begin();  
   rtc.attach(Wire);
+
+  mainMenuItem
+  .SetNextMenuItem(dhtMenuItem)
+  .SetNextMenuItem(historyMenuItem)
+  .SetNextMenuItem(scheduleMenuItem)
+  .SetNextMenuItem(scheduleRangeMenuItem)
+  .SetNextMenuItem(startAngleMenuItem)
+  .SetNextMenuItem(rotateCountMenuItem)
+  .SetNextMenuItem(mainMenuItem);
 
 #ifdef USE_DHT
   dht.begin();
@@ -181,14 +208,14 @@ void loop()
     INFO("BACK ", BUTTON_IS_PRESSED_MSG, " menu: ", currentMenu);
     BacklightOn();
 
-    if(currentMenu != Menu::Main && currentMenu != Menu::Dht && currentMenu != Menu::History)
+    if(currentMenuItem->IsSaveSettingsRequired())
     {
       SaveSettings();
     }
-    currentMenu = Menu::Main;
+    currentMenuItem = &mainMenuItem;
     settings.FeedScheduler.SetNextAlarm(rtc);
     ShowLastAction();
-  }  
+  }
 
   if(btnOK.isReleased())
   {
@@ -207,53 +234,42 @@ void loop()
         return;
       }
 
-      btnRt.resetTicks();
-
       INFO("Ok ", BUTTON_IS_LONGPRESSED_MSG);
-      if(currentMenu == Menu::Main)
-      {
-        currentMenu = Menu::Dht;
-        if(!ShowDht())
-        {
-          currentMenu = Menu::History;
-          ShowHistory(historyMenuPos = 0);
-        }
-      }else
-      if(currentMenu == Menu::Dht)
-      {
-        currentMenu = Menu::History;
-        ShowHistory(historyMenuPos = 0);
-      }else      
-      if(currentMenu == Menu::History)
-      {
-        currentMenu = Menu::Schedule;
-        ShowSchedule(scheduleMenuPos = settings.FeedScheduler.Set);
-      }else
-      if(currentMenu == Menu::Schedule)
-      {
-        currentMenu = Menu::StartAngle;
-        ShowStartAngle(startAngleMenuPos = settings.StartAngle);
-      }else
-      if(currentMenu == Menu::StartAngle)
-      {
-        currentMenu = Menu::RotateCount;
-        ShowRotateCount(rotateCountMenuPos = settings.RotateCount - 1);
-      }
-      else currentMenu == Menu::Main;      
-    }
-  }
-  else
-  if(btnRt.isReleased())
-  {
-    INFO("BACK ", BUTTON_IS_RELEASED_MSG);
+      
+      currentMenuItem = currentMenuItem->GetNextMenu();
+      currentMenuItem->Show(-10);      
 
-    if(btnRt.isLongPress())
-    {
-      INFO("BACK ", BUTTON_IS_LONGPRESSED_MSG_MSG);
-      ClearRow(0);
-      lcd.print("V:"); lcd.print(VER); lcd.print("   "); lcd.print(__DATE__);      
-    }    
-    btnRt.resetTicks();
+      // if(currentMenu == Menu::Main)
+      // {
+      //   currentMenu = Menu::Dht;
+      //   if(!ShowDht())
+      //   {
+      //     currentMenu = Menu::History;
+      //     ShowHistory(historyMenuPos = 0);
+      //   }
+      // }else
+      // if(currentMenu == Menu::Dht)
+      // {
+      //   currentMenu = Menu::History;
+      //   ShowHistory(historyMenuPos = 0);
+      // }else      
+      // if(currentMenu == Menu::History)
+      // {
+      //   currentMenu = Menu::Schedule;
+      //   ShowSchedule(scheduleMenuPos = settings.FeedScheduler.Set);
+      // }else
+      // if(currentMenu == Menu::Schedule)
+      // {
+      //   currentMenu = Menu::StartAngle;
+      //   ShowStartAngle(startAngleMenuPos = settings.StartAngle);
+      // }else
+      // if(currentMenu == Menu::StartAngle)
+      // {
+      //   currentMenu = Menu::RotateCount;
+      //   ShowRotateCount(rotateCountMenuPos = settings.RotateCount - 1);
+      // }
+      // else currentMenu == Menu::Main;     
+    }
   }
 
   if(btnUp.isReleased())
@@ -261,22 +277,24 @@ void loop()
     INFO("UP ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);    
     BacklightOn();
 
-    if(currentMenu == Menu::History)
-    { 
-      ShowHistory(++historyMenuPos);      
-    }else
-    if(currentMenu == Menu::Schedule)
-    {
-      ShowSchedule(++scheduleMenuPos);
-    }else
-    if(currentMenu == Menu::StartAngle)
-    {
-      ShowStartAngle(startAngleMenuPos += MOTOR_START_POS_INCREMENT);
-    }else
-    if(currentMenu == Menu::RotateCount)
-    {
-      ShowRotateCount(++rotateCountMenuPos);
-    }    
+    currentMenuItem->UpButtonPressed();
+
+    // if(currentMenu == Menu::History)
+    // { 
+    //   ShowHistory(++historyMenuPos);      
+    // }else
+    // if(currentMenu == Menu::Schedule)
+    // {
+    //   ShowSchedule(++scheduleMenuPos);
+    // }else
+    // if(currentMenu == Menu::StartAngle)
+    // {
+    //   ShowStartAngle(startAngleMenuPos += MOTOR_START_POS_INCREMENT);
+    // }else
+    // if(currentMenu == Menu::RotateCount)
+    // {
+    //   ShowRotateCount(++rotateCountMenuPos);
+    // }    
   }
 
   if(btnDw.isReleased())
@@ -284,25 +302,27 @@ void loop()
     INFO("DOWN ", BUTTON_IS_RELEASED_MSG, " menu: ", currentMenu);    
     BacklightOn();
 
-    if(currentMenu == Menu::History)
-    {           
-      ShowHistory(--historyMenuPos);      
-    }else
-    if(currentMenu == Menu::Schedule)
-    {
-      ShowSchedule(--scheduleMenuPos);
-    }else
-    if(currentMenu == Menu::StartAngle)
-    {
-      ShowStartAngle(startAngleMenuPos -= MOTOR_START_POS_INCREMENT);
-    }else
-    if(currentMenu == Menu::RotateCount)
-    {
-      ShowRotateCount(--rotateCountMenuPos);
-    }    
-  } 
+    currentMenuItem->DownButtonPressed();
 
-  if(currentMenu == Menu::Main)
+    // if(currentMenu == Menu::History)
+    // {           
+    //   ShowHistory(--historyMenuPos);      
+    // }else
+    // if(currentMenu == Menu::Schedule)
+    // {
+    //   ShowSchedule(--scheduleMenuPos);
+    // }else
+    // if(currentMenu == Menu::StartAngle)
+    // {
+    //   ShowStartAngle(startAngleMenuPos -= MOTOR_START_POS_INCREMENT);
+    // }else
+    // if(currentMenu == Menu::RotateCount)
+    // {
+    //   ShowRotateCount(--rotateCountMenuPos);
+    // }    
+  }
+
+  if(*currentMenuItem == Menu::Main)
   {  
     if(btnManualFeed.isPressed())
     {
@@ -413,7 +433,7 @@ const bool DoFeed(const uint8_t &feedCount, const Feed::Status &source, const bo
 }
 
 //Menu
-void ShowLastAction()
+const bool ShowLastAction()
 {  
   const Feed::StatusInfo &lastStatus = settings.GetLastStatus();  
   TRACE("LAST: ", lastStatus.Status != Feed::Status::Unknown ? lastStatus.ToString() : NOT_FED_YET_MSG);
@@ -429,6 +449,8 @@ void ShowLastAction()
   }
 
   ShowNextFeedTime();
+
+  return true;
 }
 
 void ShowNextFeedTime()
@@ -475,8 +497,8 @@ const bool ShowDhtForHistory(const uint16_t &dht)
   if(dht > 0)
   {
     uint8_t t = 0, h = 0;
-    Helpers::StoreHelper::ExtractFromUint16(dht, t, h);
-    ClearRow(1, 8, LCD_COLS, 9);
+    Feed::StoreHelper::ExtractFromUint16(dht, t, h);
+    ClearRow(1, 8, LCD_COLS, 8);
     lcd.print(t); lcd.print('C'); lcd.print(" "); lcd.print(h); lcd.print('%');
     return true;
   }
@@ -490,27 +512,25 @@ const uint16_t GetCombinedDht(const bool &force)
   float t = dht.readTemperature();
   
   if(!isnan(t) && !isnan(h))
-    return Helpers::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
+    return Feed::StoreHelper::CombineToUint16((uint8_t)t, (uint8_t)h);
   #endif
-  return Helpers::StoreHelper::CombineToUint16((uint8_t)rtc.temperature(), 0);
+  return Feed::StoreHelper::CombineToUint16((uint8_t)rtc.temperature(), 0);
 }
 
-int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
-{
+const bool ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
+{ 
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;
 
   const uint8_t idx = maxPositions - pos - 1;
-  const Feed::StatusInfo &status = settings.GetStatusByIndex(pos);  
-
-  TRACE("Hist: ", idx + 1, ": ", status.ToString(), "Count per day: ", settings.GetFeedCountPerDay(status.DT.monthDay()));
+  const Feed::StatusInfo &status = settings.GetStatusByIndex(pos);
+  TRACE("Hist: ", idx + 1, ": ", status.ToString());
 
   ClearRow(0);
   if(status.Status != Feed::Status::Unknown)
-  { 
-    const uint8_t countPerDay = settings.GetFeedCountPerDay(status.DT.monthDay());
+  {    
     lcd.print('#'); lcd.print(idx + 1); lcd.print(": "); lcd.print(status.ToString());
     ClearNextTime();
-    lcd.print(status.GetDateString()); lcd.print(' '); lcd.print(countPerDay);
+    lcd.print(status.GetDateString());
     ShowDhtForHistory(status.DHT);
   } 
   else
@@ -519,11 +539,12 @@ int8_t &ShowHistory(int8_t &pos, const int8_t &minPositions, const int8_t &maxPo
     ClearNextTime();
   } 
 
-  return pos;
+  return true;
 }
 
-int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
+const bool ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
+  pos = pos == -10 ? settings.FeedScheduler.Set : pos;
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
   ClearRow(0);
@@ -537,10 +558,10 @@ int8_t &ShowSchedule(int8_t &pos, const int8_t &minPositions, const int8_t &maxP
 
   ShowNextFeedTime();
 
-  return pos;
+  return true;
 }
 
-int8_t &ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions, const int8_t &step)
+const bool ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions : pos > maxPositions ? minPositions : pos;
 
@@ -551,10 +572,10 @@ int8_t &ShowStartAngle(int8_t &pos, const int8_t &minPositions = 0, const int8_t
 
   TRACE("Start: ", pos, ": ", settings.StartAngle);  
 
-  return pos;
+  return true;
 }
 
-int8_t &ShowRotateCount(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
+const bool ShowRotateCount(int8_t &pos, const int8_t &minPositions, const int8_t &maxPositions, const int8_t &step)
 {
   pos = pos < minPositions ? maxPositions - 1 : pos >= maxPositions ? minPositions : pos;  
 
@@ -565,7 +586,7 @@ int8_t &ShowRotateCount(int8_t &pos, const int8_t &minPositions, const int8_t &m
 
   TRACE("Rotate Count: ", pos + 1);
 
-  return pos;
+  return true;
 }
 
 uint8_t debugButtonFromSerial = 0;
@@ -578,7 +599,7 @@ void HandleDebugSerialCommands()
 
   if(debugButtonFromSerial == 2) //RESET Settings
   {
-    currentMenu = Menu::Main;
+    currentMenuItem = &mainMenuItem;
     settings.Reset();
     SaveSettings();
     ShowLastAction();
@@ -700,11 +721,8 @@ const bool &CheckBacklightDelayAndReturnToMainMenu(const unsigned long &currentT
   if(backlightStartTicks > 0 && currentTicks - backlightStartTicks >= BACKLIGHT_DELAY)
   {      
     backlightStartTicks = 0;
-    currentMenu = Menu::Main;
+    currentMenuItem = &mainMenuItem;
     lcd.noBacklight();
-    btnOK.resetTicks();
-    btnRt.resetTicks();
-    btnManualFeed.resetTicks();
     ShowLastAction();     
     return true;
   }
@@ -728,12 +746,12 @@ void ShowLcdTime(const unsigned long &currentTicks, const DateTime &dtNow)
 { 
   if(currentTicks - prevTicks >= 1000)
   {
-    if(currentMenu == Menu::Dht)
+    if(*currentMenuItem == Menu::Dht)
     {
       ShowDht();
     }
 
-    if(currentMenu == Menu::History && settings.GetStatusByIndex(historyMenuPos).DHT > 0)
+    if(*currentMenuItem == Menu::History && settings.GetStatusByIndex(historyMenuItem.GetPosition()).DHT > 0)
     {
       return;
     }
