@@ -64,6 +64,19 @@ namespace Feed
       }
     }
 
+    const uint8_t GetFeedCountPerDay(const uint16_t &monthDay)
+    {
+      uint8_t res = 0;
+      for(int8_t idx = FEEDS_STATUS_HISTORY_COUNT - 1; idx >= 0 ; idx--)
+      {
+        const auto &histMonthDay = FeedHistory[idx].DT.monthDay();
+        res += histMonthDay == monthDay ? 1 : 0;
+
+        //if(histDay < day) break;
+      }
+      return res;
+    }
+
     private:
     void PushLast(const Feed::StatusInfo& status)
     {
@@ -87,7 +100,7 @@ namespace Feed
         }
       }
       FeedHistory[0] = status;      
-    }
+    }   
   };
 }
 

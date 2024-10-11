@@ -1,0 +1,60 @@
+gay - trolololo
+ua - Ukraine Prapor
+ua1 - Ukraine Parpor with Anthem
+menu - Simple menu
+learn - Learn Regions of Ukraine
+br - Current brightness
+br255 - Max brightness
+br2 - Min brightness
+br1 - Min brightness only alarmed visible
+modealarms - Current Mode
+modealarms0 - Alarms Mode
+modealarms1 - Souvenir Mode UAPrapor
+modealarms2 - Alarms Only Custom Regions Mode
+modesouvenir - Current Souvenir Mode
+modesouvenir0 - Souvenir Mode UA Prapor
+modesouvenir2 - Souvenir Mode BG Prapor
+modesouvenir3 - Souvenir Mode MD Prapor
+fillrgb - Fill RGB Color /fillrgb 255,0,0 #Red
+palette - Palette of Known RGB backcolors
+alarmed - List of currently alarmed regions
+all - List of All regions
+relay1 - Region Id set for Relay1
+relay10 - Switch Off Relay1
+relay2 - Region Id set for Relay2
+relay20 - Switch Off Relay2
+buzztime - Current buzzer time in milliseconds
+buzztime3000 - Set buzzer time to 3secs
+buzztime0 - Switch off buzzer
+schema - Current Color schema
+schema0 - Set Color schema to Blue
+schema1 - Set Color schema to White
+schema2 - Set Color schema to Yellow
+strobe - Stroboscope with current Br & Schema
+rainbow - Rainbow with current Br
+play500_800 - Play tones 500tone,800duration
+pm - Show Power monitor
+powerupdate - Power Monitor update period in milliseconds
+alarmpm - Alarm - send message when voltage <= value
+adjpm - Adjust voltage 0.50-1.0
+register - Register chat
+unregister - Unregister chat
+unregisterall - Unregister all chat(s)
+update - Current period of update in milliseconds
+update10000 - Set period of update to 10secs
+baseuri - Current alerts.api uri
+relay1menu - Relay1 Menu to choose region
+relay2menu - Relay2 Menu to choose region
+token - Current Alerts.Api token
+nstat - Network Statistic
+rssi - WiFi Quality rssi db
+test - test by regionId
+ver - Version Info
+fs - File System Info
+changeconfig - change configuration WiFi, tokens...
+chid - List of registered channels
+notify - Notify saved http code result
+notify0 - Notifications Off
+notify1 - Notify All http code result
+notifynot200 - Notify all http code exclude OK(200)
+notify429 - Notify To-many Requests (429)

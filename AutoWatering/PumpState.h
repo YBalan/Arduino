@@ -1,7 +1,7 @@
 #ifndef PumpState_h
 #define PumpState_h
 
-enum PumpState
+enum PumpState : uint8_t
 {
   ON = 0,
   OFF = 1,  
@@ -10,29 +10,35 @@ enum PumpState
   MANUAL_OFF = 4,
   TIMEOUT_OFF = 5,
   SENSOR_OFF = 6,
+  AERATION_ON = 7,
+  AERATION_OFF = 8,
   UNKNOWN,
 };
 
-static const char * const GetState(const PumpState & state)
+static const __FlashStringHelper* const GetState(const PumpState & state)
 {
     switch(state)
     {
       case ON:
-        return "WATERING ON";
+        return F("WATERING ON");
       case OFF:
-        return "WATERING OFF";
+        return F("WATERING OFF");
       case CALIBRATING:
-        return "CALIBRATING";
+        return F("CALIBRATING");
       case MANUAL_ON:
-        return "MANUAL ON";
+        return F("MANUAL ON");
       case MANUAL_OFF:
-        return "MANUAL OFF";
+        return F("MANUAL OFF");
       case TIMEOUT_OFF:
-        return "TIMEOUT OFF";
+        return F("TIMEOUT OFF");
       case SENSOR_OFF:
-        return "SENSOR OFF";
+        return F("SENSOR OFF");
+      case AERATION_ON:
+        return F("AERATION ON");
+      case AERATION_OFF:
+        return F("AERATION OFF");
       default:
-        return "UNKNOWN";
+        return F("UNKNOWN");
     }
 }  
 

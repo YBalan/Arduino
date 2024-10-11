@@ -25,5 +25,4 @@
   #define SS_TRACE(...) {}
 #endif
 
-
 #endif //DEBUG_HELPER_H

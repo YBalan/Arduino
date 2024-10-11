@@ -2,24 +2,27 @@
 #define Pump_h
 
 #include "PumpState.h"
+#include <String.h>
 
-#define NO_WATER_CODE               "NW"
-#define TIMEOUT_CODE                "T"
-#define CALIBRATING_REQUIRED_CODE   "CL"
+#define NO_WATER_CODE               F("NW")
+#define TIMEOUT_CODE                F("T")
+#define CALIBRATING_REQUIRED_CODE   F("CL")
+#define AERATING_CODE               F("A")
 
-#define SENSOR_LOST_CODE            "L"
-#define SENSOR_NOT_USED_CODE        "NS"
-#define SENSOR_MAX_VALUE_CODE       "D"
-#define SENSOR_MIN_VALUE_CODE       "W"
+#define SENSOR_LOST_CODE            F("L")
+#define SENSOR_NOT_USED_CODE        F("NS")
+#define SENSOR_MAX_VALUE_CODE       F("D")
+#define SENSOR_MIN_VALUE_CODE       F("W")
 
-#define NO_WATER_LCODE               "NoW"
-#define TIMEOUT_LCODE                "ToT"
-#define CALIBRATING_REQUIRED_LCODE   "Cal"
+#define NO_WATER_LCODE               F("NoW")
+#define TIMEOUT_LCODE                F("ToT")
+#define CALIBRATING_REQUIRED_LCODE   F("Cal")
+#define AERATING_LCODE               F("Aer")
 
-#define SENSOR_LOST_LCODE            "LOST"
-#define SENSOR_NOT_USED_LCODE        "NoS"
-#define SENSOR_MAX_VALUE_LCODE       "Dry"
-#define SENSOR_MIN_VALUE_LCODE       "Wet"
+#define SENSOR_LOST_LCODE            F("LOST")
+#define SENSOR_NOT_USED_LCODE        F("NoS")
+#define SENSOR_MAX_VALUE_LCODE       F("Dry")
+#define SENSOR_MIN_VALUE_LCODE       F("Wet")
 
 
 #define DO_NOT_USE_ENOUGH_LOW_LEVEL true
@@ -39,22 +42,30 @@
 #define SENSOR_DOES_NOT_CHANGED_ATTEMPTS 3
 #define SENSOR_CHANGES_LEVEL 10
 
+#ifdef DEBUG
+#define AERATION_TIMEOUT 5000
+#else
+#define AERATION_TIMEOUT 60000
+#endif
+
 struct Pump
 {  
 public:
   struct PumpSettings
   {
     unsigned long WatchDog = 0;
+    unsigned long WatchDogSec = 0;
     int Count = 0;
     short WateringRequired = -1;
     short WateringEnough = -1;
 
-    unsigned short PumpState = OFF;
+    uint8_t PumpState = OFF;
     unsigned short SensorNotChangedCount = 0;
 
     void resetSettings()
     {
-      WatchDog = DEFAULT_PUMP_TIMEOUT;
+      setWatchDog(DEFAULT_PUMP_TIMEOUT);
+      
       Count = 0;
       WateringRequired = DEFAULT_WATERING_REQUIRED_LEVEL;
       WateringEnough = DEFAULT_WATERING_ENOUGH_LEVEL;      
@@ -77,13 +88,19 @@ public:
       resetState();
     }
 
+    void setWatchDog(const unsigned long &watchDog)
+    {
+      WatchDog = watchDog;
+      WatchDogSec = watchDog * 0.001;
+    }
+
   } Settings;
 
 private:
   unsigned long _startTiks = 0;  
-  short _place = -1;
-  short _pumpPin = -1;
-  short _sensorPin = -1;  
+  uint8_t _place = 0;
+  uint8_t _pumpPin = 0;
+  uint8_t _sensorPin = 0;  
 
 private:
   short _sensorValue = -1;
@@ -91,12 +108,12 @@ private:
   short _sensorValueEnd = -1;  
 
 public:
-  Pump(const short &place, const short &pumpPin, const short &sensorPin, const unsigned int &watchDog, const short &wateringRequired, const short &wateringEnough)
+  Pump(const uint8_t &place, const uint8_t &pumpPin, const uint8_t &sensorPin, const unsigned int &watchDog, const short &wateringRequired, const short &wateringEnough)
   {
     _place = place;
     _pumpPin = pumpPin;
-    _sensorPin = sensorPin;
-    Settings.WatchDog = watchDog;
+    _sensorPin = sensorPin;    
+    Settings.setWatchDog(watchDog);
     Settings.WateringRequired = wateringRequired;
     Settings.WateringEnough = wateringEnough;
   }
@@ -109,21 +126,31 @@ public:
   }  
 
   const PumpState getState() const { return Settings.PumpState; }
-  const bool isOff() const { return Settings.PumpState == OFF || Settings.PumpState == MANUAL_OFF || Settings.PumpState == TIMEOUT_OFF || Settings.PumpState == CALIBRATING || Settings.PumpState == SENSOR_OFF; }
-  const bool isOn() const { return Settings.PumpState == ON || Settings.PumpState == MANUAL_ON; }
+  const bool isOff() const { return Settings.PumpState == OFF || Settings.PumpState == MANUAL_OFF || Settings.PumpState == TIMEOUT_OFF || Settings.PumpState == CALIBRATING || Settings.PumpState == SENSOR_OFF || Settings.PumpState == AERATION_OFF; }
+  const bool isOn() const { return Settings.PumpState == ON || Settings.PumpState == MANUAL_ON || Settings.PumpState == AERATION_ON; }
+  const bool IsAeration() const { return Settings.WatchDog >= AERATION_TIMEOUT; }
+  const bool IsAerationInProgress() const { return Settings.PumpState == AERATION_ON || Settings.PumpState == AERATION_OFF; }
   const bool IsCalibratingRequired(){ return Settings.WatchDog == DEFAULT_PUMP_TIMEOUT; }  
-  const unsigned long getTicks() const {return _startTiks;}
+  const unsigned long &getTicks() const { return _startTiks; }
 
   const bool Start(){ return Start(PumpState::ON); }
 
   const bool Start(const PumpState &state)
   {
     if(Settings.PumpState == SENSOR_OFF && state == ON) { return false; }
-    if(state == MANUAL_ON) { Settings.SensorNotChangedCount = 0; }
+    auto newState = state;
+    if(state == MANUAL_ON) 
+    {
+      if(IsAeration()) 
+      {
+        newState = AERATION_ON; 
+      }
+      Settings.SensorNotChangedCount = 0; 
+    }
 
     _startTiks = millis();
-    Settings.PumpState = state;
-    Settings.Count += state == ON ? 1 : 0;
+    Settings.PumpState = newState;
+    Settings.Count += (newState == ON || newState == AERATION_ON) ? 1 : 0;
     _sensorValueStart = GetSensorValue();
     digitalWrite(_pumpPin, ON);
     return true;
@@ -140,16 +167,27 @@ public:
     if(state == CALIBRATING)
     {
       auto time = millis() - _startTiks; 
-      Settings.WatchDog = time + ADDITIONAL_WATCHDOG_TIME; //TODO: define watchdog additional time      
+      Settings.setWatchDog(time + ADDITIONAL_WATCHDOG_TIME); //TODO: define watchdog additional time    
+        
       Settings.WateringRequired = _sensorValueStart;
       Settings.WateringEnough = DO_NOT_USE_ENOUGH_LOW_LEVEL ? DEFAULT_WATERING_ENOUGH_LEVEL : _sensorValueEnd;
       Settings.Count = 0;
       Settings.SensorNotChangedCount = 0;
+    }else
+    // if(state == AERATION_OFF)
+    // {
+    //    _startTiks = millis();
+    //   Settings.PumpState = AERATION_OFF;
+    // }else
+    if(IsAeration() && state != MANUAL_OFF)
+    {
+       _startTiks = millis();
+      Settings.PumpState = AERATION_OFF;
+    }else
+    {
+      _startTiks = 0; 
+      Settings.PumpState = HandleSensorState(state);           
     }
-
-    Settings.PumpState = HandleSensorState(state);    
-
-    _startTiks = 0;
     digitalWrite(_pumpPin, OFF);
     return state == CALIBRATING;
   }  
@@ -161,9 +199,18 @@ public:
 
   const bool IsWatchDogTriggered(const unsigned long &currentTicks) const
   {
-    //Serial.println(_startTiks);
+    if(Settings.PumpState == AERATION_ON || Settings.PumpState == AERATION_OFF) { return false; }
     if(Settings.PumpState == MANUAL_ON || _startTiks == 0){ return false; }
     return (currentTicks - _startTiks) >= Settings.WatchDog;
+  }
+
+  const bool CheckAerationStatus(const unsigned long &currentTicks)
+  { 
+    if(Settings.PumpState != AERATION_ON && Settings.PumpState != AERATION_OFF) { return false; }
+    
+    auto res = _startTiks > 0 && (currentTicks - _startTiks) >= Settings.WatchDog;
+    //TRACE(F("CheckAerationStatus: "), _startTiks, F(" "), res ? F("True") : F("False"));
+    return res;
   }
 
   const bool IsWateringRequired()
@@ -174,6 +221,7 @@ public:
     if(Settings.PumpState == TIMEOUT_OFF) { return false; }
     if(Settings.PumpState == MANUAL_ON) { return false; } 
     if(Settings.PumpState == SENSOR_OFF) { return false; } 
+    if(Settings.PumpState == AERATION_ON || Settings.PumpState == AERATION_OFF) { return false; }
 
     if(isSensorUsed() && isOff())
     {
@@ -196,6 +244,7 @@ public:
 
     if(IsCalibratingRequired()) { return false; }
     if(Settings.PumpState == MANUAL_ON) { return false; }
+    if(Settings.PumpState == AERATION_ON || Settings.PumpState == AERATION_OFF) { return false; }
 
     if(DO_NOT_USE_ENOUGH_LOW_LEVEL && isOn() && _sensorValue <= SENSOR_VALUE_MIN) { return true; }
 
@@ -224,52 +273,39 @@ public:
 
   void ResetState()
   {
-    Settings.resetState();    
+    if(!IsAeration())    
+      Settings.resetState();     
   }
 
   void ResetState(const PumpState &state)
   {
     Settings.resetState(state);
   }
-  
+private:
+  String sensorValueBuff;
+  String statusBuff;   
 public:  
-  const char * const PrintStatus(const bool &showDebugInfo, const unsigned long &currentTicks, char *buff) const
-  { 
-    const auto &ticks = currentTicks == 0 ? millis() : currentTicks;
-    if(showDebugInfo)
-    { 
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} (start:%lu, ticks:%lu sub:%lu) timeout:{%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, _startTiks, ticks, (ticks - _startTiks), Settings.WatchDog);      
-    }
-    else
-    {      
-      sprintf(buff, "Pump:[%d] Sensor:[%d (r:>%d to e:<=%d {used:%d}) Alarm:%d] State:[%s] {Count:%d} {timeout:%lu}", _place, _sensorValue, Settings.WateringRequired, Settings.WateringEnough, isSensorUsed(), Settings.SensorNotChangedCount, GetState(Settings.PumpState), Settings.Count, Settings.WatchDog);      
-    }
-    return buff;
-  }
-
-  const char * const GetFullStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, false, buff); }
-  const char * const GetShortStatus(const bool &hasWater, char *buff) const  { return GetStatus(hasWater, true, buff); }
-  const char * const GetStatus(const bool &hasWater, const bool &shortStatus, char *buff) const
-  {
-    char sensorValueBuff[6];
-    char statusBuff[6]; 
-    strcpy(sensorValueBuff, shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE);
-    strcpy(statusBuff, shortStatus ? TIMEOUT_CODE : TIMEOUT_LCODE);
+  const String GetFullStatus(const bool &hasWater) const  { return GetStatus(hasWater, false); }
+  const String GetShortStatus(const bool &hasWater) const  { return GetStatus(hasWater, true); }
+  const String GetStatus(const bool &hasWater, const bool &shortStatus) const
+  {   
+    sensorValueBuff = F(""); //(shortStatus ? SENSOR_LOST_CODE : SENSOR_LOST_LCODE);
+    statusBuff = (shortStatus ? TIMEOUT_CODE : TIMEOUT_LCODE);
     bool showCount = true;
     
     if(_sensorValue < SENSOR_VALUE_MAX && _sensorValue >= 0)
     {
       if(_sensorValue >= (SENSOR_VALUE_MAX - SENSOR_CHANGES_LEVEL))
       {
-        sprintf(sensorValueBuff, shortStatus ? SENSOR_MAX_VALUE_CODE : SENSOR_MAX_VALUE_LCODE);
+        sensorValueBuff = (shortStatus ? SENSOR_MAX_VALUE_CODE : SENSOR_MAX_VALUE_LCODE);
       }
       else if(_sensorValue <= (0 + SENSOR_CHANGES_LEVEL))
       {
-        sprintf(sensorValueBuff, shortStatus ? SENSOR_MIN_VALUE_CODE : SENSOR_MIN_VALUE_LCODE);
+        sensorValueBuff = (shortStatus ? SENSOR_MIN_VALUE_CODE : SENSOR_MIN_VALUE_LCODE);
       }
       else
       {
-        sprintf(sensorValueBuff, "%d", ToPct(_sensorValue, shortStatus));
+        sensorValueBuff = String(ToPct(_sensorValue, shortStatus));
       }
     }    
 
@@ -277,31 +313,42 @@ public:
     {
       if(Settings.WatchDog == DEFAULT_PUMP_TIMEOUT_SEC)
       {
-        sprintf(statusBuff, shortStatus ? CALIBRATING_REQUIRED_CODE : CALIBRATING_REQUIRED_LCODE);
+        statusBuff = (shortStatus ? CALIBRATING_REQUIRED_CODE : CALIBRATING_REQUIRED_LCODE);
         showCount = false;
-      }
-      else
+      }else
+      // if(IsAeration())
+      // {
+      //   statusBuff = String(shortStatus ? AERATING_CODE : AERATING_LCODE) + String(isOn() ? F("On") : F("Off"));
+      // }
+      // else
       {
         showCount = isSensorUsed();
         if(!hasWater)
         {
-          sprintf(statusBuff, shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
+          statusBuff = (shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
         }
         else
         {            
           showCount 
-            ? sprintf(statusBuff, "%d", ToPct(Settings.WateringRequired, shortStatus)) 
-            //: sprintf(statusBuff, shortStatus ? SENSOR_NOT_USED_CODE : SENSOR_NOT_USED_LCODE);
-            : sprintf(statusBuff, shortStatus ? (isOn() ? "On" : "Of") : SENSOR_NOT_USED_LCODE);          
+            ? statusBuff = String(ToPct(Settings.WateringRequired, shortStatus))             
+            : (statusBuff = shortStatus ? (isOn() ? F("On") : F("Off")) : SENSOR_NOT_USED_LCODE);          
         }
       }
     }
+
+    if(IsAeration())
+    {
+      sensorValueBuff = (shortStatus ? AERATING_CODE : AERATING_LCODE);
+      statusBuff = hasWater 
+                    ? (IsAerationInProgress() ? F("On") : F("Off"))
+                    : (shortStatus ? NO_WATER_CODE : NO_WATER_LCODE);
+      showCount = true;
+    }
     
-    showCount = showCount || !shortStatus;
-    sprintf(buff, showCount ? "%s/%s:%02d" : "%s/%s", sensorValueBuff, statusBuff, Settings.Count);      
+    showCount = showCount || !shortStatus;    
     
-    return buff;
-  }
+    return (sensorValueBuff.length() > 0 ? (sensorValueBuff + F("/")) : String(F(""))) + statusBuff + (showCount ? (String(F(":")) + String(Settings.Count)) : String(F("")));
+  }  
 
 private:
   const PumpState HandleSensorState(const PumpState &state)
