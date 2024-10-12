@@ -104,7 +104,7 @@ const uint32_t SyncTime();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
-const String DeviceReceive();
+const String DeviceReceive(const int &minDelay, const String &whileNotStartWith);
 
 // internal
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
@@ -118,7 +118,7 @@ struct PMChatInfo { int32_t msgId = -1; float alarmValue = 0.0; float currentVal
 static std::map<String, PMChatInfo> pmChatIds;
 void loadMonitorChats(const String &fileName);
 void saveMonitorChats(const String &fileName);
-void sendUpdateMonitorAllMenu(String &deviceName);
+void sendUpdateMonitorAllMenu(const String &deviceName);
 const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId);
 
 
@@ -282,38 +282,62 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT "), F("CMD:"));
     bot->sendTyping(msg.chatID);
 
+    float voltageValue = 0.0;
     const int &intValue = value.toInt();
     String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
     command.toLowerCase();
 
-    if(command.startsWith(F("up")) || command.startsWith(F("dw")))
-    {
+    if(command.startsWith(F("up")) || command.startsWith(F("dw")) || command.startsWith(F("op"))){
       const String &cmd = command.substring(0, 2);
       command.replace('_', '.');
       const float &fVal = command.substring(2).toFloat();
-      if(fVal > 0 && fVal <= 60.0)
-      {
+      if(fVal >= 0 && fVal <= 60.0){
         command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
-      }else
-      {
+        voltageValue = fVal;
+      }else{
         command.clear();      
         value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
       }
     }
 
-    if(!command.isEmpty())
-    {
+    if(command.startsWith(F("on"))){
+
+    }else
+    if(command.startsWith(F("off"))){
+
+    }
+
+    if(!command.isEmpty()){
       SendCommand(command);
 
       value.clear();
       
-      const String &receive = DeviceReceive();
+      const String &waitWhile = command.startsWith(F("get")) ? String(F("U-")) : String(F(""));
+      const String &receive = DeviceReceive(100, waitWhile);
       BOT_MENU_INFO(receive);
-      
-      value = receive;      
 
-      if(value.isEmpty())
-      {
+      if(receive.startsWith(F("U-"))){
+        if(ds->params.readFromXYDJ(receive)){
+          sendUpdateMonitorAllMenu(_settings.DeviceName);
+        }
+      }      
+      
+      value = receive;  
+
+      if(voltageValue > 0.0 && !value.startsWith(F("FALL"))) {
+        if(command.startsWith(F("up"))){
+          ds->params.upVoltage = voltageValue;
+        }else
+        if(command.startsWith(F("dw"))){
+          ds->params.dwVoltage = voltageValue;
+        }else
+        if(command.startsWith(F("op"))){
+          ds->params.opTime = (int)voltageValue;
+        }
+        sendUpdateMonitorAllMenu(_settings.DeviceName);
+      }
+
+      if(value.isEmpty()){
         value = F("Device does not respond...");
       }
     }
@@ -532,6 +556,7 @@ const String getMonitorMenu(){
               + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️"))
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
               + F("\t") + F("📊") //F("📉") F("📉")
+              + F("\n") + ds->params.toString()
               + F("\n") + F("On") + F(": ") + ds->getLastRelayOnStatus()
               + F("\n") + F("Off") + F(": ") + ds->getLastRelayOffStatus()
       ;
@@ -543,12 +568,15 @@ const String getMonitorMenuCallback(){
   String currentDate = ds->endDate;
   currentDate.replace('-', '_');
 
+  String commandCmdGet = String(BOT_COMMAND_CMD) + F("get");
+
   String call = String(BOT_COMMAND_MONITOR) 
               + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )              
               + F(",") + BOT_COMMAND_DOWNLOAD
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate
-              + F(",") + BOT_COMMAND_CMD + F("get")
-              + F(",") + BOT_COMMAND_CMD + F("get")
+              + F(",") + commandCmdGet
+              + F(",") + commandCmdGet
+              + F(",") + commandCmdGet
       ;
   BOT_MENU_TRACE(call);
   return std::move(call);

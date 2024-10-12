@@ -7,6 +7,7 @@
 #include <vector>
 #include <map>
 #include <time.h>
+#include "CommonHelper.h"
 
 #ifdef ENABLE_INFO_DS
 #define DS_INFO(...) SS_TRACE(F("[DS INFO] "), __VA_ARGS__)
@@ -155,8 +156,8 @@ struct Data {
       return Data().writeToCsv(size, shortRecord).length();
     }
 
-    void readFromCsv(const String& receivedFromXYDJ, const bool &shortRecord) {
-        DS_TRACE(F("readFromCsv"));
+    void readFromCsv(const String& csv, const bool &shortRecord) {
+        DS_TRACE(F("Data"), F("::"), F("readFromCsv"));
         char startReasonBuff[6];
         char wifiStatusBuff[6];        
 
@@ -164,9 +165,9 @@ struct Data {
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
 
         if(shortRecord){
-          sscanf(receivedFromXYDJ.c_str(), RECORD_FORMAT_SCANF_SHORT, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn);        
+          sscanf(csv.c_str(), RECORD_FORMAT_SCANF_SHORT, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn);        
         } else{       
-          sscanf(receivedFromXYDJ.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
+          sscanf(csv.c_str(), RECORD_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, (int*)&relayOn, &relayOnHH, &relayOnMM, &relayOnSS, &temperature, &count, startReasonBuff, &reserv1, wifiStatusBuff, &reserv2);        
         }
 
         resetReason = String(startReasonBuff);
@@ -179,7 +180,7 @@ struct Data {
         tm.tm_mon--;          // Convert month from 1-12 to 0-11      
         
         dateTime = mktime(&tm);
-        DS_TRACE(F("From receivedFromXYDJ: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT));        
+        DS_TRACE(F("From csv: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT));        
     }
 
     //00.3,00:00:00,CL
@@ -261,7 +262,7 @@ struct RelayStatus{
    const String writeToCsv(const bool &extended = false) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
 
   void readFromCsv(const String& receivedFromXYDJ) {
-        DS_TRACE(F("readFromCsv"));        
+        DS_TRACE(F("RelayStatus"), F("::"), F("readFromCsv"));
         struct tm tm;             // Struct to hold decomposed time
         memset(&tm, 0, sizeof(tm));  // Initialize tm structure
         sscanf(receivedFromXYDJ.c_str(), RELAY_FORMAT_SCANF, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &voltage, &relayOnHH, &relayOnMM, &relayOnSS);        
@@ -272,6 +273,40 @@ struct RelayStatus{
         dateTime = mktime(&tm);
         DS_TRACE(F("From receivedFromXYDJ: "), dateTime, F(" to epochTime: "), epochToDateTime(dateTime, EXCEL_DATE_FORMAT), F(" "), F("Voltage: "), voltage);              
     }
+};
+
+struct Parameters{
+  float upVoltage = 0.0;
+  float dwVoltage = 0.0;
+  int opTime = 0;
+  String mode;
+
+  //U-1,nL1:12.0,UL1:13.3,OP:000
+  const bool readFromXYDJ(const String &receivedFromXYDJ){
+    const auto &list = CommonHelper::split(receivedFromXYDJ, ',', ':');
+    if(list.size() == 7){
+      mode = list[0];
+      dwVoltage = list[2].toFloat();
+      upVoltage = list[4].toFloat();
+         opTime = list[6].toInt();
+      return true;
+    }
+
+    DS_TRACE(F("Parameters"), F("::"), F("readFromStr"), F("invalid param: "), receivedFromXYDJ);
+    return false;
+  }
+
+  const String toString(){
+    String res = mode 
+               + F(" ")
+               + F("dw") + F(":") + String(dwVoltage, 1) + F("V")
+               + F(" ")
+               + F("up") + F(":") + String(upVoltage, 1) + F("V")
+               + F(" ")
+               + F("op") + F(":") + String(opTime) + F("min")
+        ;
+    return std::move(res);
+  }
 };
 
 class DataStorage {
@@ -288,6 +323,7 @@ public:
     String currentFileName;    
     String startDate;
     String endDate;    
+    Parameters params;
 public:
     DataStorage() = default;
 
