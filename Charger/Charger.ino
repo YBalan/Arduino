@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.17")
+  #define VER F("1.18")
 #endif
 
 //#define RELEASE
@@ -173,7 +173,10 @@ void setup()
 
   if(now > 0) ds->setDateTime(now);
   StartTimers();
-  SendCommand(F("start"));  
+  SendCommand(F("start")); 
+
+  SendCommand(F("get"));
+  ds->params.readFromXYDJ(DeviceReceive(100, F("U-")));
 }
 
 void StartTimers()
@@ -522,15 +525,18 @@ void SendCommand(const String &command)
   XYDJ.print(command);    
 }
 
-const String DeviceReceive()
+const String DeviceReceive(const int &minDelay, const String &whileNotStartWith)
 {
   INFO(F("Waiting for device..."));  
-  String result;
+  String result;  
   
-  delay(100);
+  delay(minDelay);
   while(XYDJ.available() > 0)
   {     
-     result += XYDJ.readStringUntil('\n') + '\n';
+     const auto &read = XYDJ.readStringUntil('\n');
+     if(!whileNotStartWith.isEmpty() && read.startsWith(whileNotStartWith)){
+      result = read; break;            
+     }else result += read + '\n';
   }  
   return std::move(result);
 }
