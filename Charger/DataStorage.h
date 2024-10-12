@@ -392,8 +392,8 @@ public:
       // Calculate how many more days of storage capacity exist
       float daysLeft = remainingSize / daySize;
 
-      // Calculate the percentage of storage already used
-      percentage = (int)(((double)(usedSize) / totalSize) * 100);
+      // Calculate the percentage of storage remain
+      percentage = (int)(((double)(remainingSize) / totalSize) * 100);
 
       DS_TRACE(F("Day: "), daySize, F(" "), F("Rem: "), remainingSize, F(" "), F("Days: "), daysLeft);
       
