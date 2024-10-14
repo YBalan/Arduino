@@ -101,6 +101,8 @@ interval - Interval to store in Mins (1-15)
 
 // From .ino file
 const uint32_t SyncTime();
+void Restart();
+void MountFS();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
@@ -110,7 +112,7 @@ const String DeviceReceive(const int &minDelay, const String &whileNotStartWith)
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
-void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages);
+void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages, const bool &recalculateRecords = false);
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalRecordsSize = 0);
 
 // Monitor
@@ -141,7 +143,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);   
     
   } else
-  #ifdef USE_NOTIFY
+  #ifdef USE_NOTIFY  
   if(GetCommandValue(BOT_COMMAND_NOTIFY, filtered, value))
   { 
     bot->sendTyping(msg.chatID);
@@ -163,7 +165,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     bot->sendTyping(msg.chatID);
     bot->sendMessage(F("Wait for restart..."), msg.chatID);
-    ESP.restart();
+    Restart();
   }else
   if(GetCommandValue(BOT_COMMAND_CHANGE_CONFIG, filtered, value))
   {
@@ -171,7 +173,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     _settings.resetFlag = 1985;
     SaveSettings();
     bot->sendMessage(F("Wait for restart..."), msg.chatID);
-    ESP.restart();
+    Restart();
   }else  
   if(GetCommandValue(BOT_COMMAND_VER, filtered, value))
   {
@@ -181,6 +183,15 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_FS, filtered, value))
   {
     bot->sendTyping(msg.chatID);
+    if(value.startsWith(F("format"))){
+      MFS.format();
+      bot->sendMessage(F("Wait for restart..."), msg.chatID);
+      Restart();
+    }else
+    if(value.startsWith(F("end"))){
+      MFS.end();
+      MountFS();
+    }
     PrintFSInfo(value);
   }else  
   if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
@@ -258,6 +269,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       SaveSettings();
     }
     value = _settings.DeviceName;
+    if(value.isEmpty()){ value = F("Name is empty now..."); }
   }
   else if(GetCommandValue(BOT_COMMAND_MONITOR, filtered, value))
   {
@@ -350,7 +362,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     const int &last = value.toInt();
     value.clear();
-    sendList(last, /*showGet:*/true, /*showRem:*/false, value, messages);
+    sendList(last, /*showGet:*/true, /*showRem:*/false, value, messages, /*recalculateRecords:*/true);
   }
   else
   if(GetCommandValue(BOT_COMMAND_REMOVE, filtered, value))
@@ -401,7 +413,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
       if(filesInfo.size() > 0)
       {
-        filter = String(FILE_PATH) + F("/") + filter;      
+        String outerFileName = _botSettings.botNameForMenu + F("_") + filter;        
 
         std::vector<String> files;
         for(const auto& fi : filesInfo)
@@ -413,7 +425,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
         });     
         
         //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
-        String outerFileName = filter + F("(") + totalRecordsCount + F(")") + FILE_EXT; 
+        outerFileName += String(F("(")) + totalRecordsCount + F(")") + FILE_EXT; 
         BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
 
         if(bot->sendFile(files, totalRecordsSize, outerFileName, msg.chatID) != 1)
@@ -425,6 +437,29 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       }else
         value = F("File(s) not found");
     }
+  }else
+  if(GetCommandValue(BOT_COMMAND_TEST, filtered, value)){ 
+    BOT_MENU_INFO(F("BOT "), F("TEST:"));
+    bot->sendTyping(msg.chatID);    
+    #ifdef DEBUG
+      int days = value.toInt();
+      days = days > 0 ? days : 1;
+      value = String(days) + F(" felt");
+      value.clear();
+      dsTest.setDateTime(1440 * 60);
+      String removedFile;        
+      for(int i = 0; i < 1440 * days; i++){
+        //if(i % 1440 == 0) bot->sendTyping(msg.chatID);
+        BOT_MENU_TRACE(i);
+        if(!dsTest.appendData(60, removedFile)){
+          value += String(F("FALL"));
+          break;
+        }else
+        if(!removedFile.isEmpty()) { value += removedFile + F(" removed!") + '\n'; removedFile.clear(); }
+        //delay(100);
+      }
+    #endif
+    PrintFSInfo(value);    
   }
   
 
@@ -440,8 +475,8 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 }
 
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalRecordsSize){  
-    const auto &total = SPIFFS.totalBytes();
-    const auto &used = SPIFFS.usedBytes();
+    const auto &total = MFS.totalBytes();
+    const auto &used = MFS.usedBytes();
 
     if(!value.isEmpty()){
       messages.push_back(value); value.clear();}
@@ -475,7 +510,7 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     //value += F("\n");                                                       // NewLine
 }
 
-void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages){
+void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages, const bool &recalculateRecords){
     BOT_MENU_INFO(F("BOT "), F("sendList:"));       
 
     String filter;
@@ -483,7 +518,7 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
     uint32_t totalRecordsSize = 0;
 
     uint32_t sw = millis();
-    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize); 
+    const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize, recalculateRecords); 
     BOT_MENU_TRACE(F("Recs: "), totalRecordsCount, F(" "), F("Size: "), totalRecordsSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 
     sendStatus(value, messages, totalRecordsCount, totalRecordsSize);
@@ -605,12 +640,12 @@ void sendUpdateMonitorAllMenu(const String &deviceName){
 
 void saveMonitorChats(const String &fileName){
   BOT_MENU_TRACE(F("saveMonitorChats"));
-  File file = SPIFFS.open(fileName.c_str(), "w");
+  File file = MFS.open(fileName.c_str(), FILE_WRITE);
   CommonHelper::saveMap(file, pmChatIds);  
   file.close();
 
   #ifdef DEBUG
-  file = SPIFFS.open(fileName.c_str(), "r");  
+  file = MFS.open(fileName.c_str(), FILE_READ);  
   BOT_MENU_INFO(file.readString());
   file.close();
   #endif
@@ -622,14 +657,14 @@ void loadMonitorChats(const String &fileName){
   #ifdef DEBUG
   auto &map = pmChatIds;
   {    
-    File file = SPIFFS.open(fileName.c_str(), "r"); 
+    File file = MFS.open(fileName.c_str(), FILE_READ); 
     file.seek(0);
     BOT_MENU_INFO(file.readString());
     file.close();
   }
   #endif
 
-  File file = SPIFFS.open(fileName.c_str(), "r");
+  File file = MFS.open(fileName.c_str(), FILE_READ);
   CommonHelper::loadMap(file, pmChatIds);  
   file.close();
 

@@ -126,14 +126,20 @@ void PrintFSInfo(String &fsInfo)
 {
   #ifdef ESP8266
   FSInfo fs_info;
-  SPIFFS.info(fs_info);   
+  MFS.info(fs_info);   
   const auto &total = fs_info.totalBytes;
   const auto &used = fs_info.usedBytes;
   #else //ESP32
-  const auto &total = SPIFFS.totalBytes();
-  const auto &used = SPIFFS.usedBytes();
+  const auto &total = MFS.totalBytes();
+  const auto &used = MFS.usedBytes();
   #endif
-  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
+  if(!fsInfo.isEmpty()) fsInfo += '\n';
+  #ifdef LITTLEFS
+  String fs = String(F("LittleFS"));
+  #else
+  String fs = String(F("SPIFFS"));
+  #endif
+  fsInfo += fs + F(": ") + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
 }
 
 #endif //ESP_HELPER_H

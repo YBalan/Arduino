@@ -2,6 +2,22 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define LITTLEFS
+
+#ifdef LITTLEFS
+#define MFS LittleFS
+#ifdef ESP32  
+  #include <FS.h>
+  #include <LittleFS.h>
+#endif
+#else
+#define MFS SPIFFS
+#ifdef ESP32  
+  #include <FS.h>
+  #include <SPIFFS.h>
+#endif
+#endif
+
 #define PRODUCT_NAME  F("Charger")
 #define PORTAL_TITLE  String(PRODUCT_NAME) + F("WiFi Manager")
 #define AP_NAME       String(PRODUCT_NAME) + F("_AP")
@@ -24,7 +40,7 @@
   //#define USE_API
   //#define HTTP_TIMEOUT 3000
   #define LANGUAGE_UA
-  #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
+  #define BOT_MAX_INCOME_MSG_SIZE 7000 //should not be less because of menu action takes a lot
   #define USE_BOT_ONE_MSG_ANSWER true
   #define USE_STOPWATCH
   #define USE_NOTIFY

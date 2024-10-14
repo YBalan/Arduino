@@ -24,8 +24,6 @@
 struct FileInfo { size_t size = 0; int linesCount = 0; };
 typedef std::map<String, FileInfo> FilesInfo;
 
-#define fileSystem SPIFFS // LittleFS
-
 #define YEAR_2024_SECONDS   1704075408u
 #define YEAR_2021_SECONDS   1609459200u; // Example timestamp for January 1, 2021
 #define MILLIS_MAX_SECONDS  4294967u
@@ -36,7 +34,9 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define FILE_NAME_FORMAT F("%Y-%m-%d")
 #define BUFFER_DATE_SIZE 30
 
+#define RESERVED_RECORDS_SPACE 10
 #define MAX_RECORD_LENGTH   62  // Target record length with fixed size for consistent read offsets
+#define RESERVED_SPACE ((MAX_RECORD_LENGTH * RESERVED_RECORDS_SPACE) + 4096)
 //#define RECORD_FORMAT       "%lu,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%s,"
 //#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
 
@@ -329,12 +329,12 @@ public:
 
     const Data& begin(const bool &shortRecord) {
         _shortRecord = shortRecord;
-        if (!fileSystem.begin()) {
+        if (!MFS.begin()) {
             DS_INFO(F("fileSystem initialization failed"));
             return Data();
         }
         readLastFileRecord();
-        fileSystem.mkdir(FILE_PATH); 
+        MFS.mkdir(FILE_PATH); 
 
         writeHeader();
         if(!readRelayStatus()){
@@ -357,8 +357,7 @@ public:
       DS_TRACE(F("Off"), F(" -> "), lastRelayOff.writeToCsv());
     }
 
-    void setDateTime(const uint32_t &datetime) { currentData.setDateTime(datetime); /*lastRecord.setDateTime(dateTime);*/  }
-    const uint32_t &getDateTime() const { return currentData.getDateTime(); }
+    void setDateTime(const uint32_t &datetime) { currentData.setDateTime(datetime); }
 
     void setResetReason(const String &resetreason) { currentData.setResetReason(resetreason); }
     const String &getResetReason() const { return currentData.getResetReason(); }
@@ -421,15 +420,18 @@ public:
     static float getDaysLeft(const int &intervalMin, const bool &shortRecord, const int &totalSize, const int &usedSize, int &percentage){
       // Calculate the size of data recorded each day
       int daySize = getDaySize(intervalMin, shortRecord);
+
+      //adjusted totalSize
+      int totalSizeAdj = totalSize - RESERVED_SPACE;
       
       // Calculate remaining storage size
-      int remainingSize = totalSize - usedSize;
+      float remainingSize = totalSizeAdj - usedSize;
 
       // Calculate how many more days of storage capacity exist
       float daysLeft = remainingSize / daySize;
 
       // Calculate the percentage of storage remain
-      percentage = (int)(((double)(remainingSize) / totalSize) * 100);
+      percentage = (int)((remainingSize / totalSizeAdj) * 100);
 
       DS_TRACE(F("Day: "), daySize, F(" "), F("Rem: "), remainingSize, F(" "), F("Days: "), daysLeft);
       
@@ -442,7 +444,7 @@ public:
     const bool writeHeader() {
       String headerName = String(HEADER_FILE_NAME) + FILE_EXT;
       String headerPath = String(FILE_PATH) + F("/") + headerName;        
-      File header = fileSystem.open(headerPath.c_str(), "w");
+      File header = MFS.open(headerPath.c_str(), FILE_WRITE);
       if(!header) { TraceOpenFileFailed(headerPath); return false; }
       else 
       { 
@@ -457,7 +459,7 @@ public:
     const bool writeRelayStatus() const {
       DS_TRACE(F("Write "), F("relayStatus"));  
       String path = String(F("/")) + RELAY_FILE_NAME;
-      File file = fileSystem.open(path.c_str(), "w");
+      File file = MFS.open(path.c_str(), FILE_WRITE);
       if(!file) { TraceOpenFileFailed(path); return false; }
       else 
       { 
@@ -476,7 +478,7 @@ public:
     const bool readRelayStatus(){
       DS_TRACE(F("Read "), F("relayStatus"));
       String path = String(F("/")) + RELAY_FILE_NAME;
-      File file = fileSystem.open(path.c_str(), "r");
+      File file = MFS.open(path.c_str(), FILE_READ);
       if(!file) { TraceOpenFileFailed(path); return false; }
       else 
       {
@@ -499,7 +501,7 @@ public:
     }
 
     void readLastFileRecord() {
-        File root = fileSystem.open(FILE_PATH);
+        File root = MFS.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return; }
 
         String lastFile, firstFile;
@@ -526,7 +528,7 @@ public:
 
         if (!lastFile.isEmpty()) {
             lastFile = String(F("/")) + root.name() + F("/") + lastFile;            
-            file = fileSystem.open(lastFile, "r");
+            file = MFS.open(lastFile, FILE_READ);
             if (!file) { TraceOpenFileFailed(lastFile); return; }
 
             int seek = file.size() - ((MAX_RECORD_LENGTH + 1) * 2);
@@ -547,24 +549,24 @@ public:
     }
 
     public:
-    void appendData(const uint32_t &dateTime) { appendData(currentData, dateTime); }
+    const bool appendData(const uint32_t &dateTime, String &removedFile) { return appendData(currentData, dateTime, removedFile); }
 
     private:
-    void appendData(Data &data, const uint32_t &dateTime) {
+    const bool appendData(Data &data, const uint32_t &dateTime, String &removedFile) {
         data.setDateTime(dateTime);        
         const String &fileName = generateFileName(data.getDateTime());
 
-        manageStorage();
+        manageStorage(removedFile);
 
-        if (fileName != currentFileName || !fileSystem.exists(fileName)) {            
+        if (fileName != currentFileName || !MFS.exists(fileName)) {            
             currentFileName = fileName;
             filesCount++;
             data.count = 0;
             endDate = extractDate(fileName);
         }        
 
-        File file = fileSystem.open(fileName, "a");
-        if (!file) { TraceOpenFileFailed(fileName); return; }
+        File file = MFS.open(fileName, FILE_APPEND);
+        if (!file) { TraceOpenFileFailed(fileName); return false; }
         
         uint16_t realDataSize = 0;
         data.count++;
@@ -573,6 +575,7 @@ public:
         DS_TRACE(F("Size: "), realDataSize, F(" "), F("Wrote: "), size);        
         file.close();
         lastRecord = data;        
+        return true;
     }    
     
     public:
@@ -581,13 +584,13 @@ public:
         return true;
     }
 
-    const FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize) {
+    const FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize, const bool &recalculateRecords = false) {
         FilesInfo result;
         totalSize = 0;
         recordsTotal = 0;
         filesCount = 0; 
 
-        File root = fileSystem.open(FILE_PATH);
+        File root = MFS.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return filesInfo; }
 
         File file = root.openNextFile();
@@ -609,7 +612,7 @@ public:
               if(filter.isEmpty() || fileName.startsWith(filter)) {
                 //DS_TRACE(F("endDate: "), endDate, F(" "), F("fileName: "), fileName, F(" "), F("filesInfo.size: "), filesInfo.size());
                 totalSize += file.size();
-                if(fileName.startsWith(endDate) || filesInfo.count(fileName) == 0){              
+                if(fileName.startsWith(endDate) || filesInfo.count(fileName) == 0 || recalculateRecords){              
                   //out += file.readString();                
                   while (file.available()) {
                       file.readStringUntil('\n') + '\n';                    
@@ -662,7 +665,7 @@ public:
 
     const int removeData(String &filter, const bool &except = false)
     {
-        File root = fileSystem.open(FILE_PATH);
+        File root = MFS.open(FILE_PATH);
         if (!root) { TraceOpenFileFailed(FILE_PATH); return 0; }
 
         File file = root.openNextFile();
@@ -691,7 +694,7 @@ public:
           {
             String fileName = String(F("/")) + root.name() + F("/") + f;
             DS_TRACE(F("Remove: "), fileName);
-            fileSystem.remove(fileName);
+            MFS.remove(fileName);
             filesInfo.erase(f);
             filesCount--; 
             removedFiles++;           
@@ -719,10 +722,13 @@ private:
     }
 
 private:
-    void manageStorage() {
+    void manageStorage(String &removedFile) {
         // Check storage capacity and delete old files if necessary
-        if (fileSystem.totalBytes() - fileSystem.usedBytes() < MAX_RECORD_LENGTH) {
-            File root = fileSystem.open(FILE_PATH);
+        const int sizeLeft = MFS.totalBytes() - MFS.usedBytes();  
+        const int reservedSpace = RESERVED_SPACE;   
+        DS_TRACE(F("manageStorage"), F(" "), F("sizeLeft: "), sizeLeft, F(" "), F("reservedRecordsSize: "), reservedSpace); 
+        if (sizeLeft < reservedSpace) {
+            File root = MFS.open(FILE_PATH);
             if (!root) { TraceOpenFileFailed(FILE_PATH); return; }
 
             String oldestFile, prevFile;
@@ -743,10 +749,10 @@ private:
             file.close();
 
             if (!oldestFile.isEmpty()) {
-                String oldestFilePath = String(F("/")) + root.name() + F("/") + oldestFile;
-                DS_TRACE(F("Old file to remove: "), oldestFilePath, F(" "), F("Prev file: "), prevFile);
-                fileSystem.remove(oldestFilePath);
-                filesInfo.erase(oldestFile);
+                removedFile = String(F("/")) + root.name() + F("/") + oldestFile;
+                DS_TRACE(F("Old file to remove: "), removedFile, F(" "), F("Prev file: "), prevFile);
+                MFS.remove(removedFile);
+                filesInfo.erase(removedFile);
                 startDate = extractDate(prevFile);
                 filesCount--;
             }
@@ -761,5 +767,9 @@ private:
 };
 
 std::unique_ptr<DataStorage> ds(new DataStorage());
+
+#ifdef DEBUG
+DataStorage dsTest;
+#endif
 
 #endif // DATASTORAGE_H

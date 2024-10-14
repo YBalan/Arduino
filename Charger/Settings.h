@@ -72,7 +72,7 @@ UAMap::SettingsExt _settingsExt;
 
 const bool SaveFile(const char* const fileName, const byte* const data, const size_t& size)
 {  
-  File configFile = SPIFFS.open(fileName, "w");
+  File configFile = MFS.open(fileName, FILE_WRITE);
   if (configFile) 
   { 
     configFile.write(data, size);
@@ -84,12 +84,12 @@ const bool SaveFile(const char* const fileName, const byte* const data, const si
 
 const bool LoadFile(const char* const fileName, byte* const data, const size_t& size)
 {
-  if (SPIFFS.begin()) 
+  if (MFS.begin()) 
   {
     SETTINGS_TRACE(F("File system mounted"));
-    if (SPIFFS.exists(fileName)) 
+    if (MFS.exists(fileName)) 
     {
-      File configFile = SPIFFS.open(fileName, "r");
+      File configFile = MFS.open(fileName, FILE_READ);
       if (configFile) 
       {
         SETTINGS_INFO(F("Read file "), fileName);    
@@ -111,9 +111,7 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
   }
   else
   {
-    SETTINGS_INFO(F("Failed to mount FS"));
-    Serial.println(F("\t\t\tFormat..."));
-    SPIFFS.format();
+    SETTINGS_INFO(F("Failed to mount FS"));    
   }
   return false;
 }

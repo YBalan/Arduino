@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.18")
+  #define VER F("1.19")
 #endif
 
 //#define RELEASE
@@ -53,8 +53,7 @@
 #define DEBOUNCE_TIME 50
 
 #ifdef ESP32
-  #define IsESP32 true
-  #include <SPIFFS.h>
+  #define IsESP32 true  
 #else
   #define IsESP32 false
 #endif
@@ -132,6 +131,8 @@ void setup()
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
+  MountFS();
+
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset();
@@ -179,31 +180,43 @@ void setup()
   ds->params.readFromXYDJ(DeviceReceive(100, F("U-")));
 }
 
-void StartTimers()
-{
+void StartTimers(){
   storeDataTicks = millis();
   syncTimeTicks = millis();
 }
 
-void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
-{
+void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager){
   INFO(F("Portal Started: "), manager->getConfigPortalSSID()); 
   digitalWrite(PIN_WIFI_LED_BTN, HIGH); 
 }
 
-const bool IsWiFiOn()
-{
+const bool IsWiFiOn(){
   const auto &wifiBtnState = wifiBtn.getState(); //digitalRead(PIN_WIFI_BTN);  
   return wifiBtnState == LOW;  
 }
 
-void WiFiStatusLED()
-{
+void WiFiStatusLED(){
   digitalWrite(PIN_WIFI_LED_BTN, WiFi.status() == WL_CONNECTED ? HIGH : LOW);
 }
 
-void InitBot()
-{
+void MountFS(){
+  #ifdef LITTLEFS
+  INFO(F("Mount FS"), F(": "), F("LittleFS"));
+  #else
+  INFO(F("Mount FS"), F(": "), F("SPIFFS"));
+  #endif
+  if(!MFS.begin(/*formatOnFail:*/true)){
+    #ifdef LITTLEFS
+    INFO(F("Failed to mount FS"), F(": "), F("LittleFS"));
+    #else
+    INFO(F("Failed to mount FS"), F(": "), F("SPIFFS"));
+    #endif
+    delay(5000);
+    Restart();
+  }
+}
+
+void InitBot(){
   #ifdef USE_BOT  
   LoadChannelIDs();
   if(WiFi.status() == WL_CONNECTED){
@@ -219,8 +232,7 @@ void InitBot()
   #endif
 }
 
-void loop()
-{
+void loop(){
   static uint32_t currentTicks = millis(); 
   currentTicks = millis(); 
 
@@ -246,25 +258,20 @@ void loop()
     WiFi.disconnect();
   }
   static bool saveRequired = false;
-  if(XYDJ.available() > 0)
-  {     
+  if(XYDJ.available() > 0)  {     
     digitalWrite(PIN_WIFI_LED_BTN, !digitalRead(PIN_WIFI_LED_BTN));
     const auto &received = XYDJ.readStringUntil('\n');    
 
-    if(received.startsWith(F("U")))
-    {
+    if(received.startsWith(F("U"))) {
       INFO("EXT Device = ", F("'"), received, F("'"));
     }
-    else if(received.startsWith(F("FALL")))
-    {
+    else if(received.startsWith(F("FALL"))) {
       INFO("EXT Device = ", F("'"), received, F("'"));
     }
-    else if(received.startsWith(F("DOWN")))
-    {
+    else if(received.startsWith(F("DOWN"))) {
       INFO("EXT Device = ", F("'"), received, F("'"));
     }
-    else
-    {
+    else {
       saveRequired = true;      
       const bool isRelayStatusChanged = ds->updateCurrentData(received, millis() - storeDataTicks);            
       INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
@@ -274,8 +281,7 @@ void loop()
     }
   }
   
-  if(Serial.available() > 0)
-  {
+  if(Serial.available() > 0) {
     const auto &sendCommand = Serial.readString();
     TRACE(F("STR "), F("Serial = "), F("'"), sendCommand, F("'"));
     debugCommandFromSerial = sendCommand.toInt();    
@@ -365,11 +371,15 @@ void StoreData(const uint32_t &storeTicks)
 {
   INFO(F("\t\t\t\t\t"), F("Store currentData..."));
   digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-  ds->appendData((int)(storeTicks / 1000));
+  String removedFile;
+  ds->appendData((int)(storeTicks / 1000), removedFile);
   ds->traceToSerial();   
   String fsInfo;
   PrintFSInfo(fsInfo); 
   TRACE(fsInfo);
+  if(!removedFile.isEmpty()){
+    TRACE(F("\t\t\t\t\t"), removedFile, F(" removed!"));
+  }
 }
 
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
@@ -460,7 +470,7 @@ void HandleDebugSerialCommands()
   { 
     // _settings.resetFlag = 1985;
     // SaveSettings();
-    ESP.restart();
+    Restart();
   }
 
   if(debugCommandFromSerial == 2) // Show currentData
@@ -502,10 +512,10 @@ void HandleDebugSerialCommands()
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
     INFO(F("\t\t\t\t\t"), F("Format..."));   
-    SPIFFS.format();
+    MFS.format();
     _settings.resetFlag = 1985;
     SaveSettings();
-    ESP.restart();
+    Restart();
   }
 
   debugCommandFromSerial = 0;
@@ -534,10 +544,17 @@ const String DeviceReceive(const int &minDelay, const String &whileNotStartWith)
   while(XYDJ.available() > 0)
   {     
      const auto &read = XYDJ.readStringUntil('\n');
-     if(!whileNotStartWith.isEmpty() && read.startsWith(whileNotStartWith)){
+     if(!whileNotStartWith.isEmpty() && read.startsWith(whileNotStartWith)){      
       result = read; break;            
      }else result += read + '\n';
   }  
+  TRACE(result);
   return std::move(result);
 }
 
+void Restart(){
+  #ifdef ESP32
+  MFS.end();
+  #endif
+  ESP.restart();
+}

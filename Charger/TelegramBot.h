@@ -64,7 +64,12 @@ class TelegramBot : public FastBot
             else if (OTAstate == 2) ota = String(F("OTA OK")) + F(": ") + VER + F(" -> ") + OTAVersion;
             OTAVersion.clear();
             sendMessage(ota, _otaID);
-            if (OTAstate == 2) ESP.restart();
+            if (OTAstate == 2){
+              #ifdef ESP32
+              MFS.end();
+              #endif
+              ESP.restart();
+            }
             OTAstate = -1;
         }
         #endif
@@ -97,8 +102,8 @@ class TelegramBot : public FastBot
     #ifdef FS_H    
     private:
     void _sendFilesRoutine(FB_SECURE_CLIENT& client, const std::vector<String> &files) {        
-        // Start SPIFFS if not started
-        if (!SPIFFS.begin()) {
+        // Start MFS if not started
+        if (!MFS.begin()) {
             BOT_TRACE("Failed to mount FS");
             return;
         }
@@ -107,7 +112,7 @@ class TelegramBot : public FastBot
             BOT_TRACE(F("Sending file: "), filename);            
             yield(); // watchdog
             // Open the file for reading
-            File file = SPIFFS.open(filename.c_str(), "r");
+            File file = MFS.open(filename.c_str(), FILE_READ);
             if (!file) {
                 BOT_TRACE(F("Failed to open: "), filename);                
                 continue;
