@@ -18,7 +18,7 @@
 #define BOT_TRACE(...) {}
 #endif
 
-#define BOT_MENU_NAME F("Menu")
+#define BOT_MENU_NAME F("") //F("Menu")
 #define BOT_CONNECTION_ISSUES_MSG F(" faced with connection issues")
 
 #define BOT_COMMAND_FRMW_UPDATE F("frmwupdate")
@@ -246,7 +246,7 @@ void SendMessageToAllRegisteredChannels(const String &msg, const bool &useBotNam
 void SaveChannelIDs()
 {
   BOT_INFO(F("SaveChannelIDs"));
-  File configFile = SPIFFS.open("/channelIDs.json", "w");
+  File configFile = MFS.open("/channelIDs.json", FILE_WRITE);
   if (configFile) 
   {
     BOT_TRACE(F("Write channelIDs file"));
@@ -272,7 +272,7 @@ void SaveChannelIDs()
 void LoadChannelIDs()
 {
   BOT_INFO(F("LoadChannelIDs"));
-  File configFile = SPIFFS.open("/channelIDs.json", "r");
+  File configFile = MFS.open("/channelIDs.json", FILE_READ);
   if (configFile) 
   {
     BOT_TRACE(F("Read channelIDs file"));    

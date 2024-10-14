@@ -6,10 +6,6 @@
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 #include <ArduinoJson.h>
 
-#ifdef ESP32
-  #include <SPIFFS.h>
-#endif
-
 #include "DEBUGHelper.h"
 #include "WiFiParameters.h"
 
@@ -111,7 +107,7 @@ class WiFiOps
     void FormatFS()
     {
       //clean FS, for testing
-      SPIFFS.format();
+      MFS.format();
     }
 
     const int ParametersCount() const
@@ -204,8 +200,12 @@ class WiFiOps
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
-        if(portalTimeOut == 0)
-          ESP.restart();        
+        if(portalTimeOut == 0){
+          #ifdef ESP32
+          MFS.end();
+          #endif
+          ESP.restart();
+        }          
       }else{
         //if you get here you have connected to the WiFi
         WIFI_INFO(F("connected...yeey :)"));
@@ -250,7 +250,7 @@ class WiFiOps
           json[p.GetJson()] = readValue;
         }
 
-        File configFile = SPIFFS.open("/config.json", "w");
+        File configFile = MFS.open("/config.json", FILE_WRITE);
         if (!configFile) {
           WIFI_INFO(F("failed to open config file for writing"));
         }
@@ -273,12 +273,12 @@ class WiFiOps
       WIFI_TRACE(F("Load WiFi Settings..."));
       WIFI_TRACE(F("Mounting FS..."));
 
-      if (SPIFFS.begin()) {
+      if (MFS.begin()) {
         WIFI_TRACE(F("File system mounted"));
-        if (SPIFFS.exists("/config.json")) {
+        if (MFS.exists("/config.json")) {
           //file exists, reading and loading
           WIFI_TRACE(F("reading config file"));
-          File configFile = SPIFFS.open("/config.json", "r");
+          File configFile = MFS.open("/config.json", FILE_READ);
           if (configFile) {
             WIFI_TRACE(F("opened config file"));
             size_t size = configFile.size();
