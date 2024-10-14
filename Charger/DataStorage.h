@@ -255,18 +255,18 @@ struct RelayStatus{
   void clearRelayTime() { relayOnHH = 0; relayOnMM = 0; relayOnSS = 0; }
   void setVoltage(const float &volt) { voltage = volt; }
 
-  const String writeToCsv(uint16_t &realDataSize, const String &format = EXCEL_DATE_FORMAT, const bool &extended = false) const {        
+  const String writeToCsv(uint16_t &realDataSize, const String &format = EXCEL_DATE_FORMAT, const bool &extended = false, const bool &debugInfo = true) const {        
         char buffer[MAX_RECORD_LENGTH];        
         const String &dateTimeStr = epochToDateTime(dateTime, format);        
         snprintf(buffer, sizeof(buffer), extended ? RELAY_FORMAT_EXT : RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
         auto res = String(buffer) 
-                  + (extended ? String(F("(")) + String(voltagePrev, 1) + F(",") + String(voltagePost, 1) + F(")") : String(F("")) )
+                  + (debugInfo ? String(F("(")) + String(voltagePrev, 1) + F(",") + String(voltagePost, 1) + F(")") : String(F("")) )
             ;
         realDataSize = res.length();        
         return std::move(res);
   }
 
-   const String writeToCsv(const String &format = EXCEL_DATE_FORMAT, const bool &extended = false) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, format, extended); }
+   const String writeToCsv(const String &format = EXCEL_DATE_FORMAT, const bool &extended = false, const bool &debugInfo = true) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, format, extended, debugInfo); }
 
   void readFromCsv(const String& receivedFromXYDJ) {
         DS_TRACE(F("RelayStatus"), F("::"), F("readFromCsv"));
@@ -416,8 +416,8 @@ public:
     const String getCurrentDateTimeStr() const { return currentData.dateTimeToString(); }
     const String getLastRecordDateTimeStr() const { return lastRecord.dateTimeToString(); }   
 
-    const String getLastRelayOnStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOn.writeToCsv(format, /*extended:*/IsDebug); }
-    const String getLastRelayOffStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOff.writeToCsv(format, /*extended:*/IsDebug); }
+    const String getLastRelayOnStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOn.writeToCsv(format, /*extended:*/true, IsDebug); }
+    const String getLastRelayOffStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOff.writeToCsv(format, /*extended:*/true, IsDebug); }
 
     const int &getFilesCount() const { return filesCount; }
 
