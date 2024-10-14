@@ -96,6 +96,8 @@ interval - Interval to store in Mins (1-15)
 #define BOT_COMMAND_MONITOR       F("/monitor")
 #define BOT_COMMAND_SHORT         F("/short")
 #define BOT_COMMAND_INTERVAL      F("/interval")
+//Service Commands
+#define BOT_COMMAND_UPDOWN_MENU   F("/updw")
 
 //Fast Menu
 
@@ -122,6 +124,8 @@ void loadMonitorChats(const String &fileName);
 void saveMonitorChats(const String &fileName);
 void sendUpdateMonitorAllMenu(const String &deviceName);
 const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId);
+void handleUpDownMenuValues(String &value, const String &chatId);
+void updateAllMonitorsFromDeviceSettings(String &value, const String &waitWhile);
 
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -325,16 +329,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       value.clear();
       
       const String &waitWhile = command.startsWith(F("get")) ? String(F("U-")) : String(F(""));
-      const String &receive = DeviceReceive(100, waitWhile);
-      BOT_MENU_INFO(receive);
-
-      if(receive.startsWith(F("U-"))){
-        if(ds->params.readFromXYDJ(receive)){
-          sendUpdateMonitorAllMenu(_settings.DeviceName);
-        }
-      }      
-      
-      value = receive;  
+      updateAllMonitorsFromDeviceSettings(value, waitWhile);      
 
       if(voltageValue > 0.0 && !value.startsWith(F("FALL"))) {
         if(command.startsWith(F("up"))){
@@ -438,6 +433,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
         value = F("File(s) not found");
     }
   }else
+  if(GetCommandValue(BOT_COMMAND_UPDOWN_MENU, filtered, value)){ 
+    BOT_MENU_INFO(F("BOT "), F("UP DOWN MENU:"));
+    //bot->sendTyping(msg.chatID);  
+    handleUpDownMenuValues(value, msg.chatID);
+  }else
   if(GetCommandValue(BOT_COMMAND_TEST, filtered, value)){ 
     BOT_MENU_INFO(F("BOT "), F("TEST:"));
     bot->sendTyping(msg.chatID);    
@@ -472,6 +472,18 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }
 
   return std::move(messages);
+}
+
+void updateAllMonitorsFromDeviceSettings(String &value, const String &waitWhile){
+  const String &receive = DeviceReceive(100, waitWhile);
+  BOT_MENU_INFO(receive);
+
+  if(receive.startsWith(F("U-"))){
+    if(ds->params.readFromXYDJ(receive)){
+      sendUpdateMonitorAllMenu(_settings.DeviceName);
+    }
+  }      
+  value = receive;  
 }
 
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount, const uint32_t &totalRecordsSize){  
@@ -605,16 +617,122 @@ const String getMonitorMenuCallback(){
 
   String commandCmdGet = String(BOT_COMMAND_CMD) + F("get");
 
-  String call = String(BOT_COMMAND_MONITOR) 
-              + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )              
-              + F(",") + BOT_COMMAND_DOWNLOAD
-              + F(",") + BOT_COMMAND_DOWNLOAD + currentDate
-              + F(",") + commandCmdGet
-              + F(",") + commandCmdGet
-              + F(",") + commandCmdGet
+  String call = String(BOT_COMMAND_MONITOR)                                                         // Voltage
+              + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off
+              + F(",") + BOT_COMMAND_DOWNLOAD                                                       // Last record DateTime
+              + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv
+              + F(",") + BOT_COMMAND_UPDOWN_MENU                                                    // Mode U-1 dw:12.0 up: 13.0 op: 0 min
+              + F(",") + commandCmdGet                                                              // On relay status
+              + F(",") + commandCmdGet                                                              // Off relay status
       ;
   BOT_MENU_TRACE(call);
   return std::move(call);
+}
+
+static std::map<String, int32_t> menuIds;
+static float newUp = 0.0;
+static float newDw = 0.0;
+void sendUpdateUpDownMenu(const float &dwDelta, const float &upDelta, const bool &submit, bool &cancel, const String &deviceName, const String &chatId){
+  BOT_MENU_INFO(F("BOT "), F("sendUpdateUpDownMenu: "), dwDelta, F(" "), upDelta, F(" "), submit, F(" "), cancel);
+
+  float nUp = newUp == 0.0 && upDelta == 0.0 ? ds->params.upVoltage : (newUp + upDelta);
+  float nDw = newDw == 0.0 && dwDelta == 0.0 ? ds->params.dwVoltage : (newDw + dwDelta);
+
+  BOT_MENU_INFO(nDw, F(" "), nUp);
+
+  String menu;
+  String call;
+
+  bool isNewValuesValid = false;
+  if(true || nDw > 0.0 && nUp <= 60.0 && newUp > newDw){
+    isNewValuesValid = true;
+    newUp = nUp;
+    newDw = nDw;
+    BOT_MENU_INFO(newDw, F(" "), newUp);
+  }
+
+  if(!cancel){
+    menu =    String(F("DW")) + F("\t") + F("UP")
+         + F("\n") + F("⤴️") + F("\t") + F("⬆️") + F("\t") + F("⬆️") + F("\t") + F("⤴️") //↖️↗️⬆️↘️↙️⤴️⤵️
+         + F("\n") + String(newDw, 1) + F("V") + F("\t") + String(newUp, 1) + F("V")
+         + F("\n") + F("⤵️") + F("\t") + F("⬇️") + F("\t") + F("⬇️") + F("\t") + F("⤵️") //↖️↗️⬆️↘️↙️⤴️⤵️
+         + F("\n") + F("Submit") + F("\t") + F("Cancel")
+    ;
+
+    // menu =    String(F("DW")) + F("\t") + F("UP")
+    //      + F("\n") + F("+1.0") + F("\t") + F("+0.1") + F("\t") + F("+1.0") + F("\t") + F("+0.1")
+    //      + F("\n") + String(newDw, 1) + F("V") + F("\t") + String(newUp, 1) + F("V")
+    //      + F("\n") + F("-1.0") + F("\t") + F("-0.1") + F("\t") + F("-1.0") + F("\t") + F("-0.1")
+    //      + F("\n") + F("Submit") + F("\t") + F("Cancel")
+    // ;
+
+    String cdw = String(BOT_COMMAND_UPDOWN_MENU) + F("dw");
+    String cup = String(BOT_COMMAND_UPDOWN_MENU) + F("up");
+
+    call = String(F("/0")) + F(",") + F("/0")         //First line DW UP - nothing
+         + F(",") + cdw + F("10") + F(",") + cdw + F("01") // DW - up
+         + F(",") + cup + F("10") + F(",") + cup + F("01") // UP - up
+         + F(",") + F("/0") + F(",") + F("/0")               //3rd line - nothing
+         + F(",") + cdw + F("10_") + F(",") + cdw + F("01_") // DW - down
+         + F(",") + cup + F("10_") + F(",") + cup + F("01_") // UP - down
+         + F(",") + BOT_COMMAND_UPDOWN_MENU + F("Submit") + F(",") + BOT_COMMAND_UPDOWN_MENU + F("Cancel")
+    ;
+  }
+
+  auto &messageId = menuIds[chatId];
+  BOT_MENU_INFO(F("messageId: "), messageId, F(" "), F("chatId: "), chatId);
+  BOT_MENU_INFO(menu);
+  BOT_MENU_INFO(call); 
+
+  if(messageId > 0){      
+    if(submit && isNewValuesValid){
+      ds->params.upVoltage = newUp;
+      ds->params.dwVoltage = newDw;
+      //sendUpdateMonitorAllMenu(_settings.DeviceName); 
+      String cmd = String(F("dw")) + String(newDw, 1) + F(",") + F("up") + String(newUp);
+      BOT_MENU_INFO(cmd);
+      SendCommand(cmd);
+      delay(1000);
+      SendCommand(F("get"));
+      updateAllMonitorsFromDeviceSettings(cmd, F("U-"));
+      BOT_MENU_INFO(cmd);
+      cancel = true;   
+    }
+    if(cancel){
+      bot->deleteMessage(messageId, chatId);
+      menuIds.erase(chatId);
+      newUp = 0.0; newDw = 0.0;
+    }else
+      bot->editMenuCallback(messageId, menu, call, chatId); 
+  }else
+  if(messageId == 0){        
+    bot->inlineMenuCallback(_botSettings.botNameForMenu + F("Params"), menu, call, chatId);
+    messageId = bot->lastBotMsg(); 
+  }  
+}
+
+void handleUpDownMenuValues(String &value, const String &chatId){
+  float upDelta = 0.0;
+  float dwDelta = 0.0;
+  bool submit = false;
+  bool cancel = false;
+  if(!value.isEmpty()){
+    submit = value.startsWith(F("Submit"));
+    cancel = submit || value.startsWith(F("Cancel"));
+
+    if(!cancel){
+      float val = (float)value.substring(2).toInt();
+      bool minus = value.endsWith(F("_"));
+      if(value.startsWith(F("dw"))){
+        dwDelta = (val / 10) * (minus ? -1 : 1);
+      }else
+      if(value.startsWith(F("up"))){
+        upDelta = (val / 10) * (minus ? -1 : 1);
+      }
+      BOT_MENU_INFO(dwDelta, F(" "), upDelta);
+    }
+  }
+  sendUpdateUpDownMenu(dwDelta, upDelta, submit, cancel, _settings.DeviceName, chatId);
 }
 
 const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId){
