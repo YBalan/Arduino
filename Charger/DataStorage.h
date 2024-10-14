@@ -9,6 +9,12 @@
 #include <time.h>
 #include "CommonHelper.h"
 
+#ifdef DEBUG
+static const bool IsDebug = true;
+#else
+static const bool IsDebug = false;
+#endif
+
 #ifdef ENABLE_INFO_DS
 #define DS_INFO(...) SS_TRACE(F("[DS INFO] "), __VA_ARGS__)
 #else
@@ -49,6 +55,7 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define RECORD_FORMAT_SCANF_SHORT  "%d-%d-%d %d:%d:%d,%f,%d"
 
 #define EXCEL_DATE_FORMAT           F("%Y-%m-%d %H:%M:%S")
+#define USER_DATE_FORMAT            F("%H:%M:%S %Y-%m-%d")
 
 #define RELAY_FILE_NAME            F("relayStatus")
 #define RELAY_FORMAT               "%s,%.1f,%03d:%02d:%02d"
@@ -120,7 +127,7 @@ struct Data {
         return *this;
     }
 
-    const String dateTimeToString(const String &format = EXCEL_DATE_FORMAT) const{
+    const String dateTimeToString(const String &format = USER_DATE_FORMAT) const{
       return std::move(epochToDateTime(dateTime, format));
     }
 
@@ -248,9 +255,9 @@ struct RelayStatus{
   void clearRelayTime() { relayOnHH = 0; relayOnMM = 0; relayOnSS = 0; }
   void setVoltage(const float &volt) { voltage = volt; }
 
-  const String writeToCsv(uint16_t &realDataSize, const bool &extended = false) const {        
+  const String writeToCsv(uint16_t &realDataSize, const String &format = EXCEL_DATE_FORMAT, const bool &extended = false) const {        
         char buffer[MAX_RECORD_LENGTH];        
-        const String &dateTimeStr = epochToDateTime(dateTime, EXCEL_DATE_FORMAT);        
+        const String &dateTimeStr = epochToDateTime(dateTime, format);        
         snprintf(buffer, sizeof(buffer), extended ? RELAY_FORMAT_EXT : RELAY_FORMAT, dateTimeStr.c_str(), voltage, relayOnHH, relayOnMM, relayOnSS);
         auto res = String(buffer) 
                   + (extended ? String(F("(")) + String(voltagePrev, 1) + F(",") + String(voltagePost, 1) + F(")") : String(F("")) )
@@ -259,7 +266,7 @@ struct RelayStatus{
         return std::move(res);
   }
 
-   const String writeToCsv(const bool &extended = false) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, extended); }
+   const String writeToCsv(const String &format = EXCEL_DATE_FORMAT, const bool &extended = false) const { uint16_t realDataSize = 0; return writeToCsv(realDataSize, format, extended); }
 
   void readFromCsv(const String& receivedFromXYDJ) {
         DS_TRACE(F("RelayStatus"), F("::"), F("readFromCsv"));
@@ -279,7 +286,7 @@ struct Parameters{
   float upVoltage = 0.0;
   float dwVoltage = 0.0;
   int opTime = 0;
-  String mode;
+  String mode = F("NA");
 
   //U-1,nL1:12.0,UL1:13.3,OP:000
   const bool readFromXYDJ(const String &receivedFromXYDJ){
@@ -409,8 +416,8 @@ public:
     const String getCurrentDateTimeStr() const { return currentData.dateTimeToString(); }
     const String getLastRecordDateTimeStr() const { return lastRecord.dateTimeToString(); }   
 
-    const String getLastRelayOnStatus() const { return lastRelayOn.writeToCsv(/*extended:*/true); }
-    const String getLastRelayOffStatus() const { return lastRelayOff.writeToCsv(/*extended:*/true); }
+    const String getLastRelayOnStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOn.writeToCsv(format, /*extended:*/IsDebug); }
+    const String getLastRelayOffStatus(const String &format = USER_DATE_FORMAT) const { return lastRelayOff.writeToCsv(format, /*extended:*/IsDebug); }
 
     const int &getFilesCount() const { return filesCount; }
 
