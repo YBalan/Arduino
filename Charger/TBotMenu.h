@@ -101,6 +101,13 @@ interval - Interval to store in Mins (1-15)
 
 //Fast Menu
 
+//SHORT_MONITOR_IN_GROUP
+#ifdef SHORT_MONITOR_IN_GROUP
+const bool ShortMonitorInGroup = SHORT_MONITOR_IN_GROUP == true;
+#else
+const bool ShortMonitorInGroup = false;
+#endif
+
 // From .ino file
 const uint32_t SyncTime();
 void Restart();
@@ -598,20 +605,22 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
     }
 }
 
-const String getMonitorMenu(){
+const String getMonitorMenu(const bool &isInGroup){  
+  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
   String menu = String(ds->getVoltage(), 1) + F("V")
               + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️"))
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
               + F("\t") + F("📊") //F("📉") F("📉")
               + F("\n") + ds->params.toString()
-              + F("\n") + F("On") + F(": ") + ds->getLastRelayOnStatus()
-              + F("\n") + F("Off") + F(": ") + ds->getLastRelayOffStatus()
+              + (showRelayStatus ? String(F("\n")) + F("On") + F(": ") + ds->getLastRelayOnStatus() : String(F("")))
+              + (showRelayStatus ? String(F("\n")) + F("Off") + F(": ") + ds->getLastRelayOffStatus() : String(F("")))
       ;
   BOT_MENU_TRACE(menu);
   return std::move(menu);
 }
 
-const String getMonitorMenuCallback(){
+const String getMonitorMenuCallback(const bool &isInGroup){
+  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
   String currentDate = ds->endDate;
   currentDate.replace('-', '_');
 
@@ -622,8 +631,8 @@ const String getMonitorMenuCallback(){
               + F(",") + BOT_COMMAND_DOWNLOAD                                                       // Last record DateTime
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv
               + F(",") + BOT_COMMAND_UPDOWN_MENU                                                    // Mode U-1 dw:12.0 up: 13.0 op: 0 min
-              + F(",") + commandCmdGet                                                              // On relay status
-              + F(",") + commandCmdGet                                                              // Off relay status
+              + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // On relay status
+              + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // Off relay status
       ;
   BOT_MENU_TRACE(call);
   return std::move(call);
@@ -736,8 +745,9 @@ void handleUpDownMenuValues(String &value, const String &chatId){
 }
 
 const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId){
-  const String &menu = getMonitorMenu();
-  const String &call = getMonitorMenuCallback();
+  bool isInGroup = chatId.startsWith(F("-"));
+  const String &menu = getMonitorMenu(isInGroup);
+  const String &call = getMonitorMenuCallback(isInGroup);
   int32_t resMsgId = -1;
 
   if(messageId == -1){

@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.20")
+  #define VER F("1.21")
 #endif
 
 //#define RELEASE
@@ -157,7 +157,7 @@ void setup()
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
     digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false, /*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
     if(_settings.resetFlag == 1985)
     {
       _settings.resetFlag = 200;
@@ -241,7 +241,7 @@ void loop(){
   if(wifiBtn.isPressed())
   {
     TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
-    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT);
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false);
     const auto &now = SyncTime();   
     ds->setDateTime(now); 
     StartTimers();

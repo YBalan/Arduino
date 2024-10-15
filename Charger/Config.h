@@ -29,6 +29,8 @@
 
 #define CONFIG_PORTAL_TIMEOUT 60
 
+#define SHORT_MONITOR_IN_GROUP true
+
 #define USE_BOT
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
