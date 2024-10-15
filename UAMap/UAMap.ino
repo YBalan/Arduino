@@ -20,6 +20,7 @@
 #ifdef DEBUG
 
 #define WM_NODEBUG
+#undef WM_DEBUG_LEVEL
 //#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
 //#define USE_BUZZER_MELODIES 
@@ -50,6 +51,7 @@
 #else
 
 #define WM_NODEBUG
+#undef WM_DEBUG_LEVEL
 //#define WM_DEBUG_LEVEL 0
 
 #endif
