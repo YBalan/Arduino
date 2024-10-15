@@ -65,7 +65,7 @@ class WiFiOps
   public:
     
   public:    
-    WiFiOps(const String &title = "WiFIManager", const String &apName = "AutoConnectAP", const String &apPass = "00000", const bool &addMacToAPName = true) 
+    WiFiOps(const String &title = F("WiFIManager"), const String &apName = F("AutoConnectAP"), const String &apPass = F("password"), const bool &addMacToAPName = true) 
     : _title(std::move(title))
     , _APName(std::move(apName))
     , _APPass(std::move(apPass))
@@ -115,7 +115,7 @@ class WiFiOps
       return _parameters.Count();
     }
 
-    const WiFiParameters &TryToConnectOrOpenConfigPortal(const int &portalTimeOut = 180, const bool &resetSettings = false)
+    const WiFiParameters &TryToConnectOrOpenConfigPortal(const int &portalTimeOut = 180, const bool &restartAfterPortalTimeOut = false, const bool &resetSettings = false)
     {
       WIFI_TRACE(F("TryToConnectOrOpenConfigPortal..."));
 
@@ -200,7 +200,7 @@ class WiFiOps
         WIFI_INFO(F("failed to connect and hit timeout"));
         delay(3000);
         //reset and try again, or maybe put it to deep sleep
-        if(portalTimeOut == 0){
+        if(portalTimeOut == 0 || restartAfterPortalTimeOut){
           #ifdef ESP32
           MFS.end();
           #endif

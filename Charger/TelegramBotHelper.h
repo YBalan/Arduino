@@ -95,7 +95,7 @@ void HangleBotMessages(FB_msg& msg)
   bool isGroup = msg.chatID.startsWith("-");
   if(
     (!isGroup) //In private chat
-    || (msg.text.startsWith(F("/nstat")) || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/pm") || msg.text == BOT_COMMAND_FRMW_UPDATE) //Only /nstat or /rssi or /ver command for all bots in group
+    || (msg.text.startsWith(F("/nstat")) || msg.text == F("/rssi") || msg.text == F("/ver") || msg.text == F("/monitor") || msg.text == BOT_COMMAND_FRMW_UPDATE) //Only /nstat or /rssi or /ver command for all bots in group
     || (botNameIdx = (_botSettings.botName.length() == 0 ? 0 : msg.text.indexOf(_botSettings.botName))) >= 0 //In Groups only if bot tagged
     || (msg.replyText.indexOf(_botSettings.botName) == 0 && msg.replyText.indexOf(REGISTRATION_MSG, botNameIdx + _botSettings.botName.length()) > 0) //In registration
     || (msg.data.length() > 0 && msg.text.indexOf(_botSettings.botNameForMenu) >= 0) //From BOT inline menu
@@ -199,29 +199,29 @@ const bool HandleFrmwUpdate(FB_msg& msg, std::vector<String> &messages)
     fileName.replace(F(".gz"), F(""));
     auto uidx = fileName.lastIndexOf(F("_"));
     bool isEsp32Frmw = fileName.lastIndexOf(F("esp32")) >= 0;
+    const bool isValidProduct = fileName.startsWith(PRODUCT_NAME);
 
     if(uidx >= 0 && uidx < fileName.length() - 1)
     {    
-      if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw))
-      {
-        bot->OTAVersion = fileName.substring(uidx + 1);
-        String currentVersion = String(VER);
-        if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
-        {
-          messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+      if(isValidProduct){
+        if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw)){
+          bot->OTAVersion = fileName.substring(uidx + 1);
+          String currentVersion = String(VER);
+          if(bot->OTAVersion.toFloat() > currentVersion.toFloat()){
+            messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+            BOT_INFO(messages[0]);
+            bot->update();
+          }else{        
+            messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
+            bot->OTAVersion.clear();   
+            BOT_INFO(messages[0]);     
+          }
+        }else{
+          messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
           BOT_INFO(messages[0]);
-          bot->update();
         }
-        else
-        {        
-          messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
-          bot->OTAVersion.clear();   
-          BOT_INFO(messages[0]);     
-        }
-      }
-      else
-      {
-        messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
+      }else{
+        messages.push_back(String(F("Wrong ProductName")) + F(". NO Updates..."));
         BOT_INFO(messages[0]);
       }
     }
