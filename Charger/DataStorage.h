@@ -55,7 +55,7 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define RECORD_FORMAT_SCANF_SHORT  "%d-%d-%d %d:%d:%d,%f,%d"
 
 #define EXCEL_DATE_FORMAT           F("%Y-%m-%d %H:%M:%S")
-#define USER_DATE_FORMAT            F("%H:%M:%S %Y-%m-%d")
+#define USER_DATE_FORMAT            F("%H:%M:%S %d-%m-%Y")
 
 #define RELAY_FILE_NAME            F("relayStatus")
 #define RELAY_FORMAT               "%s,%.1f,%03d:%02d:%02d"
