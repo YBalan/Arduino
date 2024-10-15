@@ -5,7 +5,7 @@
 #ifdef ESP8266
   #define VER F("1.35")
 #else //ESP32
-  #define VER F("1.41")
+  #define VER F("1.42")
 #endif
 
 #define AVOID_FLICKERING
@@ -19,7 +19,8 @@
 
 #ifdef DEBUG
 
-#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
+#define WM_NODEBUG
+//#define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
 //#define USE_BUZZER_MELODIES 
 
@@ -202,7 +203,7 @@ void setup() {
   auto resetButtonState = resetBtn.getState();
   INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
   INFO(F("ResetFlag: "), _settings.resetFlag);
-  wifiOps.TryToConnectOrOpenConfigPortal(/*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+  wifiOps.TryToConnectOrOpenConfigPortal(/*portalTimeout:*/60, /*restartAfterPortalTimeOut*/true, /*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
   if(_settings.resetFlag == 1985)
   {
     _settings.resetFlag = 200;
