@@ -1,0 +1,68 @@
+1.Description:
+XY-DJ is a DC 0-60V Battery Charge Discharge Voltage Monitor. It can input voltage fromDC 0-60VBattery with relay switch output which can controller DC0-30V/AC0-250V various equipment. It can set battery discharge voltage to prevent the battery from over-discharging and causing damage. The output switch turn on to the load when the battery charging voltage rises to the allowable discharge value. Therefore, it can effectively protect the service life of the battery and make the use of the battery safer and more reliable. 
+2.Features:
+	1>.Real-time battery voltage monitoring
+	2>.Automatically cut off the load to protect the battery
+	3>.Automatically start the load when charging is completed
+	4>.Programmable battery stop value and start value
+	5>.Programmable battery charge/discharge time
+	6>.Support button and UART command set parameters
+	7>.Independent output working status signal
+	
+3.Parameters:
+	1>.Product name:XY-DJ DC 0V-60V Battery Charge Discharge Voltage Monitor
+	2>.Work voltage:DC 6V-40V
+	3>.Measured voltage:DC 0V-60V
+	4>.Output type:Relay switch output(No voltage output!!!)
+	5>.Control precision:0.1V
+	6>.Power consumption:<1.0W
+	7>.Load current:10A(Max)
+	8>.Load voltage:DC0-30V or AC0-250V
+	9>.Charge/discharge time:0~999minute
+	10>.Appropriate types:Storage battery, Lithium battery
+	11>.Work Temperature:-25℃~80℃
+	12>.Work Humidity:5%~90%RH
+	13>.Module Size:64*40*19mm
+	
+4.Work Mode:
+	1>.UL1:the Upper limit voltage value. 
+	2>.nL1:the Lower limit voltage value. 
+	3>.The Upper limit voltage value must be greater than the Lower limit voltage value(UL1 > nL1).
+	
+	4>.U-1:Charging Measure Mode. 
+		4.1>.Relay turn ON to start charging if the Battery Measured Value is less then the Lower limit voltage value nL1. 
+		4.2>.Relay turn OFF to stop charging if the Battery Measured Value is more then the Upper limit voltage value UL1. 
+	5>.U-2:Charging Measure Time Control Mode. 
+		5.1>.This mode needs set charging time OP and its set range is 0~999minute. 
+		5.2>.Relay turn ON to start charging if the Battery Measured Value is less then the Lower limit	voltage value nL1. Relay turn OFF and stop charging after the charging time reaches OP. 
+		5.3>.Relay turn OFF to stop charging if the Battery Measured Value is more then the Upper limit voltage value UL1. 
+	6>.U-3:Discharging Measure Mode. 
+		6.1>.Relay turn OFF to stop discharging if the Battery Measured Value is less then the Lower limit voltage value nL1. 
+		6.2>.Relay turn ON to start discharging if the Battery Measured Value is more then the Upper limit voltage value UL1. 
+	7>.U-4:Charging Measure Time Control Mode. 
+		7.1>.This mode needs set charging time OP and its set range is 0~999minute. 
+		7.2>.Relay turn OFF to stop discharging if the Battery Measured Value is less then the Lower limit voltage value nL1. 
+		7.3>.Relay turn ON to start discharging if the Battery Measured Value is more then the Upper limit voltage value UL1.Relay turn OFF and stop discharging after the discharging time reaches OP. 
+	8>.U-5:Turn ON within range:
+		8.1>.Relay turn ON if the Battery Measured Value is between the Lower limit voltage value nL1 and the Upper limit voltage value UL1. Otherwise relay turn OFF. 
+	9>.U-6:Turn ON without range:
+		9.1>.Relay turn ON if the Battery Measured Value is less the Lower limit voltage value nL1 or more than the Upper limit voltage value UL1. Otherwise relay turn OFF. 
+		
+5.Set Parameters:
+	1>.Confirm its working mode at first. 
+	2>.Keep press SET button more than 2 second to enter set mode and then press UP/DOWN button to select work mode U-1 to U-6. XY-DJ DC 0-60V Battery Charge Discharge Voltage Monitor
+	3>.Then press SET button to switch set parameters.The selected parameter will flash automatically. The set parameters are UL1, nL1 and OP. 
+	4>.Then press UP/DOWN button to set parameter value after selected. 
+	5>.Keep press SET button more than 2 second to automatically save the parameters and return to the display interface. 
+	6>.Press DOWN button at normal display interface can switch display measured voltage and time OP. 
+	
+6.Auxiliaries Function:
+	1>.Enable/disable relay status. 
+		1.1>.Press STOP button to switch ON and OFF. 
+		1.2>.ON: Relay is allowed to turn ON during delay time OP. 
+		1.3>.OFF: Relay is forbidden to turn ON and is always keep OFF. 
+	2>.Sleep mode:
+		2.1>.Keep press SET button more than 2 second to switch C-P and O-d. 
+		2.2>.C-P:Sleep mode.The display automatically turns off the display if no operation in 5 minutes. Note:Other functions are operating normally. 
+		2.3>.O-d:Normal mode.Screen keep turn ON. 
+	3>.Work Status Signal Output: It can output a 5V/100mA high level signal from out and gnd pads when relay turn ON. This signal can be used to connect MCU or other equipment.

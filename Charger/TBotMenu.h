@@ -125,7 +125,7 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalRecordsSize = 0);
 
 // Monitor
-struct PMChatInfo { int32_t msgId = -1; float alarmValue = 0.0; float currentValue = 0.0; };
+struct PMChatInfo { int32_t msgId = 0; float alarmValue = 0.0; float currentValue = 0.0; };
 static std::map<String, PMChatInfo> pmChatIds;
 void loadMonitorChats(const String &fileName);
 void saveMonitorChats(const String &fileName);
@@ -291,9 +291,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     loadMonitorChats(MONITOR_CHATS_FILE_NAME);
     #endif
 
+    bool updateMonitor = value.startsWith(F("up"));
+
     auto &chatInfo = pmChatIds[msg.chatID];
-    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, -1);
-    if(msgId != -1){
+    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, updateMonitor ? chatInfo.msgId : 0);
+    if(msgId != chatInfo.msgId){
       chatInfo.msgId = msgId;
       saveMonitorChats(MONITOR_CHATS_FILE_NAME);
     }
@@ -305,24 +307,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT "), F("CMD:"));
     bot->sendTyping(msg.chatID);
 
+    bool isOPTimeChanged = false;
     float voltageValue = 0.0;
     const int &intValue = value.toInt();
     String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
     command.toLowerCase();
 
-    if(command.startsWith(F("up")) || command.startsWith(F("dw")) || command.startsWith(F("op"))){
+    if(command.startsWith(F("up")) || command.startsWith(F("dw"))){
       const String &cmd = command.substring(0, 2);
       command.replace('_', '.');
       const float &fVal = command.substring(2).toFloat();
-      if(fVal >= 0 && fVal <= MAX_VOLTAGE){
+      if(fVal > 0.0 && fVal <= MAX_VOLTAGE){
         command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
         voltageValue = fVal;
       }else{
         command.clear();      
         value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
       }
-    }
-
+    }else
+    if(command.startsWith(F("op"))){
+      const String &cmd = command.substring(0, 2);
+      const int &iVal = command.substring(2).toInt();
+      if(iVal >= 0 && iVal <= MAX_OPTIME){
+        char buff[4];
+        snprintf(buff, sizeof(buff), "%03d", iVal);
+        command = String(buff);
+        voltageValue = iVal;
+        isOPTimeChanged = true;
+      }else{
+        command.clear();      
+        value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
+      }
+    }else
     if(command.startsWith(F("on"))){
 
     }else
@@ -338,14 +354,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       const String &waitWhile = command.startsWith(F("get")) ? String(F("U-")) : String(F(""));
       updateAllMonitorsFromDeviceSettings(value, waitWhile);      
 
-      if(voltageValue > 0.0 && !value.startsWith(F("FALL"))) {
+      if(voltageValue >= 0.0 && !value.startsWith(F("FALL"))) {
         if(command.startsWith(F("up"))){
           ds->params.upVoltage = voltageValue;
         }else
         if(command.startsWith(F("dw"))){
           ds->params.dwVoltage = voltageValue;
         }else
-        if(command.startsWith(F("op"))){
+        if(isOPTimeChanged){
           ds->params.opTime = (int)voltageValue;
         }
         sendUpdateMonitorAllMenu(_settings.DeviceName);
@@ -607,10 +623,13 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 
 const String getMonitorMenu(const bool &isInGroup){  
   bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
-  String menu = String(ds->getVoltage(), 1) + F("V")
-              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️"))
+  String relayStatus = String(F(" ")) + F("[") + (ds->getRelayOn() ? F("On") : F("Off")) + F("]");
+  String btnRelayStatus = String(F(" ")) + F("[") + (!ds->getRelayOn() ? F("On") : F("Off")) + F("]");
+
+  String menu = String(ds->getVoltage(), 1) + F("V") + relayStatus
+              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️")) + btnRelayStatus
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
-              + F("\t") + F("📊") //F("📉") F("📉")
+              + F("\t") + F("📊") + F("(") + FILE_EXT + F(")")  //F("📉") F("📉")
               + F("\n") + ds->params.toString()
               + (showRelayStatus ? String(F("\n")) + F("On") + F(": ") + ds->getLastRelayOnStatus() : String(F("")))
               + (showRelayStatus ? String(F("\n")) + F("Off") + F(": ") + ds->getLastRelayOffStatus() : String(F("")))
@@ -625,12 +644,14 @@ const String getMonitorMenuCallback(const bool &isInGroup){
   currentDate.replace('-', '_');
 
   String commandCmdGet = String(BOT_COMMAND_CMD) + F("get");
+  String monitorCmd = String(BOT_COMMAND_MONITOR) + (isInGroup ? F("up") : F(""));
+  String downloadListCmd = String(BOT_COMMAND_DOWNLOAD) + (ds->getShortRecord() ? F("10") : F(""));
 
   String call = String(BOT_COMMAND_MONITOR)                                                         // Voltage
               + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off
-              + F(",") + BOT_COMMAND_DOWNLOAD                                                       // Last record DateTime
+              + F(",") + (isInGroup ? monitorCmd : downloadListCmd)                                 // Last record DateTime
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv
-              + F(",") + BOT_COMMAND_UPDOWN_MENU                                                    // Mode U-1 dw:12.0 up: 13.0 op: 0 min
+              + F(",") + (isInGroup ? commandCmdGet : String(BOT_COMMAND_UPDOWN_MENU))              // Mode U-1 dw:12.0 up: 13.0 op: 0 min
               + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // On relay status
               + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // Off relay status
       ;
@@ -748,14 +769,15 @@ const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chat
   bool isInGroup = chatId.startsWith(F("-"));
   const String &menu = getMonitorMenu(isInGroup);
   const String &call = getMonitorMenuCallback(isInGroup);
-  int32_t resMsgId = -1;
+  int32_t resMsgId = 0;
 
-  if(messageId == -1){
+  if(messageId <= 0){
     bot->inlineMenuCallback(_botSettings.botNameForMenu + deviceName, menu, call, chatId);
     resMsgId = bot->lastBotMsg(); 
   }
   else{
-    bot->editMenuCallback(messageId, menu, call, chatId);    
+    bot->editMenuCallback(messageId, menu, call, chatId);  
+    resMsgId = messageId;  
   }
   return resMsgId;
 }
