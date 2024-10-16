@@ -623,10 +623,13 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 
 const String getMonitorMenu(const bool &isInGroup){  
   bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
-  String menu = String(ds->getVoltage(), 1) + F("V")
-              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️"))
+  String relayStatus = String(F(" ")) + F("[") + (ds->getRelayOn() ? F("On") : F("Off")) + F("]");
+  String btnRelayStatus = String(F(" ")) + F("[") + (!ds->getRelayOn() ? F("On") : F("Off")) + F("]");
+
+  String menu = String(ds->getVoltage(), 1) + F("V") + relayStatus
+              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️")) + btnRelayStatus
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
-              + F("\t") + F("📊") //F("📉") F("📉")
+              + F("\t") + F("📊") + F("(") + FILE_EXT + F(")")  //F("📉") F("📉")
               + F("\n") + ds->params.toString()
               + (showRelayStatus ? String(F("\n")) + F("On") + F(": ") + ds->getLastRelayOnStatus() : String(F("")))
               + (showRelayStatus ? String(F("\n")) + F("Off") + F(": ") + ds->getLastRelayOffStatus() : String(F("")))
