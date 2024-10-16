@@ -23,6 +23,8 @@
 #define AP_NAME       String(PRODUCT_NAME) + F("_AP")
 #define AP_PASS       F("password")
 
+#define TRACE_TAB           F("\t\t\t\t\t")
+
 #define STORE_DATA_TIMEOUT 60000
 #define SYNC_TIME_TIMEOUT 900000 //15 mins
 #define SYNC_TIME_ATTEMPTS 10
