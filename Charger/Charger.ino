@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.21")
+  #define VER F("1.22")
 #endif
 
 //#define RELEASE
@@ -240,7 +240,7 @@ void loop(){
 
   if(wifiBtn.isPressed())
   {
-    TRACE(BUTTON_IS_PRESSED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));
+    TRACE(BUTTON_IS_PRESSED_MSG, TRACE_TAB, F("WiFi"), F("Switch"));
     wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false);
     const auto &now = SyncTime();   
     ds->setDateTime(now); 
@@ -254,7 +254,7 @@ void loop(){
 
   if(wifiBtn.isReleased())
   {
-    TRACE(BUTTON_IS_RELEASED_MSG, F("\t\t\t\t\t"), F("WiFi"), F("Switch"));   
+    TRACE(BUTTON_IS_RELEASED_MSG, TRACE_TAB, F("WiFi"), F("Switch"));   
     WiFi.disconnect();
   }
   static bool saveRequired = false;
@@ -296,7 +296,7 @@ void loop(){
 
   currentTicks = millis();
   const uint32_t &storeTicks = currentTicks - storeDataTicks;  
-  //TRACE(F("\t\t\t\t\t"), storeTicks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
+  //TRACE(TRACE_TAB, storeTicks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
   if(storeDataTicks > 0 && storeTicks >= _settings.storeDataTimeout)
   {    
     storeDataTicks = currentTicks;
@@ -369,7 +369,7 @@ const uint32_t SyncTime()
 
 void StoreData(const uint32_t &storeTicks)
 {
-  INFO(F("\t\t\t\t\t"), F("Store currentData..."));
+  INFO(TRACE_TAB, F("Store currentData..."));
   digitalWrite(PIN_WIFI_LED_BTN, HIGH);
   String removedFile;
   ds->appendData((int)(storeTicks / 1000), removedFile);
@@ -378,7 +378,7 @@ void StoreData(const uint32_t &storeTicks)
   PrintFSInfo(fsInfo); 
   TRACE(fsInfo);
   if(!removedFile.isEmpty()){
-    TRACE(F("\t\t\t\t\t"), removedFile, F(" removed!"));
+    TRACE(TRACE_TAB, removedFile, F(" removed!"));
   }
 }
 
@@ -451,10 +451,10 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
     {  
       #ifdef ESP32     
       WiFiStatusLED();
-      //TRACE(F("\t\t\t\t\t"), F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
+      //TRACE(TRACE_TAB, F("RECONNECT"), F(" "), F("Status: "), WiFi.status());       
       if(WiFi.status() == WL_CONNECT_FAILED  ||  WiFi.status() == WL_CONNECTION_LOST)
       {        
-        TRACE(F("\t\t\t\t\t"), F("RECONNECT"));
+        TRACE(TRACE_TAB, F("RECONNECT"));
         WiFi.reconnect();
         delay(200);
       }
@@ -476,6 +476,7 @@ void HandleDebugSerialCommands()
   if(debugCommandFromSerial == 2) // Show currentData
   { 
     ds->traceToSerial();
+    ds->traceFilesInfoToSerial();
   }
 
   if(debugCommandFromSerial == 3) // Extract all
@@ -511,7 +512,7 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
-    INFO(F("\t\t\t\t\t"), F("Format..."));   
+    INFO(TRACE_TAB, F("Format..."));   
     MFS.format();
     _settings.resetFlag = 1985;
     SaveSettings();

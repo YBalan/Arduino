@@ -62,13 +62,16 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define RELAY_FORMAT_EXT           "[%s] %.1fV (%03dh:%02dm:%02ds)"
 #define RELAY_FORMAT_SCANF         "%d-%d-%d %d:%d:%d,%f,%d:%d:%d"
 
+#define MAX_VOLTAGE               60.0
+#define MAX_OPTIME                999
+
 struct Data {
   private:
     uint32_t dateTime = YEAR_2024_SECONDS;
     String resetReason = F("Normal");
     String wifiStatus = F("OK");
   public:
-    float voltage = 60.1;
+    float voltage = MAX_VOLTAGE;
     bool relayOn = false;
     uint16_t relayOnHH = 0;
     uint8_t relayOnMM = 0;
@@ -290,12 +293,13 @@ struct Parameters{
 
   //U-1,nL1:12.0,UL1:13.3,OP:000
   const bool readFromXYDJ(const String &receivedFromXYDJ){
+    if(receivedFromXYDJ.length() >= 30) return false;
     const auto &list = CommonHelper::split(receivedFromXYDJ, ',', ':');
     if(list.size() == 7){
       mode = list[0];
-      dwVoltage = list[2].toFloat();
-      upVoltage = list[4].toFloat();
-         opTime = list[6].toInt();
+      dwVoltage = list[2].toFloat(); dwVoltage = dwVoltage > MAX_VOLTAGE ? 0.0 : dwVoltage;
+      upVoltage = list[4].toFloat(); upVoltage = upVoltage > MAX_VOLTAGE ? 0.0 : upVoltage;
+         opTime = list[6].toInt();   opTime = opTime > MAX_OPTIME ? 0 : opTime;
       return true;
     }
 
@@ -327,7 +331,7 @@ private:
   RelayStatus lastRelayOff;
   bool isRelayStatusChanged = false;
 public:
-    String currentFileName;    
+    String currentFilePath;    
     String startDate;
     String endDate;    
     Parameters params;
@@ -337,7 +341,7 @@ public:
     const Data& begin(const bool &shortRecord) {
         _shortRecord = shortRecord;
         if (!MFS.begin()) {
-            DS_INFO(F("fileSystem initialization failed"));
+            DS_INFO(F("Failed to mount FS"));
             return Data();
         }
         readLastFileRecord();
@@ -354,14 +358,20 @@ public:
         return lastRecord;
     }
 
-    void traceToSerial() const
-    {
+    void traceToSerial() const{
       uint16_t size = 0;
-      DS_TRACE(F("CurrentFile: "), currentFileName);
+      DS_TRACE(F("CurrentFile: "), currentFilePath);
       DS_TRACE(F("Last Record: "), lastRecord.writeToCsv(size, _shortRecord), F(" "), F("Count: "), lastRecord.count);
       DS_TRACE(F("startDate: "), startDate, F(" "), F("endDate: "), endDate, F(" "), F("Days: "), filesCount);
-      DS_TRACE(F("On"), F(" -> "), lastRelayOn.writeToCsv());
-      DS_TRACE(F("Off"), F(" -> "), lastRelayOff.writeToCsv());
+      DS_TRACE(F("On"), F(":"), F(" "), lastRelayOn.writeToCsv());
+      DS_TRACE(F("Off"), F(":"), F(" "), lastRelayOff.writeToCsv());
+    }
+
+    void traceFilesInfoToSerial() const{
+      DS_TRACE(F("FilesInfo:"));
+      for(const auto &[key, value] : filesInfo){
+        DS_TRACE(key, F(":"), F(" "), value.linesCount);
+      }
     }
 
     void setDateTime(const uint32_t &datetime) { currentData.setDateTime(datetime); }
@@ -389,7 +399,7 @@ public:
 
       isRelayStatusChanged = prevData.relayOn != currentData.relayOn;
       if (isRelayStatusChanged){
-        DS_TRACE(F("\t\t\t\t\t"), F("Relay status changed..."));
+        DS_TRACE(TRACE_TAB, F("Relay status changed..."));
         if(currentData.relayOn == false){ //Relay OFF
           lastRelayOff.set(prevData);
           lastRelayOff.addDateTime(additionalTime);
@@ -547,7 +557,7 @@ public:
               lastString = file.readStringUntil('\n');
             DS_TRACE(F("Last Record: "), F("'"), lastString, F("'"), F(" "), F("Size: "), lastString.length());
             lastRecord.readFromCsv(lastString, _shortRecord);
-            currentFileName = lastFile;
+            currentFilePath = lastFile;
             file.close();            
         }
         
@@ -560,27 +570,30 @@ public:
 
     private:
     const bool appendData(Data &data, const uint32_t &dateTime, String &removedFile) {
-        data.setDateTime(dateTime);        
-        const String &fileName = generateFileName(data.getDateTime());
+        data.setDateTime(dateTime);
+        String fileName;
+        const String &filePath = generateFilePath(data.getDateTime(), fileName);
 
         manageStorage(removedFile);
 
-        if (fileName != currentFileName || !MFS.exists(fileName)) {            
-            currentFileName = fileName;
+        if (filePath != currentFilePath || !MFS.exists(filePath)) {            
+            currentFilePath = filePath;
             filesCount++;
             data.count = 0;
-            endDate = extractDate(fileName);
+            endDate = extractDate(filePath);
         }        
 
-        File file = MFS.open(fileName, FILE_APPEND);
-        if (!file) { TraceOpenFileFailed(fileName); return false; }
+        File file = MFS.open(filePath, FILE_APPEND);
+        if (!file) { TraceOpenFileFailed(filePath); return false; }
         
         uint16_t realDataSize = 0;
-        data.count++;
+        data.count++;        
         String csv = data.writeToCsv(realDataSize, _shortRecord) + '\n';
         const auto &size = file.write((uint8_t*)csv.c_str(), csv.length());
         DS_TRACE(F("Size: "), realDataSize, F(" "), F("Wrote: "), size);        
         file.close();
+        if(filesInfo.count(fileName) > 0)
+          filesInfo[fileName].linesCount = data.count;
         lastRecord = data;        
         return true;
     }    
@@ -768,8 +781,9 @@ private:
         }
     }
 
-    static const String generateFileName(const uint32_t &epochTime) {        
-        return String(FILE_PATH) + F("/") + Data::epochToDateTime(epochTime, FILE_NAME_FORMAT) + FILE_EXT;
+    static const String generateFilePath(const uint32_t &epochTime, String &fileName) {        
+        fileName = Data::epochToDateTime(epochTime, FILE_NAME_FORMAT) + FILE_EXT;
+        return String(FILE_PATH) + F("/") + fileName;
     }
 };
 

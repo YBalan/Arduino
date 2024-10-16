@@ -314,7 +314,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       const String &cmd = command.substring(0, 2);
       command.replace('_', '.');
       const float &fVal = command.substring(2).toFloat();
-      if(fVal >= 0 && fVal <= 60.0){
+      if(fVal >= 0 && fVal <= MAX_VOLTAGE){
         command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
         voltageValue = fVal;
       }else{
@@ -653,7 +653,7 @@ void sendUpdateUpDownMenu(const float &dwDelta, const float &upDelta, const bool
   String call;
 
   bool isNewValuesValid = false;
-  if(true || nDw > 0.0 && nUp <= 60.0 && newUp > newDw){
+  if(true || nDw > 0.0 && nUp <= MAX_VOLTAGE && newUp > newDw){
     isNewValuesValid = true;
     newUp = nUp;
     newDw = nDw;
