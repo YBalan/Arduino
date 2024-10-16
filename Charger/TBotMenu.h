@@ -125,7 +125,7 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalRecordsSize = 0);
 
 // Monitor
-struct PMChatInfo { int32_t msgId = -1; float alarmValue = 0.0; float currentValue = 0.0; };
+struct PMChatInfo { int32_t msgId = 0; float alarmValue = 0.0; float currentValue = 0.0; };
 static std::map<String, PMChatInfo> pmChatIds;
 void loadMonitorChats(const String &fileName);
 void saveMonitorChats(const String &fileName);
@@ -291,9 +291,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     loadMonitorChats(MONITOR_CHATS_FILE_NAME);
     #endif
 
+    bool updateMonitor = value.startsWith(F("up"));
+
     auto &chatInfo = pmChatIds[msg.chatID];
-    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, -1);
-    if(msgId != -1){
+    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, updateMonitor ? chatInfo.msgId : 0);
+    if(msgId != chatInfo.msgId){
       chatInfo.msgId = msgId;
       saveMonitorChats(MONITOR_CHATS_FILE_NAME);
     }
@@ -639,12 +641,14 @@ const String getMonitorMenuCallback(const bool &isInGroup){
   currentDate.replace('-', '_');
 
   String commandCmdGet = String(BOT_COMMAND_CMD) + F("get");
+  String monitorCmd = String(BOT_COMMAND_MONITOR) + (isInGroup ? F("up") : F(""));
+  String downloadListCmd = String(BOT_COMMAND_DOWNLOAD) + (ds->getShortRecord() ? F("10") : F(""));
 
   String call = String(BOT_COMMAND_MONITOR)                                                         // Voltage
               + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off
-              + F(",") + BOT_COMMAND_DOWNLOAD                                                       // Last record DateTime
+              + F(",") + (isInGroup ? monitorCmd : downloadListCmd)                                 // Last record DateTime
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv
-              + F(",") + BOT_COMMAND_UPDOWN_MENU                                                    // Mode U-1 dw:12.0 up: 13.0 op: 0 min
+              + F(",") + (isInGroup ? commandCmdGet : String(BOT_COMMAND_UPDOWN_MENU))              // Mode U-1 dw:12.0 up: 13.0 op: 0 min
               + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // On relay status
               + (showRelayStatus ? String(F(",")) + commandCmdGet : String(F("")))                  // Off relay status
       ;
@@ -762,14 +766,15 @@ const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chat
   bool isInGroup = chatId.startsWith(F("-"));
   const String &menu = getMonitorMenu(isInGroup);
   const String &call = getMonitorMenuCallback(isInGroup);
-  int32_t resMsgId = -1;
+  int32_t resMsgId = 0;
 
-  if(messageId == -1){
+  if(messageId <= 0){
     bot->inlineMenuCallback(_botSettings.botNameForMenu + deviceName, menu, call, chatId);
     resMsgId = bot->lastBotMsg(); 
   }
   else{
-    bot->editMenuCallback(messageId, menu, call, chatId);    
+    bot->editMenuCallback(messageId, menu, call, chatId);  
+    resMsgId = messageId;  
   }
   return resMsgId;
 }
