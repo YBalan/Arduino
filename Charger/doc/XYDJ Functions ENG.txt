@@ -50,10 +50,19 @@ XY-DJ is a DC 0-60V Battery Charge Discharge Voltage Monitor. It can input volta
 		
 5.Set Parameters:
 	1>.Confirm its working mode at first. 
-	2>.Keep press SET button more than 2 second to enter set mode and then press UP/DOWN button to select work mode U-1 to U-6. 
-	XY-DJ DC 0-60V Battery Charge Discharge Voltage Monitor
-	3>.Then press SET button to switch set parameters.The selected parameter will flash automatically. The set parameters are UL1, nL1 and OP. 4>.Then press UP/DOWN button to set parameter value after selected. 5>.Keep press SET button more than 2 second to automatically save the parameters and return to the display interface. 6>.Press DOWN button at normal display interface can switch display measured voltage and time OP. 
+	2>.Keep press SET button more than 2 second to enter set mode and then press UP/DOWN button to select work mode U-1 to U-6. XY-DJ DC 0-60V Battery Charge Discharge Voltage Monitor
+	3>.Then press SET button to switch set parameters.The selected parameter will flash automatically. The set parameters are UL1, nL1 and OP. 
+	4>.Then press UP/DOWN button to set parameter value after selected. 
+	5>.Keep press SET button more than 2 second to automatically save the parameters and return to the display interface. 
+	6>.Press DOWN button at normal display interface can switch display measured voltage and time OP. 
 	
 6.Auxiliaries Function:
-	1>.Enable/disable relay status. 1.1>.Press STOP button to switch ON and OFF. 1.2>.ON: Relay is allowed to turn ON during delay time OP. 1.3>.OFF: Relay is forbidden to turn ON and is always keep OFF. 2>.Sleep mode:
-	2.1>.Keep press SET button more than 2 second to switch C-P and O-d. 2.2>.C-P:Sleep mode.The display automatically turns off the display if no operation in 5 minutes. Note:Other functions are operating normally. 2.3>.O-d:Normal mode.Screen keep turn ON. 3>.Work Status Signal Output: It can output a 5V/100mA high level signal from out and gnd pads when relay turn ON. This signal can be used to connect MCU or other equipment.
+	1>.Enable/disable relay status. 
+		1.1>.Press STOP button to switch ON and OFF. 
+		1.2>.ON: Relay is allowed to turn ON during delay time OP. 
+		1.3>.OFF: Relay is forbidden to turn ON and is always keep OFF. 
+	2>.Sleep mode:
+		2.1>.Keep press SET button more than 2 second to switch C-P and O-d. 
+		2.2>.C-P:Sleep mode.The display automatically turns off the display if no operation in 5 minutes. Note:Other functions are operating normally. 
+		2.3>.O-d:Normal mode.Screen keep turn ON. 
+	3>.Work Status Signal Output: It can output a 5V/100mA high level signal from out and gnd pads when relay turn ON. This signal can be used to connect MCU or other equipment.
