@@ -305,24 +305,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT "), F("CMD:"));
     bot->sendTyping(msg.chatID);
 
+    bool isOPTimeChanged = false;
     float voltageValue = 0.0;
     const int &intValue = value.toInt();
     String command = value.isEmpty() || intValue > 0 ? String(F("get")) : value;
     command.toLowerCase();
 
-    if(command.startsWith(F("up")) || command.startsWith(F("dw")) || command.startsWith(F("op"))){
+    if(command.startsWith(F("up")) || command.startsWith(F("dw"))){
       const String &cmd = command.substring(0, 2);
       command.replace('_', '.');
       const float &fVal = command.substring(2).toFloat();
-      if(fVal >= 0 && fVal <= MAX_VOLTAGE){
+      if(fVal > 0.0 && fVal <= MAX_VOLTAGE){
         command = cmd + (fVal < 10 ? F("0") : F("")) + String(fVal, 1);
         voltageValue = fVal;
       }else{
         command.clear();      
         value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
       }
-    }
-
+    }else
+    if(command.startsWith(F("op"))){
+      const String &cmd = command.substring(0, 2);
+      const int &iVal = command.substring(2).toInt();
+      if(iVal >= 0 && iVal <= MAX_OPTIME){
+        char buff[4];
+        snprintf(buff, sizeof(buff), "%03d", iVal);
+        command = String(buff);
+        voltageValue = iVal;
+        isOPTimeChanged = true;
+      }else{
+        command.clear();      
+        value = String(F("'")) + value + F("'") + F(" ") + F("Wrong command");
+      }
+    }else
     if(command.startsWith(F("on"))){
 
     }else
@@ -338,14 +352,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       const String &waitWhile = command.startsWith(F("get")) ? String(F("U-")) : String(F(""));
       updateAllMonitorsFromDeviceSettings(value, waitWhile);      
 
-      if(voltageValue > 0.0 && !value.startsWith(F("FALL"))) {
+      if(voltageValue >= 0.0 && !value.startsWith(F("FALL"))) {
         if(command.startsWith(F("up"))){
           ds->params.upVoltage = voltageValue;
         }else
         if(command.startsWith(F("dw"))){
           ds->params.dwVoltage = voltageValue;
         }else
-        if(command.startsWith(F("op"))){
+        if(isOPTimeChanged){
           ds->params.opTime = (int)voltageValue;
         }
         sendUpdateMonitorAllMenu(_settings.DeviceName);
