@@ -374,6 +374,8 @@ public:
       }
     }
 
+    const int clearFilesInfo(){ int res = filesInfo.size(); filesInfo.clear(); return res; }
+
     void setDateTime(const uint32_t &datetime) { currentData.setDateTime(datetime); }
 
     void setResetReason(const String &resetreason) { currentData.setResetReason(resetreason); }

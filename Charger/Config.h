@@ -33,6 +33,8 @@
 
 #define SHORT_MONITOR_IN_GROUP true
 
+#define RESET_WIFI_FLAG 1985
+
 #define USE_BOT
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
