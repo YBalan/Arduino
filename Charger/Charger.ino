@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.24")
+  #define VER F("1.25")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -157,8 +157,8 @@ void setup()
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
     digitalWrite(PIN_WIFI_LED_BTN, HIGH);
-    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false, /*resetSettings:*/_settings.resetFlag == 1985 /*|| resetButtonState == LOW*/);
-    if(_settings.resetFlag == 1985)
+    wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false, /*resetSettings:*/_settings.resetFlag == RESET_WIFI_FLAG /*|| resetButtonState == LOW*/);
+    if(_settings.resetFlag == RESET_WIFI_FLAG)
     {
       _settings.resetFlag = 200;
       SaveSettings();
@@ -466,10 +466,15 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
 
 void HandleDebugSerialCommands()
 {
-  if(debugCommandFromSerial == 1) // Reset WiFi
+  if(debugCommandFromSerial == 1) // restart
+  {
+    Restart();
+  }
+
+  if(debugCommandFromSerial == 140) // Reset WiFi
   { 
-    // _settings.resetFlag = 1985;
-    // SaveSettings();
+    _settings.resetFlag = RESET_WIFI_FLAG;
+    SaveSettings();
     Restart();
   }
 
@@ -514,7 +519,7 @@ void HandleDebugSerialCommands()
   { 
     INFO(TRACE_TAB, F("Format..."));   
     MFS.format();
-    _settings.resetFlag = 1985;
+    _settings.resetFlag = RESET_WIFI_FLAG;
     SaveSettings();
     Restart();
   }

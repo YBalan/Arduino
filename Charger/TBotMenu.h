@@ -293,14 +293,20 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     bool updateMonitor = value.startsWith(F("up"));
 
+    if(value.startsWith(F("cl"))){
+      value = String(pmChatIds.size()) + F(" ") + F("chatId") + F(" ") + F("cleared");
+      pmChatIds.clear();
+      saveMonitorChats(MONITOR_CHATS_FILE_NAME);
+    }else{
+      value.clear();
+    }    
+
     auto &chatInfo = pmChatIds[msg.chatID];
     const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, updateMonitor ? chatInfo.msgId : 0);
     if(msgId != chatInfo.msgId){
       chatInfo.msgId = msgId;
       saveMonitorChats(MONITOR_CHATS_FILE_NAME);
-    }
-
-    value.clear();
+    }    
   }
   else if(GetCommandValue(BOT_COMMAND_CMD, filtered, value))
   {
