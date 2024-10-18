@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.25")
+  #define VER F("1.26")
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -273,10 +273,11 @@ void loop(){
     }
     else {
       saveRequired = true;      
-      const bool isRelayStatusChanged = ds->updateCurrentData(received, millis() - storeDataTicks);            
+      const bool isRelayStatusChanged = ds->updateCurrentData(received, (millis() - storeDataTicks) / 1000);            
       INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
       if(isRelayStatusChanged){
         sendUpdateMonitorAllMenu(_settings.DeviceName);
+        StartTimers();
       }
     }
   }

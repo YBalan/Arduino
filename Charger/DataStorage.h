@@ -384,7 +384,7 @@ public:
     void setWiFiStatus(const String &wifistatus) { currentData.setWiFiStatus(wifistatus); }
     const String &getWiFiStatus() const { return currentData.getWiFiStatus(); }
 
-    const bool updateCurrentData(const String &receivedFromXYDJ, const uint32_t &additionalTime = 0) {      
+    const bool updateCurrentData(const String &receivedFromXYDJ, const uint32_t &additionalTimeSec = 0) {      
       Data prevData = currentData;
       currentData.readFromXYDJ(receivedFromXYDJ); 
 
@@ -404,15 +404,17 @@ public:
         DS_TRACE(TRACE_TAB, F("Relay status changed..."));
         if(currentData.relayOn == false){ //Relay OFF
           lastRelayOff.set(prevData);
-          lastRelayOff.addDateTime(additionalTime);
+          lastRelayOff.addDateTime(additionalTimeSec);
           lastRelayOff.voltagePrev = currentData.voltage;
           lastRelayOn.clearRelayTime();
         }else{                        //Relay On
           lastRelayOn.set(prevData);
-          lastRelayOn.addDateTime(additionalTime);
+          lastRelayOn.addDateTime(additionalTimeSec);
           lastRelayOn.voltagePrev = currentData.voltage;
         }  
         writeRelayStatus();
+        
+        appendData(additionalTimeSec);
       }
       if(getRelayOn()) lastRelayOn.setRelayTime(currentData);
       return isRelayStatusChanged;
@@ -569,6 +571,7 @@ public:
 
     public:
     const bool appendData(const uint32_t &dateTime, String &removedFile) { return appendData(currentData, dateTime, removedFile); }
+    const bool appendData(const uint32_t &dateTime) { String removedFile; return appendData(currentData, dateTime, removedFile); }
 
     private:
     const bool appendData(Data &data, const uint32_t &dateTime, String &removedFile) {
