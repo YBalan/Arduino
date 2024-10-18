@@ -3,11 +3,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.26")
+  #define VER F("1.27")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -317,7 +317,8 @@ void loop(){
     }
     saveRequired = false;
 
-    sendUpdateMonitorAllMenu(_settings.DeviceName);
+    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
+      sendUpdateMonitorAllMenu(_settings.DeviceName);
 
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);

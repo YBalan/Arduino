@@ -41,7 +41,7 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define BUFFER_DATE_SIZE 30
 
 #define RESERVED_RECORDS_SPACE 10
-#define MAX_RECORD_LENGTH   62  // Target record length with fixed size for consistent read offsets
+#define MAX_RECORD_LENGTH   66  // Target record length with fixed size for consistent read offsets
 #define RESERVED_SPACE ((MAX_RECORD_LENGTH * RESERVED_RECORDS_SPACE) + 4096)
 //#define RECORD_FORMAT       "%lu,%.1f,%d,%03d:%02d:%02d,%.1f,%s,%s,"
 //#define RECORD_FORMAT_SCANF "%lu,%f,%d,%d:%d:%d,%f,%s,%s,"
