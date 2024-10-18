@@ -70,7 +70,8 @@
   #define RXD2 16
   #define TXD2 17
   #define PIN_WIFI_BTN  15
-  #define PIN_WIFI_LED_BTN  12
+  #define PIN_WIFI_LED  12
+  #define PIN_WIFI_LED2  2
 #endif
 
 
