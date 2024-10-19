@@ -130,7 +130,7 @@ static std::map<String, PMChatInfo> pmChatIds;
 void loadMonitorChats(const String &fileName);
 void saveMonitorChats(const String &fileName);
 void sendUpdateMonitorAllMenu(const String &deviceName);
-const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId);
+const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId, const bool &extendMonitorInGroup);
 void handleUpDownMenuValues(String &value, const String &chatId);
 void updateAllMonitorsFromDeviceSettings(String &value, const String &waitWhile);
 
@@ -289,9 +289,10 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     #ifdef DEBUG
     loadMonitorChats(MONITOR_CHATS_FILE_NAME);
-    #endif
+    #endif    
 
-    bool updateMonitor = value.startsWith(F("up"));
+    const bool extendMonitorInGroup = value.startsWith(F("ext"));
+    const bool updateMonitor = extendMonitorInGroup || value.startsWith(F("up"));
 
     if(value.startsWith(F("cl"))){
       value = String(pmChatIds.size()) + F(" ") + F("chatId") + F(" ") + F("cleared");
@@ -300,9 +301,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     }else{
       value.clear();
     }    
-
+    
     auto &chatInfo = pmChatIds[msg.chatID];
-    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, updateMonitor ? chatInfo.msgId : 0);
+
+    BOT_MENU_INFO(chatInfo.msgId, F(" "), updateMonitor, F(" "), extendMonitorInGroup);
+    const auto &msgId = sendUpdateMonitorMenu(_settings.DeviceName, msg.chatID, updateMonitor ? chatInfo.msgId : 0, extendMonitorInGroup);
     if(msgId != chatInfo.msgId){
       chatInfo.msgId = msgId;
       saveMonitorChats(MONITOR_CHATS_FILE_NAME);
@@ -627,13 +630,14 @@ void sendList(const int &last, const bool &showGet, const bool &showRem, String 
     }
 }
 
-const String getMonitorMenu(const bool &isInGroup){  
-  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
+const String getMonitorMenu(const bool &isInGroup, const bool &extendMonitorInGroup){  
+  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup) || extendMonitorInGroup;
   String relayStatus = String(F(" ")) + F("[") + (ds->getRelayOn() ? F("On") : F("Off")) + F("]");
   String btnRelayStatus = String(F(" ")) + F("[") + (!ds->getRelayOn() ? F("On") : F("Off")) + F("]");
 
   String menu = String(ds->getVoltage(), 1) + F("V") + relayStatus
-              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️")) + btnRelayStatus
+              + (isInGroup ? String(F("\t")) + F("...") : String())
+              + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️")) + btnRelayStatus              
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
               + F("\t") + F("📊") + F("(") + FILE_EXT + F(")")  //F("📉") F("📉")
               + F("\n") + ds->params.toString()
@@ -644,8 +648,8 @@ const String getMonitorMenu(const bool &isInGroup){
   return std::move(menu);
 }
 
-const String getMonitorMenuCallback(const bool &isInGroup){
-  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup);
+const String getMonitorMenuCallback(const bool &isInGroup, const bool &extendMonitorInGroup){
+  bool showRelayStatus = !isInGroup || !(isInGroup && ShortMonitorInGroup) || extendMonitorInGroup;
   String currentDate = ds->endDate;
   currentDate.replace('-', '_');
 
@@ -654,7 +658,8 @@ const String getMonitorMenuCallback(const bool &isInGroup){
   String downloadListCmd = String(BOT_COMMAND_DOWNLOAD) + (ds->getShortRecord() ? F("10") : F(""));
 
   String call = String(BOT_COMMAND_MONITOR)                                                         // Voltage
-              + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off
+              + (isInGroup ? String(F(",")) + BOT_COMMAND_MONITOR + F("ext") : String())            // ... if isInGroup
+              + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off              
               + F(",") + (isInGroup ? monitorCmd : downloadListCmd)                                 // Last record DateTime
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv
               + F(",") + (isInGroup ? commandCmdGet : String(BOT_COMMAND_UPDOWN_MENU))              // Mode U-1 dw:12.0 up: 13.0 op: 0 min
@@ -771,10 +776,10 @@ void handleUpDownMenuValues(String &value, const String &chatId){
   sendUpdateUpDownMenu(dwDelta, upDelta, submit, cancel, _settings.DeviceName, chatId);
 }
 
-const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId){
+const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId, const bool &extendMonitorInGroup){
   bool isInGroup = chatId.startsWith(F("-"));
-  const String &menu = getMonitorMenu(isInGroup);
-  const String &call = getMonitorMenuCallback(isInGroup);
+  const String &menu = getMonitorMenu(isInGroup, extendMonitorInGroup);
+  const String &call = getMonitorMenuCallback(isInGroup, extendMonitorInGroup);
   int32_t resMsgId = 0;
 
   if(messageId <= 0){
@@ -790,7 +795,7 @@ const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chat
 
 void sendUpdateMonitorAllMenu(const String &deviceName){
   for(const auto &[key, value] : pmChatIds){
-    sendUpdateMonitorMenu(deviceName, key, value.msgId);
+    sendUpdateMonitorMenu(deviceName, key, value.msgId, /*extendMonitorInGroup:*/false);
   }
 }
 
