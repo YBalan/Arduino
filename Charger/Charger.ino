@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.27")
+  #define VER F("1.29")
 #endif
 
 //#define RELEASE
@@ -121,8 +121,9 @@ void setup()
   XYDJ.begin(9600, SERIAL_8N1, RXD2, TXD2);
   while (!Serial2); 
 
-  pinMode(PIN_WIFI_LED_BTN, OUTPUT);
-  digitalWrite(PIN_WIFI_LED_BTN, LOW);
+  pinMode(PIN_WIFI_LED, OUTPUT);
+  pinMode(PIN_WIFI_LED2, OUTPUT);
+  setLEDs(LOW);
   wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
@@ -156,7 +157,7 @@ void setup()
   if(IsWiFiOn())
   {
     INFO(F("ResetFlag: "), _settings.resetFlag);
-    digitalWrite(PIN_WIFI_LED_BTN, HIGH);
+    setLEDs(HIGH);
     wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false, /*resetSettings:*/_settings.resetFlag == RESET_WIFI_FLAG /*|| resetButtonState == LOW*/);
     if(_settings.resetFlag == RESET_WIFI_FLAG)
     {
@@ -185,9 +186,19 @@ void StartTimers(){
   syncTimeTicks = millis();
 }
 
+void setLEDs(const uint8_t &value){
+  digitalWrite(PIN_WIFI_LED, value); 
+  digitalWrite(PIN_WIFI_LED2, value); 
+}
+
+void toogleLEDs(){
+  digitalWrite(PIN_WIFI_LED, !digitalRead(PIN_WIFI_LED)); 
+  digitalWrite(PIN_WIFI_LED2, !digitalRead(PIN_WIFI_LED2)); 
+}
+
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager){
   INFO(F("Portal Started: "), manager->getConfigPortalSSID()); 
-  digitalWrite(PIN_WIFI_LED_BTN, HIGH); 
+  setLEDs(HIGH); 
 }
 
 const bool IsWiFiOn(){
@@ -196,7 +207,7 @@ const bool IsWiFiOn(){
 }
 
 void WiFiStatusLED(){
-  digitalWrite(PIN_WIFI_LED_BTN, WiFi.status() == WL_CONNECTED ? HIGH : LOW);
+  setLEDs(WiFi.status() == WL_CONNECTED ? HIGH : LOW);
 }
 
 void MountFS(){
@@ -259,7 +270,7 @@ void loop(){
   }
   static bool saveRequired = false;
   if(XYDJ.available() > 0)  {     
-    digitalWrite(PIN_WIFI_LED_BTN, !digitalRead(PIN_WIFI_LED_BTN));
+    toogleLEDs();
     const auto &received = XYDJ.readStringUntil('\n');    
 
     if(received.startsWith(F("U"))) {
@@ -372,7 +383,7 @@ const uint32_t SyncTime()
 void StoreData(const uint32_t &storeTicks)
 {
   INFO(TRACE_TAB, F("Store currentData..."));
-  digitalWrite(PIN_WIFI_LED_BTN, HIGH);
+  setLEDs(HIGH);
   String removedFile;
   ds->appendData((int)(storeTicks / 1000), removedFile);
   ds->traceToSerial();   
