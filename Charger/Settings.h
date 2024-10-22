@@ -33,7 +33,7 @@ namespace UAMap
     int notifyHttpCode = 0;   
     
     char NotifyChatId[MAX_CHAT_ID_LENGTH];
-    int8_t timeZone = 3;
+    int8_t timeZone = DEFAULT_TIME_ZONE;
     uint32_t storeDataTimeout = STORE_DATA_TIMEOUT;
 
     char DeviceName[MAX_DEVICE_NAME_LENGTH];
@@ -45,7 +45,7 @@ namespace UAMap
       memset(DeviceName, 0, MAX_DEVICE_NAME_LENGTH);
       resetFlag = 200;
       notifyHttpCode = 0;      
-      timeZone = 3;
+      timeZone = DEFAULT_TIME_ZONE;
       storeDataTimeout = STORE_DATA_TIMEOUT;
       shortRecord = false;
     }

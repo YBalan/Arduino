@@ -29,6 +29,7 @@
 #define SYNC_TIME_TIMEOUT 900000 //15 mins
 #define SYNC_TIME_ATTEMPTS 10
 
+#define DEFAULT_TIME_ZONE 2
 #define CONFIG_PORTAL_TIMEOUT 60
 
 #define SHORT_MONITOR_IN_GROUP true
@@ -38,6 +39,8 @@
 #define USE_BOT
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
+
+#define USE_BOT_HISTORY
 
 #ifdef ESP32  
   #ifdef USE_BOT
