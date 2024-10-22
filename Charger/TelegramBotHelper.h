@@ -32,6 +32,11 @@ std::unique_ptr<TelegramBot> bot(new TelegramBot());
 std::unique_ptr<TelegramBot> bot;
 #endif
 
+#ifdef USE_BOT_HISTORY
+struct CommandHistoryItem { String dateTime; int count = 0; };
+std::map<String, CommandHistoryItem> botHistory;
+#endif
+
 //https://stackoverflow.com/questions/72594564/how-can-i-add-menu-button-in-telegram-bot
 struct BotSettings
 {
@@ -104,6 +109,15 @@ void HangleBotMessages(FB_msg& msg)
   {
     //botNameIdx = botNameIdx == -1 ? 0 : botNameIdx; // for register unregister
 
+    #ifdef USE_BOT_HISTORY
+    if(true){
+      const String &histMsg = (msg.data.isEmpty() ? msg.text : msg.data).substring(0, 100);
+      auto &historyItem = botHistory[histMsg];
+      historyItem.dateTime = bot->getTime(DEFAULT_TIME_ZONE).timeString();
+      historyItem.count++;
+    }
+    #endif
+
     BOT_TRACE(F("Checking authorization: "), msg.chatID);
     if(_botSettings.toStore.registeredChannelIDs.count(msg.chatID) > 0) //REGISTERED
     {
@@ -113,6 +127,15 @@ void HangleBotMessages(FB_msg& msg)
       //   BOT_TRACE(msg.chatID, "Banned");
       // }
       // else
+      #ifdef USE_BOT_HISTORY
+      if(msg.text.startsWith(F("/thist"))){
+        String history;
+        for(const auto &[key, value] : botHistory){
+          history += key + F(": ") + F("[") + value.dateTime + F("]") + F(" ") + F("(") + String(value.count) + F(")") + F("\n");
+        }
+        bot->sendMessage(history, msg.chatID);
+      }else
+      #endif
       if(msg.text.indexOf(F("/unregister")) >= 0)
       {
         BOT_TRACE(F("Unregistered: "), msg.chatID);

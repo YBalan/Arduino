@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.29")
+  #define VER F("1.30")
 #endif
 
 //#define RELEASE
