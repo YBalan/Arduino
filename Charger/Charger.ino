@@ -268,7 +268,7 @@ void loop(){
     TRACE(BUTTON_IS_RELEASED_MSG, TRACE_TAB, F("WiFi"), F("Switch"));   
     WiFi.disconnect();
   }
-  static bool saveRequired = false;
+  static bool isDeviceOn = false;
   if(XYDJ.available() > 0)  {     
     toogleLEDs();
     const auto &received = XYDJ.readStringUntil('\n');    
@@ -283,8 +283,8 @@ void loop(){
       INFO("EXT Device = ", F("'"), received, F("'"));
     }
     else {
-      saveRequired = true;      
-      const bool isRelayStatusChanged = ds->updateCurrentData(received, (millis() - storeDataTicks) / 1000);            
+      isDeviceOn = true;      
+      const bool isRelayStatusChanged = ds->updateCurrentData(received, (millis() - storeDataTicks) / 1000);
       INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
       if(isRelayStatusChanged){
         sendUpdateMonitorAllMenu(_settings.DeviceName);
@@ -313,10 +313,10 @@ void loop(){
   {    
     storeDataTicks = currentTicks;
 
-    INFO(F("Is Save Data Required: "), saveRequired ? F("true") : F("false"));
+    INFO(F("Is Save Data Required: "), isDeviceOn ? F("true") : F("false"));
     INFO(F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
 
-    if(saveRequired)
+    if(isDeviceOn)
     {      
       StoreData(storeTicks);    
       //ds->currentData.setResetReason(F("Normal"));
@@ -326,7 +326,7 @@ void loop(){
       //ds->currentData.setResetReason(F("Paused")); 
       ds->setResetReason(F("Paused")); 
     }
-    saveRequired = false;
+    isDeviceOn = false;
 
     if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
       sendUpdateMonitorAllMenu(_settings.DeviceName);

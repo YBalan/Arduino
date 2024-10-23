@@ -694,9 +694,9 @@ void sendUpdateUpDownMenu(const float &dwDelta, const float &upDelta, const bool
 
   if(!cancel){
     menu =    String(F("DW")) + F("\t") + F("UP")
-         + F("\n") + F("⤴️") + F("\t") + F("⬆️") + F("\t") + F("⬆️") + F("\t") + F("⤴️") //↖️↗️⬆️↘️↙️⤴️⤵️
+         + F("\n") + F("⤴️") + F("\t") + F("⬆️") + F("\t") + F("⤴️") + F("\t") + F("⬆️") //↖️↗️⬆️↘️↙️⤴️⤵️
          + F("\n") + String(newDw, 1) + F("V") + F("\t") + String(newUp, 1) + F("V")
-         + F("\n") + F("⤵️") + F("\t") + F("⬇️") + F("\t") + F("⬇️") + F("\t") + F("⤵️") //↖️↗️⬆️↘️↙️⤴️⤵️
+         + F("\n") + F("⤵️") + F("\t") + F("⬇️") + F("\t") + F("⤵️") + F("\t") + F("⬇️") //↖️↗️⬆️↘️↙️⤴️⤵️
          + F("\n") + F("Submit") + F("\t") + F("Cancel")
     ;
 
