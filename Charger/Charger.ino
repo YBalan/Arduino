@@ -1,3 +1,6 @@
+
+//Android app for charts: https://github.com/YBalan/ChargerCharts
+
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
