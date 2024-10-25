@@ -470,7 +470,7 @@ public:
       else 
       { 
         String headerContent = RECORD_HEADER + '\n';
-        header.write((uint8_t*)headerContent.c_str(), headerContent.length() + 1);
+        header.write((uint8_t*)headerContent.c_str(), headerContent.length());
         header.close();
         filesInfo[headerName] = { headerContent.length(), 1 };
         return true;
