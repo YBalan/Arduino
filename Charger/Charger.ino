@@ -6,7 +6,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.30")
+  #define VER F("1.31")
 #endif
 
 //#define RELEASE
@@ -25,10 +25,10 @@
 #define ENABLE_TRACE_MAIN
 
 #define ENABLE_INFO_DS
-#define ENABLE_TRACE_DS
+//#define ENABLE_TRACE_DS
 
-#define ENABLE_INFO_SETTINGS
-#define ENABLE_TRACE_SETTINGS
+//#define ENABLE_INFO_SETTINGS
+//#define ENABLE_TRACE_SETTINGS
 
 #define ENABLE_INFO_BOT
 #define ENABLE_TRACE_BOT
@@ -36,11 +36,11 @@
 #define ENABLE_INFO_BOT_MENU
 #define ENABLE_TRACE_BOT_MENU
 
-#define ENABLE_INFO_WIFI
+//#define ENABLE_INFO_WIFI
 //#define ENABLE_TRACE_WIFI
 
-#define ENABLE_INFO_API
-#define ENABLE_TRACE_API
+//#define ENABLE_INFO_API
+//#define ENABLE_TRACE_API
 #else
 
 #define VER_POSTFIX F("R")
@@ -73,6 +73,13 @@
 #endif
 
 #include "Config.h"
+
+#ifdef USE_UDP
+#include <WiFiUdp.h>
+WiFiUDP udp;
+String udpAddress;
+int udpPort = DEFAULT_UDP_PORT;
+#endif
 
 #include <map>
 #include <set>
@@ -182,6 +189,8 @@ void setup()
 
   SendCommand(F("get"));
   ds->params.readFromXYDJ(DeviceReceive(100, F("U-")));
+
+  InitUDP();
 }
 
 void StartTimers(){
@@ -331,8 +340,23 @@ void loop(){
     }
     isDeviceOn = false;
 
-    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED)
+    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
       sendUpdateMonitorAllMenu(_settings.DeviceName);
+
+      #ifdef USE_UDP
+      if(_settings.useUdp && !udpAddress.isEmpty()){
+        String udpMsg;
+        #ifdef USE_BOT
+        udpMsg = _botSettings.botNameForMenu;
+        #endif
+        udpMsg += _settings.DeviceName;
+        if(udpMsg.isEmpty()) udpMsg = F("NA");
+        udpMsg += F(",");
+        udpMsg += ds->writeToCsv();
+        sendUDPMessage(udpMsg);
+      }
+      #endif
+    }
 
     String nstatTrace;
     PrintNetworkStatistic(nstatTrace, 0);
@@ -528,7 +552,11 @@ void HandleDebugSerialCommands()
     //ds->currentData.setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
     ds->setResetReason(F("Test"));  
     ds->setWiFiStatus(WiFi.status() == WL_CONNECTED ? F("OK") : F("NoWiFi"));
-    StoreData(millis() - storeDataTicks);      
+    StoreData(millis() - storeDataTicks);     
+
+    #ifdef USE_UDP
+    sendUDPMessage(String(F("Test")) + F(",") + ds->writeToCsv()); 
+    #endif
   }
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
@@ -549,6 +577,24 @@ void HandleDebugSerialCommands()
   //     TRACE(F("INT "), F("Serial = "), debugCommandFromSerial);
   //   }
   // }  
+}
+
+void InitUDP(){
+  #ifdef USE_UDP
+  const auto &ip = WiFi.localIP();
+  IPAddress udpIp = IPAddress(ip[0], ip[1], ip[2], 255);
+  udpAddress = udpIp.toString();
+  TRACE(F("UDP: "), udpAddress);
+  #endif
+}
+
+void sendUDPMessage(const String &message){
+  #ifdef USE_UDP
+    TRACE(F("UDP: "), udpAddress, F(":"), udpPort, F(" "), message);
+    udp.beginPacket(udpAddress.c_str(), udpPort);
+    udp.print(message);
+    udp.endPacket();
+  #endif
 }
 
 void SendCommand(const String &command)
