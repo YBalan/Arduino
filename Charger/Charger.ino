@@ -1,16 +1,16 @@
 
-//Android app for charts: https://github.com/YBalan/ChargerCharts
+//Android app for charts: https://github.com/YBalan/ChargerCharts & https://github.com/YBalan/ChargerCharts2
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.31")
+  #define VER F("1.32")
 #endif
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -300,6 +300,7 @@ void loop(){
       INFO("      XYDJ = ", F("'"), ds->writeToCsv(), F("'"), F(" "), F("WiFi"), F("Switch: "), IsWiFiOn() ? F("On") : F("Off"), F(" "), F("WiFi"), F("Status: "), statusMsg);
       if(isRelayStatusChanged){
         sendUpdateMonitorAllMenu(_settings.DeviceName);
+        sendCurrentDataUDPMessage();
         StartTimers();
       }
     }
@@ -343,19 +344,7 @@ void loop(){
     if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
       sendUpdateMonitorAllMenu(_settings.DeviceName);
 
-      #ifdef USE_UDP
-      if(_settings.useUdp && !udpAddress.isEmpty()){
-        String udpMsg;
-        #ifdef USE_BOT
-        udpMsg = _botSettings.botNameForMenu;
-        #endif
-        udpMsg += _settings.DeviceName;
-        if(udpMsg.isEmpty()) udpMsg = F("NA");
-        udpMsg += F(",");
-        udpMsg += ds->writeToCsv();
-        sendUDPMessage(udpMsg);
-      }
-      #endif
+      sendCurrentDataUDPMessage();
     }
 
     String nstatTrace;
@@ -555,8 +544,10 @@ void HandleDebugSerialCommands()
     StoreData(millis() - storeDataTicks);     
 
     #ifdef USE_UDP
-    sendUDPMessage(String(F("Test")) + F(",") + ds->writeToCsv()); 
+    sendUDPMessage(String(F("Test")) + F(",") + ds->writeToCsv(/*shortRecord:*/true)); 
     #endif
+
+    StartTimers();
   }
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
@@ -585,6 +576,22 @@ void InitUDP(){
   IPAddress udpIp = IPAddress(ip[0], ip[1], ip[2], 255);
   udpAddress = udpIp.toString();
   TRACE(F("UDP: "), udpAddress);
+  #endif
+}
+
+void sendCurrentDataUDPMessage(){
+  #ifdef USE_UDP
+  if(_settings.useUdp && !udpAddress.isEmpty()){
+    String udpMsg;
+    #ifdef USE_BOT
+    udpMsg = _botSettings.botNameForMenu;
+    #endif
+    udpMsg += _settings.DeviceName;
+    if(udpMsg.isEmpty()) udpMsg = F("NA");
+    udpMsg += F(",");
+    udpMsg += ds->writeToCsv(/*shortRecord:*/true);
+    sendUDPMessage(udpMsg);
+  }
   #endif
 }
 

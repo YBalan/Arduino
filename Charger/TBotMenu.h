@@ -450,6 +450,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       uint32_t totalRecordsSize = 0;
 
       uint32_t sw = millis();
+      ds->attachSendFilesCallback(sendFilesCallback);
       const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize); 
       BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Size: "), totalRecordsSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 

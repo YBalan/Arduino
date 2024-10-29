@@ -100,6 +100,7 @@ class TelegramBot : public FastBot
     }
 
     #ifdef FS_H
+    private:
     void (*_sendFilesCallback)(const int& fileNumber, const int &filesCount, const String& filePath) = nullptr;    
     public:
     void attachSendFilesCallback(void (*handler)(const int& fileNumber, const int &filesCount, const String& filePath)) {
