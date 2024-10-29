@@ -38,6 +38,7 @@ namespace UAMap
 
     char DeviceName[MAX_DEVICE_NAME_LENGTH];
     bool shortRecord = false;
+    int useUdp = 0;
 
     void init()
     {      
@@ -48,6 +49,7 @@ namespace UAMap
       timeZone = DEFAULT_TIME_ZONE;
       storeDataTimeout = STORE_DATA_TIMEOUT;
       shortRecord = false;
+      useUdp = 0;
     }
 
     void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }

@@ -96,6 +96,7 @@ interval - Interval to store in Mins (1-15)
 #define BOT_COMMAND_MONITOR       F("/monitor")
 #define BOT_COMMAND_SHORT         F("/short")
 #define BOT_COMMAND_INTERVAL      F("/interval")
+#define BOT_COMMAND_UDP           F("/udp")
 //Service Commands
 #define BOT_COMMAND_UPDOWN_MENU   F("/updw")
 
@@ -112,6 +113,7 @@ const bool ShortMonitorInGroup = false;
 const uint32_t SyncTime();
 void Restart();
 void MountFS();
+void toogleLEDs();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
@@ -133,6 +135,7 @@ void sendUpdateMonitorAllMenu(const String &deviceName);
 const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chatId, const int32_t &messageId, const bool &extendMonitorInGroup);
 void handleUpDownMenuValues(String &value, const String &chatId);
 void updateAllMonitorsFromDeviceSettings(String &value, const String &waitWhile);
+void sendFilesCallback(const int& fileNumber, const int &filesCount, const String& filePath) { toogleLEDs(); }
 
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
@@ -257,6 +260,18 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     }    
     ds->setShortRecord(_settings.shortRecord); 
     value = String(F("Short record: ")) + (_settings.shortRecord ? F("true") : F("false"));
+  }
+  else if(GetCommandValue(BOT_COMMAND_UDP, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+    const int &intValue = value.toInt();
+
+    if(value.length() > 0 && intValue >= 0)
+    {
+      _settings.useUdp = intValue;
+      SaveSettings();    
+    }        
+    value = String(F("UDP: ")) + (_settings.useUdp > 0 ? String(_settings.useUdp) : String(F("false")));
   }
   else if(GetCommandValue(BOT_COMMAND_INTERVAL, filtered, value))
   {
@@ -435,6 +450,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       uint32_t totalRecordsSize = 0;
 
       uint32_t sw = millis();
+      ds->attachSendFilesCallback(sendFilesCallback);
       const auto &filesInfo = ds->downloadData(filter, totalRecordsCount, totalRecordsSize); 
       BOT_MENU_TRACE(F("Records: "), totalRecordsCount, F(" "), F("Size: "), totalRecordsSize, F(" "), F("SW:"), millis() - sw, F("ms."));
 
@@ -454,10 +470,12 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
         //const auto &totalRecordsCount = TelegramBot::getFilesLineCount(filesInfo);
         outerFileName += String(F("(")) + totalRecordsCount + F(")") + FILE_EXT; 
         BOT_MENU_TRACE(filter, F(" -> "), outerFileName);
-
-        if(bot->sendFile(files, totalRecordsSize, outerFileName, msg.chatID) != 1)
+        
+        bot->attachSendFilesCallback(sendFilesCallback);
+        const auto &errorCode = bot->sendFile(files, totalRecordsSize, outerFileName, msg.chatID);
+        if(errorCode != 1)
         {
-          value = F("Telegram error");
+          value = String(F("Telegram error: ")) + String(errorCode);
         }
         else
           value.clear();
@@ -549,6 +567,8 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     value += String(F("Day(s): ")) + String(ds->getFilesCount()) 
           + (totalRecordsCount > 0 ? String(F("\n")) + F("Recs: ") + String(totalRecordsCount) : String(F("")))
           + (totalRecordsSize > 0 ? String(F("\n")) + F("Size: ") + String(totalRecordsSize) + F("bytes") : String(F("")))
+          + F("\n") + F("Interval: ") + String(_settings.storeDataTimeout) + F("min.")
+          + F("\n") + F("Short record: ") + (_settings.shortRecord ? F("true") : F("false"))
           + F("\n") + F("Left: ") + String(daysLeft, 1) + F("Day(s)") + F(" ") + F("(") + String(percentage) + F("%") + F(")");
     messages.push_back(value); value.clear();
     //value += F("\n");                                                       // NewLine

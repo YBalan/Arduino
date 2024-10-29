@@ -41,6 +41,8 @@
 #define USE_BOT_INLINE_MENU
 
 #define USE_BOT_HISTORY
+#define USE_UDP
+#define DEFAULT_UDP_PORT 1985
 
 #ifdef ESP32  
   #ifdef USE_BOT

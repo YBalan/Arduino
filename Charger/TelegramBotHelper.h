@@ -113,7 +113,8 @@ void HangleBotMessages(FB_msg& msg)
     if(true){
       const String &histMsg = (msg.data.isEmpty() ? msg.text : msg.data).substring(0, 100);
       auto &historyItem = botHistory[histMsg];
-      historyItem.dateTime = bot->getTime(DEFAULT_TIME_ZONE).timeString();
+      const auto &dt = bot->getTime(DEFAULT_TIME_ZONE);
+      historyItem.dateTime = dt.dateString() + F(" ") + dt.timeString();
       historyItem.count++;
     }
     #endif

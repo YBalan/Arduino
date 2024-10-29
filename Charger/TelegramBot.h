@@ -18,7 +18,7 @@
 #endif
 
 class TelegramBot : public FastBot
-{
+{  
   public:
   String OTAVersion;
   virtual uint8_t tickManual() {
@@ -99,7 +99,19 @@ class TelegramBot : public FastBot
         return status;
     }
 
-    #ifdef FS_H    
+    #ifdef FS_H
+    private:
+    void (*_sendFilesCallback)(const int& fileNumber, const int &filesCount, const String& filePath) = nullptr;    
+    public:
+    void attachSendFilesCallback(void (*handler)(const int& fileNumber, const int &filesCount, const String& filePath)) {
+        _sendFilesCallback = handler;
+    }
+
+    // отключение обработчика сообщений
+    void detachSendFilesCallback() {
+        _sendFilesCallback = nullptr;
+    }
+ 
     private:
     void _sendFilesRoutine(FB_SECURE_CLIENT& client, const std::vector<String> &files) {        
         // Start MFS if not started
@@ -108,8 +120,14 @@ class TelegramBot : public FastBot
             return;
         }
 
+        int fileNumber = 1;
         for (const auto &filename : files) {            
-            BOT_TRACE(F("Sending file: "), filename);            
+            BOT_TRACE(F("Sending file: "), filename);   
+
+            if (*_sendFilesCallback){
+                _sendFilesCallback(fileNumber, files.size(), filename);
+            }
+
             yield(); // watchdog
             // Open the file for reading
             File file = MFS.open(filename.c_str(), FILE_READ);
@@ -121,6 +139,7 @@ class TelegramBot : public FastBot
             _sendFileRoutine(client, file);
           
             file.close();  // Close the file after finished transmitting
+            fileNumber++;
         }
     }    
    

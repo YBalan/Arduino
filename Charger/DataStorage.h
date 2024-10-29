@@ -424,6 +424,7 @@ public:
 
     const String writeToCsv(uint16_t &realDataSize) const { return currentData.writeToCsv(realDataSize, _shortRecord); }
     const String writeToCsv() const { uint16_t realDataSize = 0; return currentData.writeToCsv(realDataSize, _shortRecord); }
+    const String writeToCsv(const bool &shortRecord) const { uint16_t realDataSize = 0; return currentData.writeToCsv(realDataSize, shortRecord); }
 
     const float &getVoltage() const { return currentData.voltage; } 
     const bool &getRelayOn() const { return currentData.relayOn; }
@@ -609,6 +610,18 @@ public:
         return true;
     }
 
+    private:
+    void (*_sendFilesCallback)(const int& fileNumber, const int &filesCount, const String& filePath) = nullptr;    
+    public:
+    void attachSendFilesCallback(void (*handler)(const int& fileNumber, const int &filesCount, const String& filePath)) {
+        _sendFilesCallback = handler;
+    }
+
+    // отключение обработчика сообщений
+    void detachSendFilesCallback() {
+        _sendFilesCallback = nullptr;
+    }
+
     const FilesInfo downloadData(String &filter, int &recordsTotal, uint32_t &totalSize, const bool &recalculateRecords = false) {
         FilesInfo result;
         totalSize = 0;
@@ -623,9 +636,16 @@ public:
 
         fileFilterPrepare(filter);
 
+        int fileNumber = 1;
+
         while (file) {
             int recordsInFile = 0;
-            const String &fileName = file.name();                  
+            const String &fileName = file.name();   
+
+            if (*_sendFilesCallback){
+                _sendFilesCallback(fileNumber++, 0, fileName);
+            }
+
             if(fileName.startsWith(HEADER_FILE_NAME)) {
               recordsInFile = 1;
               totalSize += file.size();
