@@ -1,5 +1,5 @@
 
-//Android app for charts: https://github.com/YBalan/ChargerCharts & https://github.com/YBalan/ChargerCharts2
+//Android app for charts: https://github.com/YBalan/ChargerCharts2
 
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
