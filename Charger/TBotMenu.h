@@ -266,7 +266,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     const int &intValue = value.toInt();
 
-    if(value.length() > 0 && intValue >= 0)
+    if(value.length() > 0 && value.length() <= 5 && intValue >= 0)
     {
       _settings.useUdp = intValue;
       SaveSettings();    
