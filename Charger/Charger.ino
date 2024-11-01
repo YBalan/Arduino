@@ -6,11 +6,11 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.32")
+  #define VER F("1.33")
 #endif
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 //#define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -582,6 +582,7 @@ void InitUDP(){
 void sendCurrentDataUDPMessage(){
   #ifdef USE_UDP
   if(_settings.useUdp && !udpAddress.isEmpty()){
+    udpPort = _settings.useUdp;
     String udpMsg;
     #ifdef USE_BOT
     udpMsg = _botSettings.botNameForMenu;

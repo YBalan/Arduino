@@ -266,7 +266,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->sendTyping(msg.chatID);
     const int &intValue = value.toInt();
 
-    if(value.length() > 0 && intValue >= 0)
+    if(value.length() > 0 && value.length() <= 5 && intValue >= 0)
     {
       _settings.useUdp = intValue;
       SaveSettings();    
@@ -567,7 +567,7 @@ void sendStatus(String &value, std::vector<String> &messages, const int &totalRe
     value += String(F("Day(s): ")) + String(ds->getFilesCount()) 
           + (totalRecordsCount > 0 ? String(F("\n")) + F("Recs: ") + String(totalRecordsCount) : String(F("")))
           + (totalRecordsSize > 0 ? String(F("\n")) + F("Size: ") + String(totalRecordsSize) + F("bytes") : String(F("")))
-          + F("\n") + F("Interval: ") + String(_settings.storeDataTimeout) + F("min.")
+          + F("\n") + F("Interval: ") + String(_settings.storeDataTimeout / 60000) + F("min.")
           + F("\n") + F("Short record: ") + (_settings.shortRecord ? F("true") : F("false"))
           + F("\n") + F("Left: ") + String(daysLeft, 1) + F("Day(s)") + F(" ") + F("(") + String(percentage) + F("%") + F(")");
     messages.push_back(value); value.clear();
