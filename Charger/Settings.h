@@ -39,6 +39,9 @@ namespace UAMap
     char DeviceName[MAX_DEVICE_NAME_LENGTH];
     bool shortRecord = false;
     int useUdp = 0;
+    float batteryUp = 60.0f;
+    float batteryDw = 7.0f;
+    float batteryNotify = 40.0f;
 
     void init()
     {      
@@ -50,6 +53,9 @@ namespace UAMap
       storeDataTimeout = STORE_DATA_TIMEOUT;
       shortRecord = false;
       useUdp = 0;
+      batteryUp = 60.0f;
+      batteryDw = 7.0f;
+      batteryNotify = 40.0f;
     }
 
     void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
