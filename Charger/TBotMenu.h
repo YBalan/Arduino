@@ -97,6 +97,7 @@ interval - Interval to store in Mins (1-15)
 #define BOT_COMMAND_SHORT         F("/short")
 #define BOT_COMMAND_INTERVAL      F("/interval")
 #define BOT_COMMAND_UDP           F("/udp")
+#define BOT_COMMAND_BATT          F("/batt")
 //Service Commands
 #define BOT_COMMAND_UPDOWN_MENU   F("/updw")
 
@@ -125,6 +126,7 @@ const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void sendList(const int &last, const bool &showGet, const bool &showRem, String &value, std::vector<String> &messages, const bool &recalculateRecords = false);
 void sendStatus(String &value, std::vector<String> &messages, const int &totalRecordsCount = 0, const uint32_t &totalRecordsSize = 0);
+const float calculateBatteryPercentage(const float &voltage, const float &_settingsDw, const float &_settingsUp);
 
 // Monitor
 struct PMChatInfo { int32_t msgId = 0; float alarmValue = 0.0; float currentValue = 0.0; };
@@ -248,6 +250,31 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     value = String(F("Synced time: ")) + epochToDateTime(now);
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  else if(GetCommandValue(BOT_COMMAND_BATT, filtered, value))
+  {
+    bot->sendTyping(msg.chatID);
+
+    if(value.length() > 0)
+    {
+      const auto &values = CommonHelper::split(value, '_', '-');
+
+      if(values.size() > 0)
+      {
+        if(values.size() >= 1) _settings.batteryDw = values[0].toFloat();
+        if(values.size() >= 2) _settings.batteryUp = values[1].toFloat();
+        if(values.size() >= 3) _settings.batteryNotify = values[2].toFloat();    
+        
+        SaveSettings();
+      }
+    }    
+    
+    const float perc = calculateBatteryPercentage(ds->getVoltage(), _settings.batteryDw, _settings.batteryUp);
+    value = String(F("Batt")) + F(":") + F(" ") 
+          + String(_settings.batteryDw, 1) + F("V") + F(" -> ") 
+          + String(_settings.batteryUp, 1) + F("V") + F(" -> ") 
+          + String(_settings.batteryNotify, 1) + F("%")
+          + F(":") + F(" ") + String(perc, 1) + F("%");
+  }
   else if(GetCommandValue(BOT_COMMAND_SHORT, filtered, value))
   {
     bot->sendTyping(msg.chatID);
@@ -655,8 +682,11 @@ const String getMonitorMenu(const bool &isInGroup, const bool &extendMonitorInGr
   String relayStatus = String(F(" ")) + F("[") + (ds->getRelayOn() ? F("On") : F("Off")) + F("]");
   String btnRelayStatus = String(F(" ")) + F("[") + (!ds->getRelayOn() ? F("On") : F("Off")) + F("]");
 
+  const float &perc = calculateBatteryPercentage(ds->getVoltage(), _settings.batteryDw, _settings.batteryUp);
+  String lowBattery = perc <= _settings.batteryNotify ? F("🪫") : F("");
+
   String menu = String(ds->getVoltage(), 1) + F("V") + relayStatus
-              + (isInGroup ? String(F("\t")) + F("...") : String())
+              + F("\t") + lowBattery + String(perc, 1) +  F("%") //🪫
               + F("\t") + (ds->getRelayOn() ? F("🔋") : F("⚡️")) + btnRelayStatus              
               + F("\n") + F("🕐") + ds->getLastRecordDateTimeStr()
               + F("\t") + F("📊") + F("(") + FILE_EXT + F(")")  //F("📉") F("📉")
@@ -666,6 +696,19 @@ const String getMonitorMenu(const bool &isInGroup, const bool &extendMonitorInGr
       ;
   BOT_MENU_TRACE(menu);
   return std::move(menu);
+}
+
+const float calculateBatteryPercentage(const float &voltage, const float &_settingsDw, const float &_settingsUp) {
+    // Ensure voltage range is valid
+    if (_settingsDw >= _settingsUp || (_settingsDw == 0.0f && _settingsUp == 0.0f)) {        
+        return 0.0;
+    }
+
+    // Calculate percentage
+    float percentage = ((voltage - _settingsDw) / (_settingsUp - _settingsDw)) * 100.0;
+
+    // Clamp result to range [0, 100]
+    return std::clamp(percentage, 0.0f, 100.0f);
 }
 
 const String getMonitorMenuCallback(const bool &isInGroup, const bool &extendMonitorInGroup){
@@ -678,7 +721,7 @@ const String getMonitorMenuCallback(const bool &isInGroup, const bool &extendMon
   String downloadListCmd = String(BOT_COMMAND_DOWNLOAD) + (ds->getShortRecord() ? F("10") : F(""));
 
   String call = String(BOT_COMMAND_MONITOR)                                                         // Voltage
-              + (isInGroup ? String(F(",")) + BOT_COMMAND_MONITOR + F("ext") : String())            // ... if isInGroup
+              + F(",") + (isInGroup ? String(BOT_COMMAND_MONITOR) + F("ext") : String(BOT_COMMAND_BATT)) // 95% if isInGroup - show monitorExt
               + F(",") + (String(BOT_COMMAND_CMD) + (ds->getRelayOn() ? F("off") : F("on")) )       // Relay On/Off              
               + F(",") + (isInGroup ? monitorCmd : downloadListCmd)                                 // Last record DateTime
               + F(",") + BOT_COMMAND_DOWNLOAD + currentDate                                         // Download current date .csv

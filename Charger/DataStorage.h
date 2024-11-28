@@ -63,6 +63,7 @@ typedef std::map<String, FileInfo> FilesInfo;
 #define RELAY_FORMAT_SCANF         "%d-%d-%d %d:%d:%d,%f,%d:%d:%d"
 
 #define MAX_VOLTAGE               60.0
+#define MIN_VOLTAGE               7.0
 #define MAX_OPTIME                999
 
 struct Data {
