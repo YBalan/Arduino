@@ -19,6 +19,8 @@
 
 #define MAX_BASE_URI_LENGTH 50
 #define MAX_CHAT_ID_LENGTH  20
+#define MAX_MESSAGE_LENGTH 50
+#define MAX_BUZZ_LENGTH 500
 
 namespace UAMap
 {
@@ -38,9 +40,14 @@ namespace UAMap
     uint16_t notifyPinCounter = 0;
     int8_t notifyPinPrevValue = -1;
 
+    char Message[MAX_MESSAGE_LENGTH];
+    char Buzz[MAX_MESSAGE_LENGTH];
+
     void init()
     {      
       memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
+      memset(Message, 0, MAX_MESSAGE_LENGTH);
+      memset(Buzz, 0, MAX_BUZZ_LENGTH);
       resetFlag = 200;
       notifyHttpCode = 0;      
       timeZone = 3;
@@ -51,6 +58,8 @@ namespace UAMap
     }
 
     void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
+    const bool setMessage(const String &str){ if(str.length() > MAX_MESSAGE_LENGTH) { SETTINGS_TRACE(F("Message length exceed maximum!")); return false; } strcpy(Message, str.c_str()); return true; }
+    const bool setBuzz(const String &str){ bool res = true; if(str.length() > MAX_BUZZ_LENGTH) { SETTINGS_TRACE(F("Buzz length exceed maximum!")); res = false; } strcpy(Buzz, str.c_str()); return res; }
   };
 
   class SettingsExt

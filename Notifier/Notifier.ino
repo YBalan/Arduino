@@ -117,6 +117,7 @@ void setup()
   while (!Serial);     
 
   pinMode(PIN_NOTIFY, INPUT_PULLUP);
+  pinMode(PIN_BUZZER, OUTPUT);
   wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
@@ -128,6 +129,7 @@ void setup()
   LoadSettings();
   LoadSettingsExt();  
   //_settings.reset(); 
+  loadSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -158,6 +160,8 @@ void setup()
 
     InitBot();
   } 
+
+  StartTimers();
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -228,30 +232,38 @@ void loop()
   String statusMsg = F("OK");
   RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
 
-  const uint32_t &ticks = currentTicks - storeDataTicks;
-  //TRACE(F("\t\t\t\t\t\t\t\t\t\t\t\t"), ticks, F(" "), currentTicks, F(" "), storeDataTicks, F(" "), _settings.storeDataTimeout);
+  const uint32_t &ticks = currentTicks - storeDataTicks;  
   if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout){
     storeDataTicks = currentTicks;
 
     INFO(F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
-    StoreData(ticks);    
+    //StoreData(ticks);        
+
+    TRACE(TRACE_TAB, F("220V Status: "), getStatus());    
   }
 
-  if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
-    if(isNotifyPinChanged()){
+  if(isNotifyPinChanged()){
+      SaveSettings();
       if(_settings.notifyPinCountBefore == _settings.notifyPinCounter){
         _settings.notifyPinCounter = 0;
         _settings.notifyPinPrevValue = -1;
-      }
-      SaveSettings();
+        //SendMessages
+
+        tone(PIN_BUZZER, 440, 1000);
+
+        TRACE(TRACE_TAB, F("220V Status: "), getStatus());
+      }else{
+        //SendMessages
+      }      
     }
 
+  if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
     const uint32_t &syncTicks = currentTicks - syncTimeTicks;
     if(syncTimeTicks > 0 && syncTicks >= SYNC_TIME_TIMEOUT){
       syncTimeTicks = currentTicks;      
       const auto &now = SyncTime();      
-      StartTimers();
-    }
+      StartTimers();      
+    }    
   }
 
   #ifdef USE_BOT
@@ -273,12 +285,86 @@ void loop()
   HandleDebugSerialCommands();
 }
 
+const String getStatus(){
+  std::move(digitalRead(PIN_NOTIFY) == 0 ? F("ON") : F("OFF"));
+}
+
+void playNotify(){
+
+}
+
 void StoreData(const uint32_t &ticks)
 {
   TRACE(F("Store data..."));  
   String fsInfo;
   PrintFSInfo(fsInfo); 
   TRACE(fsInfo);
+}
+
+const uint32_t SyncTime()
+{
+  if(WiFi.status() == WL_CONNECTED){
+    const auto &now = GetCurrentTime(_settings.timeZone);
+    TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
+    return now;
+  }
+  return 0;
+}
+
+void StartTimers(){
+  storeDataTicks = millis();
+  syncTimeTicks = millis();
+}
+
+void HandleDebugSerialCommands()
+{
+  if(debugCommandFromSerial == 1) // Reset WiFi
+  { 
+    // _settings.resetFlag = 1985;
+    // SaveSettings();
+    ESP.restart();
+  }
+
+  if(debugCommandFromSerial == 2) // Show current status
+  { 
+    TRACE(TRACE_TAB, F("220V Status: "), digitalRead(PIN_NOTIFY) == LOW ? F("ON") : F("OFF"));
+  }
+
+  if(debugCommandFromSerial == 3) // Extract all
+  { 
+    TRACE(F("Extract All..."))
+    String out;
+    
+    TRACE(out);
+  }
+
+  if(debugCommandFromSerial == 4) // Remove all
+  { 
+    TRACE(F("Remove All..."))  
+   
+  }
+
+  if(debugCommandFromSerial == 5) // Store 
+  { 
+   
+  }
+
+  if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
+  { 
+    INFO(F("\t\t\tFormat..."));   
+    SPIFFS.format();
+    _settings.resetFlag = 1985;
+    SaveSettings();
+    ESP.restart();
+  }
+
+  debugCommandFromSerial = 0;
+  if(Serial.available() > 0)
+  {
+    const auto &readFromSerial = Serial.readString();
+    INFO(F("Input: "), readFromSerial);
+    debugCommandFromSerial = readFromSerial.toInt(); 
+  }  
 }
 
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)
@@ -362,77 +448,3 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
   FillNetworkStat(httpCode, statusMsg);
   PrintNetworkStatToSerial();   
 }
-
-const uint32_t SyncTime()
-{
-  if(WiFi.status() == WL_CONNECTED){
-    const auto &now = GetCurrentTime(_settings.timeZone);
-    TRACE(F("Synced time: "), F(" "), F(" epoch:"), now, F(" "), F("dateTime: "), epochToDateTime(now));
-    return now;
-  }
-  return 0;
-}
-
-void HandleDebugSerialCommands()
-{
-  if(debugCommandFromSerial == 1) // Reset WiFi
-  { 
-    // _settings.resetFlag = 1985;
-    // SaveSettings();
-    ESP.restart();
-  }
-
-  if(debugCommandFromSerial == 2) // Show current status
-  { 
-    
-  }
-
-  if(debugCommandFromSerial == 3) // Extract all
-  { 
-    TRACE(F("Extract All..."))
-    String out;
-    
-    TRACE(out);
-  }
-
-  if(debugCommandFromSerial == 4) // Remove all
-  { 
-    TRACE(F("Remove All..."))  
-   
-  }
-
-  if(debugCommandFromSerial == 5) // Store 
-  { 
-   
-  }
-
-  if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
-  { 
-    INFO(F("\t\t\tFormat..."));   
-    SPIFFS.format();
-    _settings.resetFlag = 1985;
-    SaveSettings();
-    ESP.restart();
-  }
-
-  debugCommandFromSerial = 0;
-  if(Serial.available() > 0)
-  {
-    const auto &readFromSerial = Serial.readString();
-    INFO(F("Input: "), readFromSerial);
-    debugCommandFromSerial = readFromSerial.toInt(); 
-  }  
-}
-
-void StartTimers(){
-  storeDataTicks = millis();
-  syncTimeTicks = millis();
-}
-
-void SendCommand(const String &command)
-{
-  INFO(F("Send command: "), command);  
-}
-
-
-

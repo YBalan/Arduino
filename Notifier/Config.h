@@ -27,7 +27,7 @@
 
 #define TRACE_TAB           F("\t\t\t\t\t")
 
-#define STORE_DATA_TIMEOUT 60000
+#define STORE_DATA_TIMEOUT 5000
 #define SYNC_TIME_TIMEOUT 900000 //15 mins
 #define SYNC_TIME_ATTEMPTS 10
 #define DEFAULT_TIME_ZONE 2
@@ -69,8 +69,9 @@
 #else //ESP32
   #define RXD2 16
   #define TXD2 17
-  #define PIN_WIFI_BTN  15
-  #define PIN_NOTIFY  14
+  #define PIN_WIFI_BTN  14
+  #define PIN_NOTIFY  15
+  #define PIN_BUZZER 23
 #endif
 
 

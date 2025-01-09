@@ -60,6 +60,65 @@ namespace CommonHelper
   std::vector<int> splitToInt(const String &s, const char &delimiter) {
     return splitToInt(s, delimiter, delimiter);
   }
+
+  template <typename V>
+  const bool saveMap(File &file, const std::map<String, V> &map) {
+      if (file) { 
+      // Save the size of the map
+      int mapSize = map.size();      
+      file.write((const uint8_t*)(&mapSize), sizeof(mapSize));
+
+      // Save each key-value pair
+      for (const auto& [key, value] : map) {
+          // Save the key
+          int keyLength = key.length();  // Get the length of the key
+          file.write((const uint8_t*)(&keyLength), sizeof(keyLength));
+          file.write((const uint8_t*)(key.c_str()), keyLength);
+
+          // Save the struct (value)
+          file.write((const uint8_t*)(&value), sizeof(value));   
+      }
+      return true;
+    }
+    return false;
+  }
+
+  template <typename V>
+  const bool loadMap(File &file, std::map<String, V> &map, const int &maxElements = 100, const int &maxKeySize = 500) {
+      if (file) {        
+      int mapSize = 0;
+      file.read((uint8_t*)(&mapSize), sizeof(mapSize));    
+      map.clear();  // Clear the map before loading new data
+
+      if(maxElements == 0 || mapSize <= maxElements) {
+        for (int i = 0; i < mapSize; ++i) {
+          if(file.available()){
+            // Load the key
+            int keyLength = 0;
+            file.read((uint8_t*)(&keyLength), sizeof(keyLength));
+
+            if(keyLength > maxKeySize) continue;
+
+            char* keyBuffer = new char[keyLength + 1];  // +1 for null terminator
+            file.read((uint8_t*)(keyBuffer), keyLength);
+            keyBuffer[keyLength] = '\0';  // Null-terminate the key string
+
+            String key(keyBuffer);  // Convert char* to String
+            delete[] keyBuffer;
+
+            // Load the struct (value)
+            V value;
+            file.read((uint8_t*)(&value), sizeof(value));       
+
+            // Insert into map
+            map[key] = value;
+          }
+        }
+        return true;
+      }
+    } 
+    return false;   
+  }
 };
 
 #endif //COMMON_HELPER_H

@@ -5,6 +5,8 @@
 #include "DEBUGHelper.h"
 #include "Settings.h"
 
+#define SUBSCRIBED_CHATS_FILE_NAME F("/subscribedChats")
+
 #ifdef USE_BOT
 
 #ifdef ENABLE_INFO_BOT_MENU
@@ -39,33 +41,51 @@ notifynot200 - Notify all http code exclude OK(200)
 notify429 - Notify To-many Requests (429)
 */
 
-#define BOT_COMMAND_RESTART F("/restart")
-#define BOT_COMMAND_TEST F("/test")
-#define BOT_COMMAND_VER F("/ver")
+#define BOT_COMMAND_RESTART       F("/restart")
+#define BOT_COMMAND_TEST          F("/test")
+#define BOT_COMMAND_VER           F("/ver")
 #define BOT_COMMAND_CHANGE_CONFIG F("/changeconfig")
-#define BOT_COMMAND_MENU F("/menu")
-#define BOT_COMMAND_UPDATE F("/update")
-#define BOT_COMMAND_TOKEN F("/token")
-#define BOT_COMMAND_NSTAT F("/nstat")
-#define BOT_COMMAND_RSSI F("/rssi")
-#define BOT_COMMAND_CHID F("/chid")
-#define BOT_COMMAND_FS F("/fs")
-#define BOT_COMMAND_DOWNLOAD F("/download")
+#define BOT_COMMAND_MENU          F("/menu")
+#define BOT_COMMAND_UPDATE        F("/update")
+#define BOT_COMMAND_TOKEN         F("/token")
+#define BOT_COMMAND_NSTAT         F("/nstat")
+#define BOT_COMMAND_RSSI          F("/rssi")
+#define BOT_COMMAND_CHID          F("/chid")
+#define BOT_COMMAND_FS            F("/fs")
+#define BOT_COMMAND_SYNC          F("/sync")
 
 //Fast Menu
 
 //Notify
 #ifdef USE_NOTIFY
-#define BOT_COMMAND_NOTIFY F("/notify")
+#define BOT_COMMAND_NOTIFY        F("/notify")
 #endif
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM
+#define BOT_COMMAND_SUBSCRIBE     F("/subscribe")
+#define BOT_COMMAND_UNSUBSCRIBE   F("/unsubscribe")
+#define BOT_COMMAND_MESSAGE       F("/msg")
+#define BOT_COMMAND_BUZZ          F("/buzz")
+
+// From .ino file
+const uint32_t SyncTime();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
 const String GetPMMenu(const float &voltage, const String &chatId, const float& led_consumption_voltage_factor = 0.0);
 const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
+const String getStatus();
 
+struct PMChatInfo { int32_t msgId = 0; };
+static std::map<String, PMChatInfo> pmChatIds;
+
+void loadSubscribedChats(const String &fileName);
+void saveSubscribedChats(const String &fileName);
+
+const String getMessage(const String &status);
+void sendToAllSubscribers(const String &status);
+void sendToSubscriber(const String msg, const String &chatId, const int32_t &msgId);
 
 const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const bool &isGroup)
 {  
@@ -83,9 +103,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   
   if(GetCommandValue(BOT_COMMAND_MENU, filtered, value))
   { 
-    bot->sendTyping(msg.chatID);    
-
-    
+    bot->sendTyping(msg.chatID);       
     
   } else
   #ifdef USE_NOTIFY
@@ -146,7 +164,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_CHID, filtered, value))
   {
-    BOT_MENU_INFO(F("BOT Channels:"));
+    BOT_MENU_INFO(F("BOT "), F("Channels:"));
     value.clear();
     value = String(F("BOT Channels:")) + F(" ") + String(_botSettings.toStore.registeredChannelIDs.size()) + F(" -> ");
     for(const auto &channel : _botSettings.toStore.registeredChannelIDs)  
@@ -154,6 +172,84 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       BOT_MENU_INFO(F("\t"), channel.first);
       value += String(F("[")) + channel.first + F("]") + F("; ");
     }
+  } else
+  if(GetCommandValue(BOT_COMMAND_SYNC, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Sync:"));
+
+    bot->sendTyping(msg.chatID);
+    const int &intValue = value.toInt();
+
+    if(value.length() > 0 && intValue >= -12 && intValue <= 14)
+    {
+      _settings.timeZone = intValue;
+      SaveSettings();    
+    }
+    const auto &now = SyncTime();    
+    value = String(F("Synced time: ")) + epochToDateTime(now);
+  }
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  else
+  if(GetCommandValue(BOT_COMMAND_SUBSCRIBE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Subscribe:"));
+
+    bot->sendTyping(msg.chatID);
+
+    #ifdef DEBUG
+    loadSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+    #endif   
+
+    if(value.startsWith(F("cl"))){
+      value = String(pmChatIds.size()) + F(" ") + F("chatId") + F(" ") + F("cleared");
+      pmChatIds.clear();
+      saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+    }else{
+      value.clear();
+    } 
+
+    auto &chatInfo = pmChatIds[msg.chatID]; 
+
+    saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+    sendToSubscriber(getMessage(getStatus()), msg.chatID, chatInfo.msgId);
+
+    /*if(msgId != chatInfo.msgId){
+      chatInfo.msgId = 1;      
+    } */   
+  }else
+  if(GetCommandValue(BOT_COMMAND_UNSUBSCRIBE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("UnSubscribe:"));
+
+    bot->sendTyping(msg.chatID);    
+    
+    pmChatIds.erase(msg.chatID);
+    saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+        
+  }else
+  if(GetCommandValue(BOT_COMMAND_MESSAGE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Message:"));
+
+    bot->sendTyping(msg.chatID);    
+    
+    if(!_settings.setMessage(value)){
+      value = F("Message length exceed maximum!");
+    }
+
+    SaveSettings();        
+  }else
+  if(GetCommandValue(BOT_COMMAND_BUZZ, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Buzz:"));
+
+    bot->sendTyping(msg.chatID);    
+    
+    if(!_settings.setBuzz(value)){
+      value = F("Buzz length exceed maximum!");
+    }
+
+    SaveSettings();        
   }  
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
@@ -167,7 +263,59 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   return std::move(messages);
 }
 
+const String getMessage(const String &status){
+  std::move(String(_settings.Message) + F(" ") + status);
+}
 
+void sendToAllSubscribers(const String &status){  
+  const auto &msg = getMessage(status);
+  for(const auto &[key, value] : pmChatIds){
+    sendToSubscriber(msg, key, value.msgId);    
+  }  
+}
+
+void sendToSubscriber(const String msg, const String &chatId, const int32_t &msgId){  
+      bot->replyMessage(msg, msgId < 0 ? 0 : msgId, chatId);
+}    
+
+void saveSubscribedChats(const String &fileName){
+  BOT_MENU_TRACE(F("saveSubscribedChats"));
+  File file = MFS.open(fileName.c_str(), FILE_WRITE);
+  CommonHelper::saveMap(file, pmChatIds);  
+  file.close();
+
+  #ifdef DEBUG
+  file = MFS.open(fileName.c_str(), FILE_READ);  
+  BOT_MENU_INFO(file.readString());
+  file.close();
+  #endif
+}
+
+void loadSubscribedChats(const String &fileName){
+  BOT_MENU_TRACE(F("loadSubscribedChats"));  
+
+  #ifdef DEBUG
+  auto &map = pmChatIds;
+  {    
+    File file = MFS.open(fileName.c_str(), FILE_READ); 
+    file.seek(0);
+    BOT_MENU_INFO(file.readString());
+    file.close();
+  }
+  #endif
+
+  File file = MFS.open(fileName.c_str(), FILE_READ);
+  CommonHelper::loadMap(file, pmChatIds);  
+  file.close();
+
+  #ifdef DEBUG
+  BOT_MENU_TRACE(F("loadMonitorChats"), F("size: "), map.size());
+  for (const auto& [key, value] : map) {
+    BOT_MENU_TRACE(F("ChatId: "), key);
+    BOT_MENU_TRACE(F("\t"), F("MessageId: "), value.msgId);    
+  }
+  #endif
+}
 
 #endif //USE_BOT
 
