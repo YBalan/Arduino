@@ -4,6 +4,7 @@
 //#include <math.h>
 #include "DEBUGHelper.h"
 #include "Settings.h"
+#include "BuzzHelper.h"
 
 #define SUBSCRIBED_CHATS_FILE_NAME F("/subscribedChats")
 
@@ -66,6 +67,8 @@ notify429 - Notify To-many Requests (429)
 #define BOT_COMMAND_UNSUBSCRIBE   F("/unsubscribe")
 #define BOT_COMMAND_MESSAGE       F("/msg")
 #define BOT_COMMAND_BUZZ          F("/buzz")
+#define BOT_COMMAND_ONLINE        F("/online")
+#define BOT_COMMAND_STATUS        F("/status")
 
 // From .ino file
 const uint32_t SyncTime();
@@ -133,7 +136,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_CHANGE_CONFIG, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    _settings.resetFlag = 1985;
+    _settings.resetFlag = RESET_WIFI_FLAG;
     SaveSettings();
     bot->sendMessage(F("Wait for restart..."), msg.chatID);
     ESP.restart();
@@ -198,20 +201,21 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     #ifdef DEBUG
     loadSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
-    #endif   
+    #endif       
 
-    if(value.startsWith(F("cl"))){
-      value = String(pmChatIds.size()) + F(" ") + F("chatId") + F(" ") + F("cleared");
-      pmChatIds.clear();
-      saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
-    }else{
+    if(value.startsWith(F("rs"))){
       value.clear();
-    } 
+      for (const auto& [key, chatInfo] : pmChatIds) {
+        BOT_MENU_TRACE(F("ChatId: "), key);
+        BOT_MENU_TRACE(F("\t"), F("MessageId: "), chatInfo.msgId);    
+        value += key + F("; ");
+      }      
+    }else{
+      auto &chatInfo = pmChatIds[msg.chatID]; 
 
-    auto &chatInfo = pmChatIds[msg.chatID]; 
-
-    saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
-    sendToSubscriber(getMessage(getStatus()), msg.chatID, chatInfo.msgId);
+      saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+      sendToSubscriber(getMessage(getStatus()), msg.chatID, chatInfo.msgId);
+    }
 
     /*if(msgId != chatInfo.msgId){
       chatInfo.msgId = 1;      
@@ -221,9 +225,17 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     BOT_MENU_INFO(F("BOT "), F("UnSubscribe:"));
 
-    bot->sendTyping(msg.chatID);    
+    bot->sendTyping(msg.chatID); 
+
+    if(value.startsWith(F("all"))){
+      value = String(pmChatIds.size()) + F(" ") + F("chatId") + F(" ") + F("cleared");
+      pmChatIds.clear();
+      saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+    }else{
+      value = String(msg.chatID) + F(" ") + F("chatId") + F(" ") + F("erased");
+      pmChatIds.erase(msg.chatID);      
+    }       
     
-    pmChatIds.erase(msg.chatID);
     saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
         
   }else
@@ -232,25 +244,59 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     BOT_MENU_INFO(F("BOT "), F("Message:"));
 
     bot->sendTyping(msg.chatID);    
-    
-    if(!_settings.setMessage(value)){
-      value = F("Message length exceed maximum!");
-    }
 
-    SaveSettings();        
+    if(value.isEmpty()){    
+      value = _settingsExt.Message;
+    }else{      
+      if(!_settingsExt.setMessage(value)){
+        value = String(F("Message: ")) + F("length exceeds maximum!");
+      }
+
+      SaveSettingsExt();        
+    }
   }else
   if(GetCommandValue(BOT_COMMAND_BUZZ, filtered, value))
   {
     BOT_MENU_INFO(F("BOT "), F("Buzz:"));
 
     bot->sendTyping(msg.chatID);    
+
+    if(value.isEmpty()){    
+      value = _settingsExt.Buzz;
+    }else{    
+      if(value.startsWith(F("def"))){
+        value = BUZZER_DEFAULT;
+      }
+
+      if(!_settingsExt.setBuzz(value)){
+        value = String(F("Buzz: ")) + F("length exceeds maximum!");        
+      }
+
+      Buzz::PlayMelody(PIN_BUZZER, _settingsExt.Buzz);
+      SaveSettingsExt();        
+    }    
+  }else
+  if(GetCommandValue(BOT_COMMAND_ONLINE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Online:"));
+
+    bot->sendTyping(msg.chatID);       
     
-    if(!_settings.setBuzz(value)){
-      value = F("Buzz length exceed maximum!");
-    }
+    _settings.notifyOnline = value.toInt() > 0;
+
+    value = String(F("Notify Online: ")) + (_settings.notifyOnline ? F("On") : F("Off"));
 
     SaveSettings();        
+  }else
+  if(GetCommandValue(BOT_COMMAND_STATUS, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Status:"));
+
+    bot->sendTyping(msg.chatID);       
+
+    value = String(F("Status: ")) + String(getStatus());    
   }  
+
 
   if(value.length() > 0 && !noAnswerIfFromMenu)
       messages.push_back(value);  
@@ -264,7 +310,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 }
 
 const String getMessage(const String &status){
-  std::move(String(_settings.Message) + F(" ") + status);
+  return std::move(String(_settingsExt.Message) + F(" ") + status);
 }
 
 void sendToAllSubscribers(const String &status){  
@@ -309,7 +355,7 @@ void loadSubscribedChats(const String &fileName){
   file.close();
 
   #ifdef DEBUG
-  BOT_MENU_TRACE(F("loadMonitorChats"), F("size: "), map.size());
+  BOT_MENU_TRACE(F("loadSubscribedChats"), F(" "), F("size: "), map.size());
   for (const auto& [key, value] : map) {
     BOT_MENU_TRACE(F("ChatId: "), key);
     BOT_MENU_TRACE(F("\t"), F("MessageId: "), value.msgId);    

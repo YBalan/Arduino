@@ -6,21 +6,17 @@
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 #include <ArduinoJson.h>
 
-#ifdef ESP32
-  #include <SPIFFS.h>
-#endif
-
 #include "DEBUGHelper.h"
 #include "WiFiParameters.h"
 
 #ifdef ENABLE_INFO_WIFI
-#define WIFI_INFO(...) SS_TRACE("[WiFi OPS INFO] ", __VA_ARGS__)
+#define WIFI_INFO(...) SS_TRACE(F("[WiFi OPS INFO] "), __VA_ARGS__)
 #else
 #define WIFI_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_WIFI
-#define WIFI_TRACE(...) SS_TRACE("[WiFi OPS TRACE] ", __VA_ARGS__)
+#define WIFI_TRACE(...) SS_TRACE(F("[WiFi OPS TRACE] "), __VA_ARGS__)
 #else
 #define WIFI_TRACE(...) {}
 #endif
@@ -111,7 +107,7 @@ class WiFiOps
     void FormatFS()
     {
       //clean FS, for testing
-      SPIFFS.format();
+      MFS.format();
     }
 
     const int ParametersCount() const
@@ -172,6 +168,11 @@ class WiFiOps
       //set minimu quality of signal so it ignores AP's under that quality
       //defaults to 8%
       wifiManager.setMinimumSignalQuality();
+
+      WiFi.setAutoReconnect(true);
+      #ifdef ESP8266
+      WiFi.setAutoConnect(true); 
+      #endif
 
       //sets timeout until configuration portal gets turned off
       //useful to make it all retry or go to sleep
@@ -249,7 +250,7 @@ class WiFiOps
           json[p.GetJson()] = readValue;
         }
 
-        File configFile = SPIFFS.open("/config.json", "w");
+        File configFile = MFS.open("/config.json", FILE_WRITE);
         if (!configFile) {
           WIFI_INFO(F("failed to open config file for writing"));
         }
@@ -272,12 +273,12 @@ class WiFiOps
       WIFI_TRACE(F("Load WiFi Settings..."));
       WIFI_TRACE(F("Mounting FS..."));
 
-      if (SPIFFS.begin()) {
+      if (MFS.begin()) {
         WIFI_TRACE(F("File system mounted"));
-        if (SPIFFS.exists("/config.json")) {
+        if (MFS.exists("/config.json")) {
           //file exists, reading and loading
           WIFI_TRACE(F("reading config file"));
-          File configFile = SPIFFS.open("/config.json", "r");
+          File configFile = MFS.open("/config.json", FILE_READ);
           if (configFile) {
             WIFI_TRACE(F("opened config file"));
             size_t size = configFile.size();

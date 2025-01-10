@@ -7,13 +7,13 @@
 #include "DEBUGHelper.h"
 
 #ifdef ENABLE_INFO_BOT
-#define BOT_INFO(...) SS_TRACE("[BOT INFO] ", __VA_ARGS__)
+#define BOT_INFO(...) SS_TRACE(F("[BOT INFO] "), __VA_ARGS__)
 #else
 #define BOT_INFO(...) {}
 #endif
 
 #ifdef ENABLE_TRACE_BOT
-#define BOT_TRACE(...) SS_TRACE("[BOT TRACE] ", __VA_ARGS__)
+#define BOT_TRACE(...) SS_TRACE(F("[BOT TRACE] "), __VA_ARGS__)
 #else
 #define BOT_TRACE(...) {}
 #endif
@@ -198,29 +198,29 @@ const bool HandleFrmwUpdate(FB_msg& msg, std::vector<String> &messages)
     fileName.replace(F(".gz"), F(""));
     auto uidx = fileName.lastIndexOf(F("_"));
     bool isEsp32Frmw = fileName.lastIndexOf(F("esp32")) >= 0;
+    const bool isValidProduct = fileName.startsWith(PRODUCT_NAME);
 
     if(uidx >= 0 && uidx < fileName.length() - 1)
     {    
-      if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw))
-      {
-        bot->OTAVersion = fileName.substring(uidx + 1);
-        String currentVersion = String(VER);
-        if(bot->OTAVersion.toFloat() > currentVersion.toFloat())
-        {
-          messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+      if(isValidProduct){
+        if((IsESP32 && isEsp32Frmw) || (!IsESP32 && !isEsp32Frmw)){
+          bot->OTAVersion = fileName.substring(uidx + 1);
+          String currentVersion = String(VER);
+          if(bot->OTAVersion.toFloat() > currentVersion.toFloat()){
+            messages.push_back(String(F("Updates OK")) + F(": ") + currentVersion + F(" -> ") + bot->OTAVersion);
+            BOT_INFO(messages[0]);
+            bot->update();
+          }else{        
+            messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
+            bot->OTAVersion.clear();   
+            BOT_INFO(messages[0]);     
+          }
+        }else{
+          messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
           BOT_INFO(messages[0]);
-          bot->update();
         }
-        else
-        {        
-          messages.push_back(bot->OTAVersion + F(" <= ") + currentVersion + F(". NO Updates..."));        
-          bot->OTAVersion.clear();   
-          BOT_INFO(messages[0]);     
-        }
-      }
-      else
-      {
-        messages.push_back(String(F("Wrong firmware")) + F(". NO Updates..."));
+      }else{
+        messages.push_back(String(F("Wrong ProductName")) + F(". NO Updates..."));
         BOT_INFO(messages[0]);
       }
     }
@@ -245,7 +245,7 @@ void SendMessageToAllRegisteredChannels(const String &msg, const bool &useBotNam
 void SaveChannelIDs()
 {
   BOT_INFO(F("SaveChannelIDs"));
-  File configFile = SPIFFS.open("/channelIDs.json", "w");
+  File configFile = MFS.open("/channelIDs.json", FILE_WRITE);
   if (configFile) 
   {
     BOT_TRACE(F("Write channelIDs file"));
@@ -271,7 +271,7 @@ void SaveChannelIDs()
 void LoadChannelIDs()
 {
   BOT_INFO(F("LoadChannelIDs"));
-  File configFile = SPIFFS.open("/channelIDs.json", "r");
+  File configFile = MFS.open("/channelIDs.json", FILE_READ);
   if (configFile) 
   {
     BOT_TRACE(F("Read channelIDs file"));    

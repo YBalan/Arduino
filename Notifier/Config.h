@@ -23,6 +23,9 @@
 #define AP_NAME       String(PRODUCT_NAME) + F("_AP")
 #define AP_PASS       F("password")
 
+#define ONLINE_MSG    F("Online")
+#define BUZZER_DEFAULT F("500_200")
+
 #define NOTIFY_WHEN_LOW true
 
 #define TRACE_TAB           F("\t\t\t\t\t")
@@ -46,7 +49,7 @@
   //#define USE_API
   //#define HTTP_TIMEOUT 3000
   #define LANGUAGE_UA
-  #define BOT_MAX_INCOME_MSG_SIZE 5000 //should not be less because of menu action takes a lot
+  #define BOT_MAX_INCOME_MSG_SIZE 7000 //should not be less because of menu action takes a lot
   #define USE_BOT_ONE_MSG_ANSWER true
   #define USE_STOPWATCH
   #define USE_NOTIFY

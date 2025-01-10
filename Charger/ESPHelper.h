@@ -142,4 +142,31 @@ void PrintFSInfo(String &fsInfo)
   fsInfo += fs + F(": ") + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
 }
 
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println("Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.printf("  DIR : %s\n", file.name());
+      if (levels) {
+        listDir(fs, file.name(), levels - 1); // Recursively list subdirectories
+      }
+    } else {
+      Serial.printf("  FILE: %s  SIZE: %d bytes\n", file.name(), file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
 #endif //ESP_HELPER_H

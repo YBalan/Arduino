@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.0")
 #else //ESP32
-  #define VER F("1.0")
+  #define VER F("1.10")
 #endif
 
 //#define RELEASE
@@ -37,6 +37,9 @@
 
 #define ENABLE_INFO_API
 #define ENABLE_TRACE_API
+
+#define ENABLE_INFO_BUZZ
+#define ENABLE_TRACE_BUZZ
 #else
 
 #define VER_POSTFIX F("R")
@@ -52,8 +55,7 @@
 #define DEBOUNCE_TIME 50
 
 #ifdef ESP32
-  #define IsESP32 true
-  #include <SPIFFS.h>
+  #define IsESP32 true  
 #else
   #define IsESP32 false
 #endif
@@ -85,6 +87,7 @@
 #include "TelegramBotHelper.h"
 #include "TBotMenu.h"
 #endif
+#include "BuzzHelper.h"
 
 #define LONG_PRESS_VALUE_MS 1000
 #include "Button.h"
@@ -106,6 +109,7 @@ std::unique_ptr<WiFiOps::WiFiOps> wifiOps(new WiFiOps::WiFiOps(PORTAL_TITLE, AP_
 static uint8_t debugCommandFromSerial = 0;
 
 Button wifiBtn(PIN_WIFI_BTN);
+ezButton notifyBtn(PIN_NOTIFY);
 
 uint32_t storeDataTicks = 0;
 uint32_t syncTimeTicks = 0;
@@ -116,9 +120,10 @@ void setup()
   Serial.begin(115200);
   while (!Serial);     
 
-  pinMode(PIN_NOTIFY, INPUT_PULLUP);
+  //pinMode(PIN_NOTIFY, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
+  notifyBtn.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
   Serial.print(F("!!!! Start ")); Serial.print(PRODUCT_NAME); Serial.println(F(" !!!!"));
@@ -126,10 +131,14 @@ void setup()
   Serial.print(F(" HEAP: ")); Serial.println(ESP.getFreeHeap());
   Serial.print(F("STACK: ")); Serial.println(ESPgetFreeContStack);    
 
+  MountFS();
+  //listDir(MFS, "/", 3);  
+
   LoadSettings();
-  LoadSettingsExt();  
-  //_settings.reset(); 
+  LoadSettingsExt();    
   loadSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
+
+  //listDir(MFS, "/", 3); 
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -143,13 +152,15 @@ void setup()
   .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
   .AddParameter(F("telegramSec"), F("Telegram Bot Security"), F("telegram_sec"), F("SECURE_STRING"), 30)
   #endif
-  ;  
+  ;
+
+  //listDir(MFS, "/", 3);
   
   if(IsWiFiOn())
-  {
+  {    
     INFO(F("ResetFlag: "), _settings.resetFlag);
     wifiOps->TryToConnectOrOpenConfigPortal(CONFIG_PORTAL_TIMEOUT, /*restartAfterPortalTimeOut*/false, /*resetSettings:*/_settings.resetFlag == RESET_WIFI_FLAG /*|| resetButtonState == LOW*/);
-    if(_settings.resetFlag == 1985)
+    if(_settings.resetFlag == RESET_WIFI_FLAG)
     {
       _settings.resetFlag = 200;
       SaveSettings();
@@ -161,7 +172,17 @@ void setup()
     InitBot();
   } 
 
+  //listDir(MFS, "/", 3);
+
   StartTimers();
+
+  if(_settings.notifyOnline){
+    if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
+      #ifdef USE_BOT
+      sendToAllSubscribers(ONLINE_MSG);
+      #endif
+    }
+  }
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -193,7 +214,8 @@ void InitBot()
 }
 
 const bool isNotifyPinChanged(){
-  const auto &val = digitalRead(PIN_NOTIFY);
+  const auto val = notifyBtn.getState();//digitalRead(PIN_NOTIFY);
+  
   if(_settings.notifyPinPrevValue >= 0){
     if(_settings.notifyPinPrevValue != val){
       _settings.notifyPinPrevValue = val;
@@ -207,10 +229,13 @@ const bool isNotifyPinChanged(){
 
 void loop()
 {
+  //TRACE(TRACE_TAB, F("Loop!!!"));
+
   static uint32_t currentTicks = millis(); 
   currentTicks = millis(); 
 
   wifiBtn.loop();
+  notifyBtn.loop();
 
   if(wifiBtn.isPressed())
   {
@@ -233,28 +258,32 @@ void loop()
   RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
 
   const uint32_t &ticks = currentTicks - storeDataTicks;  
-  if(storeDataTicks > 0 && ticks >= _settings.storeDataTimeout){
+  if(storeDataTicks > 0 && ticks >= (_settings.storeDataTimeout == 0 ? STORE_DATA_TIMEOUT : _settings.storeDataTimeout)){
     storeDataTicks = currentTicks;
 
-    INFO(F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
+    //INFO(F("Store data timeout: "), String(_settings.storeDataTimeout), F(" "), F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
     //StoreData(ticks);        
 
-    TRACE(TRACE_TAB, F("220V Status: "), getStatus());    
+    //TRACE(TRACE_TAB, F("220V Status: "), getStatus());    
   }
 
-  if(isNotifyPinChanged()){
-      SaveSettings();
+  if(isNotifyPinChanged()){      
       if(_settings.notifyPinCountBefore == _settings.notifyPinCounter){
         _settings.notifyPinCounter = 0;
         _settings.notifyPinPrevValue = -1;
-        //SendMessages
+        //SendMessages        
 
-        tone(PIN_BUZZER, 440, 1000);
+        const auto &status = getStatus();
+        TRACE(TRACE_TAB, F("220V Status: "), status);
 
-        TRACE(TRACE_TAB, F("220V Status: "), getStatus());
+        if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){        
+          sendToAllSubscribers(status);
+        }        
+        playNotify();
       }else{
         //SendMessages
-      }      
+      } 
+      SaveSettings();     
     }
 
   if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
@@ -286,11 +315,13 @@ void loop()
 }
 
 const String getStatus(){
-  std::move(digitalRead(PIN_NOTIFY) == 0 ? F("ON") : F("OFF"));
+  auto pinValue = notifyBtn.getState();//digitalRead(PIN_NOTIFY);
+  TRACE(F("pinValue: "), pinValue);
+  return pinValue == LOW ? F("ON") : F("OFF");
 }
 
-void playNotify(){
-
+void playNotify(){  
+  Buzz::PlayMelody(PIN_BUZZER, _settingsExt.Buzz);
 }
 
 void StoreData(const uint32_t &ticks)
@@ -318,30 +349,45 @@ void StartTimers(){
 
 void HandleDebugSerialCommands()
 {
-  if(debugCommandFromSerial == 1) // Reset WiFi
+  if(debugCommandFromSerial == 1) // restart
   { 
     // _settings.resetFlag = 1985;
     // SaveSettings();
-    ESP.restart();
+    Restart();
+  }
+
+  if(debugCommandFromSerial == 140) // Reset WiFi
+  { 
+    _settings.resetFlag = RESET_WIFI_FLAG;
+    SaveSettings();
+    Restart();
   }
 
   if(debugCommandFromSerial == 2) // Show current status
   { 
-    TRACE(TRACE_TAB, F("220V Status: "), digitalRead(PIN_NOTIFY) == LOW ? F("ON") : F("OFF"));
+    TRACE(TRACE_TAB, F("220V Status: "), getStatus());
+    _settings.trace();
+    _settingsExt.trace();
+
+    String fsInfo; PrintFSInfo(fsInfo); TRACE(fsInfo);
   }
 
-  if(debugCommandFromSerial == 3) // Extract all
+  if(debugCommandFromSerial == 3) // Init all
   { 
-    TRACE(F("Extract All..."))
-    String out;
+    _settings.init();
+    _settingsExt.init();
     
-    TRACE(out);
+    _settings.trace();
+    _settingsExt.trace();
+
+    SaveSettings();
+    SaveSettingsExt();
   }
 
-  if(debugCommandFromSerial == 4) // Remove all
+  if(debugCommandFromSerial == 4) // Show FS tree
   { 
-    TRACE(F("Remove All..."))  
-   
+    MountFS();
+    listDir(MFS, "/", 3);
   }
 
   if(debugCommandFromSerial == 5) // Store 
@@ -351,11 +397,11 @@ void HandleDebugSerialCommands()
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
-    INFO(F("\t\t\tFormat..."));   
-    SPIFFS.format();
-    _settings.resetFlag = 1985;
+    INFO(TRACE_TAB, F("Format..."));   
+    MFS.format();
+    _settings.resetFlag = RESET_WIFI_FLAG;
     SaveSettings();
-    ESP.restart();
+    Restart();
   }
 
   debugCommandFromSerial = 0;
@@ -365,6 +411,30 @@ void HandleDebugSerialCommands()
     INFO(F("Input: "), readFromSerial);
     debugCommandFromSerial = readFromSerial.toInt(); 
   }  
+}
+
+void MountFS(){
+  #ifdef LITTLEFS
+  INFO(F("Mount FS"), F(": "), F("LittleFS"));
+  #else
+  INFO(F("Mount FS"), F(": "), F("SPIFFS"));
+  #endif
+  if(!MFS.begin(/*formatOnFail:*/true)){
+    #ifdef LITTLEFS
+    INFO(F("Failed to mount FS"), F(": "), F("LittleFS"));
+    #else
+    INFO(F("Failed to mount FS"), F(": "), F("SPIFFS"));
+    #endif
+    delay(5000);
+    Restart();
+  }
+}
+
+void Restart(){
+  #ifdef ESP32
+  MFS.end();
+  #endif
+  ESP.restart();
 }
 
 const bool RunHttp(const unsigned long &currentTicks, int &httpCode, String &statusMsg)

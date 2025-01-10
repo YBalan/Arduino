@@ -40,14 +40,12 @@ namespace UAMap
     uint16_t notifyPinCounter = 0;
     int8_t notifyPinPrevValue = -1;
 
-    char Message[MAX_MESSAGE_LENGTH];
-    char Buzz[MAX_MESSAGE_LENGTH];
+    bool notifyOnline = true;    
 
     void init()
     {      
       memset(NotifyChatId, 0, MAX_CHAT_ID_LENGTH);
-      memset(Message, 0, MAX_MESSAGE_LENGTH);
-      memset(Buzz, 0, MAX_BUZZ_LENGTH);
+      
       resetFlag = 200;
       notifyHttpCode = 0;      
       timeZone = 3;
@@ -55,49 +53,84 @@ namespace UAMap
       notifyPinCountBefore = 1;
       notifyPinCounter = 0;
       notifyPinPrevValue = -1;
+      notifyOnline = true;
     }
+    
+    const bool setNotifyChatId(const String &str){ return setStringValue(NotifyChatId, str, MAX_CHAT_ID_LENGTH, F("NotifyChatId: "), /*setIfExceeds:*/true, /*trace:*/true); }   
+    void trace(){
+      SETTINGS_TRACE(F("resetFlag: "), String(resetFlag));
+      SETTINGS_TRACE(F("notifyHttpCode: "), String(notifyHttpCode));
+      SETTINGS_TRACE(F("timeZone: "), String(timeZone));
+      SETTINGS_TRACE(F("storeDataTimeout: "), String(storeDataTimeout));
+      SETTINGS_TRACE(F("notifyPinCountBefore: "), String(notifyPinCountBefore));
+      SETTINGS_TRACE(F("notifyPinCounter: "), String(notifyPinCounter));
+      SETTINGS_TRACE(F("notifyPinPrevValue: "), String(notifyPinPrevValue));
+      SETTINGS_TRACE(F("notifyOnline: "), notifyOnline ? F("true") : F("false"));
+    } 
 
-    void setNotifyChatId(const String &str){ if(str.length() > MAX_CHAT_ID_LENGTH) SETTINGS_TRACE(F("\tChatID length exceed maximum!")); strcpy(NotifyChatId, str.c_str()); }
-    const bool setMessage(const String &str){ if(str.length() > MAX_MESSAGE_LENGTH) { SETTINGS_TRACE(F("Message length exceed maximum!")); return false; } strcpy(Message, str.c_str()); return true; }
-    const bool setBuzz(const String &str){ bool res = true; if(str.length() > MAX_BUZZ_LENGTH) { SETTINGS_TRACE(F("Buzz length exceed maximum!")); res = false; } strcpy(Buzz, str.c_str()); return res; }
+    static const bool setStringValue(char *buff, const String &value, int16_t maxLength, const String &name, const bool &setIfExceeds = true, const bool &trace = true){
+      bool res = true; 
+      if(value.length() > maxLength) { 
+        if(trace) SETTINGS_TRACE(name, F("length exceeds maximum!")); 
+        res = false; 
+      }
+      if(setIfExceeds) { strcpy(buff, value.c_str()); buff[maxLength - 1] = '\0'; }
+      return res;
+    }
   };
 
   class SettingsExt
   {
     public:    
+    char Message[MAX_MESSAGE_LENGTH];
+    char Buzz[MAX_BUZZ_LENGTH];
     
     public:
     void init()
     {
       SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));      
-    }    
+
+      memset(Message, 0, MAX_MESSAGE_LENGTH);
+      memset(Buzz, 0, MAX_BUZZ_LENGTH);
+      setBuzz(BUZZER_DEFAULT);
+    }   
+
+    const bool setMessage(const String &str){ return Settings::setStringValue(Message, str, MAX_MESSAGE_LENGTH, F("Message: "), /*setIfExceeds:*/true, /*trace:*/true); }
+    const bool setBuzz(const String &str){ return Settings::setStringValue(Buzz, str, MAX_BUZZ_LENGTH, F("Buzz: "), /*setIfExceeds:*/true, /*trace:*/true); }     
+
+    void trace(){
+      SETTINGS_TRACE(F("Message: "), Message);
+      SETTINGS_TRACE(F("Buzz: "), Buzz);
+    }
   };  
 } 
 
 UAMap::Settings _settings;
 UAMap::SettingsExt _settingsExt;
 
-
 const bool SaveFile(const char* const fileName, const byte* const data, const size_t& size)
 {  
-  File configFile = SPIFFS.open(fileName, "w");
-  if (configFile) 
-  { 
-    configFile.write(data, size);
-    configFile.close();
-    return true;
+  if (MFS.begin()) 
+  {
+    File configFile = MFS.open(fileName, FILE_WRITE);
+    if (configFile) 
+    { 
+      configFile.write(data, size);
+      configFile.close();
+      return true;
+    }
   }  
   return false;
 }
 
 const bool LoadFile(const char* const fileName, byte* const data, const size_t& size)
 {
-  if (SPIFFS.begin()) 
+  if (MFS.begin()) 
   {
     SETTINGS_TRACE(F("File system mounted"));
-    if (SPIFFS.exists(fileName)) 
+    if (MFS.exists(fileName)) 
     {
-      File configFile = SPIFFS.open(fileName, "r");
+      File configFile = MFS.open(fileName, FILE_READ);
       if (configFile) 
       {
         SETTINGS_INFO(F("Read file "), fileName);    
@@ -107,7 +140,7 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
       }
       else
       {
-        SETTINGS_INFO(F("Failed to open "), fileName);
+        SETTINGS_INFO(F("Failed to open: "), fileName);
         return false;
       }
     }
@@ -119,9 +152,7 @@ const bool LoadFile(const char* const fileName, byte* const data, const size_t& 
   }
   else
   {
-    SETTINGS_INFO(F("Failed to mount FS"));
-    Serial.println(F("\t\t\tFormat..."));
-    SPIFFS.format();
+    SETTINGS_INFO(F("Failed to mount FS"));    
   }
   return false;
 }
@@ -157,21 +188,15 @@ const bool LoadSettings()
   String fileName = F("/config.bin");
   SETTINGS_INFO(F("Load Settings from: "), fileName);
 
-  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settings, sizeof(_settings));  
+  const bool &res = LoadFile(fileName.c_str(), (byte *)&_settings, sizeof(_settings));    
   
-  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
-  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
-  SETTINGS_INFO(F("NotifyChatId: "), _settings.NotifyChatId);
   if(!res)
   {
     //SETTINGS_INFO(F("Reset Settings..."));
     _settings.init();
   }
   
-  SETTINGS_INFO(F("ResetFlag: "), _settings.resetFlag);
-  SETTINGS_INFO(F("NotifyHttpCode: "), _settings.notifyHttpCode);
-  SETTINGS_INFO(F("NotifyChatId: "), _settings.NotifyChatId);
-
+  _settings.trace();
   return res;
 }
 
@@ -186,6 +211,8 @@ const bool LoadSettingsExt()
   {    
     _settingsExt.init();
   }
+
+  _settingsExt.trace();
  
   return res;
 }

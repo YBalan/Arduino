@@ -126,14 +126,48 @@ void PrintFSInfo(String &fsInfo)
 {
   #ifdef ESP8266
   FSInfo fs_info;
-  SPIFFS.info(fs_info);   
+  MFS.info(fs_info);   
   const auto &total = fs_info.totalBytes;
   const auto &used = fs_info.usedBytes;
   #else //ESP32
-  const auto &total = SPIFFS.totalBytes();
-  const auto &used = SPIFFS.usedBytes();
+  const auto &total = MFS.totalBytes();
+  const auto &used = MFS.usedBytes();
   #endif
-  fsInfo = String(F("SPIFFS: ")) + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
+  if(!fsInfo.isEmpty()) fsInfo += '\n';
+  #ifdef LITTLEFS
+  String fs = String(F("LittleFS"));
+  #else
+  String fs = String(F("SPIFFS"));
+  #endif
+  fsInfo += fs + F(": ") + F("Total: ") + String(total) + F(" ") + F("Used: ") + String(used) + F(" ") + F("Left: ") + String(total - used);  
 }
+
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println("Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.printf("  DIR : %s\n", file.name());
+      if (levels) {
+        listDir(fs, file.name(), levels - 1); // Recursively list subdirectories
+      }
+    } else {
+      Serial.printf("  FILE: %s  SIZE: %d bytes\n", file.name(), file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
 
 #endif //ESP_HELPER_H
