@@ -103,7 +103,7 @@ const String epochToDateTime(const time_t &epochTime, const String &format = F("
     strftime(buffer, sizeof(buffer), format.c_str(), timeinfo);
 
     // Return the formatted string
-    return String(buffer);
+    return std::move(String(buffer));
 }
 
 // Converts a formatted date-time string to epoch time
@@ -120,6 +120,26 @@ const time_t dateTimeToEpoch(const String& dateTime, const String &format = F("%
 
     // Convert struct tm to time_t (epoch time)
     return mktime(&tm);
+}
+
+const String formatDuration(const uint32_t &start, const uint32_t &end, const String &format = F("%d %H:%M:%S")) {
+  // Calculate the duration in seconds
+  uint32_t duration = (end > start) ? (end - start) : (start - end);
+
+  // Break down into days, hours, minutes, and seconds
+  uint32_t days = duration / 86400;         // 1 day = 86400 seconds
+  uint32_t hours = (duration % 86400) / 3600;
+  uint32_t minutes = (duration % 3600) / 60;
+  uint32_t seconds = duration % 60;
+
+  // Format the string
+  String result = "";
+  if (days > 0) result += String(days) + " d, ";
+  if (hours > 0 || days > 0) result += String(hours) + " h, ";
+  if (minutes > 0 || hours > 0 || days > 0) result += String(minutes) + " min, ";
+  result += String(seconds) + " sec";
+
+  return result;
 }
 
 void PrintFSInfo(String &fsInfo)
@@ -168,5 +188,6 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
     file = root.openNextFile();
   }
 }
+
 
 #endif //ESP_HELPER_H

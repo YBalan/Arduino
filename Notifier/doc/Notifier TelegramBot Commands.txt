@@ -1,0 +1,12 @@
+subscribe - Subscribe for notification for this chat
+unsubscribe - Unsubscribe for notification for this chat
+unsubscribeall - Unsubscribe for notification for all chats
+msg - Set custom message
+buzz - See custon buzz
+buzzon - Set custon buzz for On action
+buzzoff - Set custon buzz for Off action
+online - Notify when online
+inverse - Use inverse logic 0 - for ON 1 for OFF
+status - See status
+play - play 500_200 500 - Hz; 200 - delay in ms
+skip - Set skip actions count for notification 1 - immidiately

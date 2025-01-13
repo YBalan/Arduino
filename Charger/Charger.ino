@@ -497,7 +497,8 @@ void HandleDebugSerialCommands()
 {
   if(debugCommandFromSerial == 1) // restart
   {
-    Restart();
+    listDir(MFS, "/", 3);   
+    Restart();    
   }
 
   if(debugCommandFromSerial == 140) // Reset WiFi
