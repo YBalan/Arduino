@@ -40,7 +40,13 @@ namespace UAMap
     uint16_t notifyPinCounter = 0;
     int8_t notifyPinPrevValue = -1;
 
-    bool notifyOnline = true;    
+    bool notifyOnline = true;
+
+    bool inversePinLogic = true;
+
+    uint32_t dtOn = START_EPOCH_TIMESTAMP; 
+    uint32_t dtOff = START_EPOCH_TIMESTAMP;
+    uint32_t dtLast = START_EPOCH_TIMESTAMP;
 
     void init()
     {      
@@ -54,6 +60,10 @@ namespace UAMap
       notifyPinCounter = 0;
       notifyPinPrevValue = -1;
       notifyOnline = true;
+      inversePinLogic = true;
+      dtOn = START_EPOCH_TIMESTAMP;
+      dtOff = START_EPOCH_TIMESTAMP;
+      dtLast = START_EPOCH_TIMESTAMP;
     }
     
     const bool setNotifyChatId(const String &str){ return setStringValue(NotifyChatId, str, MAX_CHAT_ID_LENGTH, F("NotifyChatId: "), /*setIfExceeds:*/true, /*trace:*/true); }   
@@ -64,8 +74,12 @@ namespace UAMap
       SETTINGS_TRACE(F("storeDataTimeout: "), String(storeDataTimeout));
       SETTINGS_TRACE(F("notifyPinCountBefore: "), String(notifyPinCountBefore));
       SETTINGS_TRACE(F("notifyPinCounter: "), String(notifyPinCounter));
-      SETTINGS_TRACE(F("notifyPinPrevValue: "), String(notifyPinPrevValue));
+      SETTINGS_TRACE(F("notifyPinPrevValue: "), String(notifyPinPrevValue), F(" "), F("["), notifyPinPrevValue < 0 ? F("NA") : (notifyPinPrevValue == LOW ? F("LOW") : F("HIGH")), F("]"));
       SETTINGS_TRACE(F("notifyOnline: "), notifyOnline ? F("true") : F("false"));
+      SETTINGS_TRACE(F("inversePinLogic: "), inversePinLogic ? F("true") : F("false"));
+      SETTINGS_TRACE(F("DateTimeOn: "), epochToDateTime(dtOn));
+      SETTINGS_TRACE(F("DateTimeOff: "), epochToDateTime(dtOff));
+      SETTINGS_TRACE(F("DateTimeLast: "), epochToDateTime(dtLast));
     } 
 
     static const bool setStringValue(char *buff, const String &value, int16_t maxLength, const String &name, const bool &setIfExceeds = true, const bool &trace = true){
@@ -83,7 +97,8 @@ namespace UAMap
   {
     public:    
     char Message[MAX_MESSAGE_LENGTH];
-    char Buzz[MAX_BUZZ_LENGTH];
+    char BuzzOn[MAX_BUZZ_LENGTH];
+    char BuzzOff[MAX_BUZZ_LENGTH];
     
     public:
     void init()
@@ -91,16 +106,20 @@ namespace UAMap
       SETTINGS_INFO(F("EXT: "), F("Reset Settings..."));      
 
       memset(Message, 0, MAX_MESSAGE_LENGTH);
-      memset(Buzz, 0, MAX_BUZZ_LENGTH);
-      setBuzz(BUZZER_DEFAULT);
+      memset(BuzzOn, 0, MAX_BUZZ_LENGTH);
+      memset(BuzzOff, 0, MAX_BUZZ_LENGTH);
+      setBuzzOn(BUZZER_ON_DEFAULT);
+      setBuzzOff(BUZZER_OFF_DEFAULT);
     }   
 
     const bool setMessage(const String &str){ return Settings::setStringValue(Message, str, MAX_MESSAGE_LENGTH, F("Message: "), /*setIfExceeds:*/true, /*trace:*/true); }
-    const bool setBuzz(const String &str){ return Settings::setStringValue(Buzz, str, MAX_BUZZ_LENGTH, F("Buzz: "), /*setIfExceeds:*/true, /*trace:*/true); }     
+    const bool setBuzzOn(const String &str){ return Settings::setStringValue(BuzzOn, str, MAX_BUZZ_LENGTH, F("BuzzOn: "), /*setIfExceeds:*/true, /*trace:*/true); }     
+    const bool setBuzzOff(const String &str){ return Settings::setStringValue(BuzzOff, str, MAX_BUZZ_LENGTH, F("BuzzOff: "), /*setIfExceeds:*/true, /*trace:*/true); }     
 
     void trace(){
       SETTINGS_TRACE(F("Message: "), Message);
-      SETTINGS_TRACE(F("Buzz: "), Buzz);
+      SETTINGS_TRACE(F("BuzzOn: "), BuzzOn);
+      SETTINGS_TRACE(F("BuzzOff: "), BuzzOff);
     }
   };  
 } 

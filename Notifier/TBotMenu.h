@@ -68,7 +68,10 @@ notify429 - Notify To-many Requests (429)
 #define BOT_COMMAND_MESSAGE       F("/msg")
 #define BOT_COMMAND_BUZZ          F("/buzz")
 #define BOT_COMMAND_ONLINE        F("/online")
+#define BOT_COMMAND_INVERSE       F("/inverse")
 #define BOT_COMMAND_STATUS        F("/status")
+#define BOT_COMMAND_PLAY          F("/play")
+#define BOT_COMMAND_SKIP          F("/skip")
 
 // From .ino file
 const uint32_t SyncTime();
@@ -78,7 +81,8 @@ const String GetPMMenuCall(const float &voltage, const String &chatId);
 void SetPMMenu(const String &chatId, const int32_t &msgId, const float &voltage, const float& led_consumption_voltage_factor = 0.0);
 void PrintFSInfo(String &fsInfo);
 void SendCommand(const String &command);
-const String getStatus();
+const String getNotifyPinStatus();
+const String getDurationFromLast(const uint32_t &now);
 
 struct PMChatInfo { int32_t msgId = 0; };
 static std::map<String, PMChatInfo> pmChatIds;
@@ -189,7 +193,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       SaveSettings();    
     }
     const auto &now = SyncTime();    
-    value = String(F("Synced time: ")) + epochToDateTime(now);
+    value = String(F("TimeZone: ")) + String(_settings.timeZone) + F(" ") + F("Synced time: ") + epochToDateTime(now);
   }
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CUSTOM  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   else
@@ -214,7 +218,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
       auto &chatInfo = pmChatIds[msg.chatID]; 
 
       saveSubscribedChats(SUBSCRIBED_CHATS_FILE_NAME);
-      sendToSubscriber(getMessage(getStatus()), msg.chatID, chatInfo.msgId);
+      sendToSubscriber(getMessage(getNotifyPinStatus()), msg.chatID, chatInfo.msgId);
     }
 
     /*if(msgId != chatInfo.msgId){
@@ -261,18 +265,42 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     bot->sendTyping(msg.chatID);    
 
-    if(value.isEmpty()){    
-      value = _settingsExt.Buzz;
+    if(value.isEmpty()){      
+      value = String(F("BuzzOn: ")) + (strlen(_settingsExt.BuzzOn) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOn)); 
+      value += String("\n") + F("BuzzOff: ") + (strlen(_settingsExt.BuzzOff) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOff));      
     }else{    
       if(value.startsWith(F("def"))){
-        value = BUZZER_DEFAULT;
+        value = BUZZER_ON_DEFAULT;
       }
+      
+      if(value.startsWith(F("on"))){
+        value = value.substring(2);
 
-      if(!_settingsExt.setBuzz(value)){
-        value = String(F("Buzz: ")) + F("length exceeds maximum!");        
-      }
+        if(!value.isEmpty()){
+          if(value.startsWith(F("0"))) value.clear();
+          _settingsExt.setBuzzOn(value);
+        }
+        value = String(F("BuzzOn: ")) + (strlen(_settingsExt.BuzzOn) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOn));
+        Buzz::PlayMelody(PIN_BUZZER, _settingsExt.BuzzOn);
+      }else
+      if(value.startsWith(F("off"))){
+        value = value.substring(3);
 
-      Buzz::PlayMelody(PIN_BUZZER, _settingsExt.Buzz);
+        if(!value.isEmpty()){
+          if(value.startsWith(F("0"))) value.clear();
+          _settingsExt.setBuzzOff(value);
+        }
+        
+        value = String(F("BuzzOff: ")) + (strlen(_settingsExt.BuzzOff) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOff));
+        Buzz::PlayMelody(PIN_BUZZER, _settingsExt.BuzzOff);
+      }else{
+        _settingsExt.setBuzzOn(value);                 
+        _settingsExt.setBuzzOff(value);        
+        value = String(F("BuzzOn: ")) + (strlen(_settingsExt.BuzzOn) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOn)); 
+        value += String("\n") + F("BuzzOff: ") + (strlen(_settingsExt.BuzzOff) == 0 ? String(F("Off")) : String(_settingsExt.BuzzOff));
+      }    
+
+      BOT_MENU_TRACE(value);  
       SaveSettingsExt();        
     }    
   }else
@@ -282,9 +310,23 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     bot->sendTyping(msg.chatID);       
     
-    _settings.notifyOnline = value.toInt() > 0;
+    if(!value.isEmpty())
+      _settings.notifyOnline = value.toInt() > 0;
 
     value = String(F("Notify Online: ")) + (_settings.notifyOnline ? F("On") : F("Off"));
+
+    SaveSettings();        
+  }else
+  if(GetCommandValue(BOT_COMMAND_INVERSE, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Inverse:"));
+
+    bot->sendTyping(msg.chatID);       
+    
+    if(!value.isEmpty())
+      _settings.inversePinLogic = value.toInt() > 0;
+
+    value = String(F("Inverse Pin Logic: ")) + (_settings.inversePinLogic ? F("true") : F("false"));
 
     SaveSettings();        
   }else
@@ -292,10 +334,38 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   {
     BOT_MENU_INFO(F("BOT "), F("Status:"));
 
+    bot->sendTyping(msg.chatID);      
+
+    const auto &status = getNotifyPinStatus();
+    const auto &duration = getDurationFromLast(0);
+    const auto msg = status + F(" ") + F("[") + duration + F("]"); 
+
+    value = String(F("Status: ")) + msg;    
+  }else
+  if(GetCommandValue(BOT_COMMAND_PLAY, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Play:"));
+
     bot->sendTyping(msg.chatID);       
 
-    value = String(F("Status: ")) + String(getStatus());    
-  }  
+    const auto &melodySizeMs = Buzz::PlayMelody(PIN_BUZZER, value);
+
+    value = String(melodySizeMs) + F("ms.");
+  }else
+  if(GetCommandValue(BOT_COMMAND_SKIP, filtered, value))
+  {
+    BOT_MENU_INFO(F("BOT "), F("Skip:"));
+
+    bot->sendTyping(msg.chatID);       
+    
+    auto intValue = value.toInt();
+    if(!value.isEmpty() && intValue > 1)
+      _settings.notifyPinCountBefore = intValue;
+
+    value = String(F("Skip: ")) + String(_settings.notifyPinCountBefore);
+
+    SaveSettings();        
+  }
 
 
   if(value.length() > 0 && !noAnswerIfFromMenu)

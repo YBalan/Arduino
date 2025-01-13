@@ -6,7 +6,7 @@
 #include "ESPHelper.h"
 
 #ifdef NETWORK_STATISTIC
-struct NetworkStatInfo{ int code; int count; String description; };
+struct NetworkStatInfo{ int code = -1; int count = 0; String description; };
 std::map<int, NetworkStatInfo> networkStat;
 #endif
 

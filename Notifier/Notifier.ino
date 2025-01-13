@@ -1,20 +1,21 @@
 #include <FS.h>                   //this needs to be first, or it all crashes and burns...
 
 #ifdef ESP8266
-  #define VER F("1.0")
-#else //ESP32
   #define VER F("1.10")
+#else //ESP32
+  #define VER F("1.11")
 #endif
 
 //#define RELEASE
 #define DEBUG
-#define VER_POSTFIX F("D")
 
-//#define NETWORK_STATISTIC
+#define NETWORK_STATISTIC
 #define ENABLE_TRACE
 #define ENABLE_INFO_MAIN
 
 #ifdef DEBUG
+
+#define VER_POSTFIX F("D")
 
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
@@ -109,10 +110,13 @@ std::unique_ptr<WiFiOps::WiFiOps> wifiOps(new WiFiOps::WiFiOps(PORTAL_TITLE, AP_
 static uint8_t debugCommandFromSerial = 0;
 
 Button wifiBtn(PIN_WIFI_BTN);
-ezButton notifyBtn(PIN_NOTIFY);
+ezButton notifyPinTrigger(PIN_NOTIFY);
 
 uint32_t storeDataTicks = 0;
 uint32_t syncTimeTicks = 0;
+uint32_t last = 0;
+
+const String getDurationFromLast(const uint32_t &now = 0u);
 
 void setup() 
 {
@@ -123,7 +127,7 @@ void setup()
   //pinMode(PIN_NOTIFY, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   wifiBtn.setDebounceTime(DEBOUNCE_TIME);  
-  notifyBtn.setDebounceTime(DEBOUNCE_TIME);  
+  notifyPinTrigger.setDebounceTime(DEBOUNCE_TIME);  
 
   Serial.println();
   Serial.print(F("!!!! Start ")); Serial.print(PRODUCT_NAME); Serial.println(F(" !!!!"));
@@ -183,6 +187,8 @@ void setup()
       #endif
     }
   }
+
+  last = _settings.dtLast;
 }
 
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
@@ -192,7 +198,7 @@ void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 
 const bool IsWiFiOn()
 {
-  const auto &wifiBtnState = wifiBtn.getState(); //digitalRead(PIN_WIFI_BTN);  
+  const auto &wifiBtnState = wifiBtn.getState();
   return wifiBtnState == HIGH;  
 }
 
@@ -214,17 +220,40 @@ void InitBot()
 }
 
 const bool isNotifyPinChanged(){
-  const auto val = notifyBtn.getState();//digitalRead(PIN_NOTIFY);
+  auto pinValue = notifyPinTrigger.getState();
+
+  setDebugPinValue(pinValue);  
   
-  if(_settings.notifyPinPrevValue >= 0){
-    if(_settings.notifyPinPrevValue != val){
-      _settings.notifyPinPrevValue = val;
+  if(_settings.notifyPinPrevValue >= 0)
+  {
+    if(_settings.notifyPinPrevValue != pinValue){
+      TRACE(F("pinValue: "), pinValue == LOW ? F("LOW") : F("HIGH"));
+      _settings.notifyPinPrevValue = pinValue;
       _settings.notifyPinCounter += 1;
       return true;
     }
   }
-  _settings.notifyPinPrevValue = val;  
+  _settings.notifyPinPrevValue = pinValue;  
   return false;
+}
+
+const bool isNotifyPinOn(){
+  auto pinValue = notifyPinTrigger.getState();
+
+  setDebugPinValue(pinValue);
+
+  return pinValue == (_settings.inversePinLogic ? LOW : HIGH);
+}
+
+void setDebugPinValue(int &pinValue){
+  if(debugCommandFromSerial == 5){
+    TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
+    pinValue = _settings.inversePinLogic ? LOW : HIGH;    
+  }
+  if(debugCommandFromSerial == 6){  
+    TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
+    pinValue = _settings.inversePinLogic ? HIGH : LOW;    
+  }
 }
 
 void loop()
@@ -232,10 +261,13 @@ void loop()
   //TRACE(TRACE_TAB, F("Loop!!!"));
 
   static uint32_t currentTicks = millis(); 
-  currentTicks = millis(); 
+  currentTicks = millis();
+  static uint32_t now = _settings.dtLast;
+  
+  //now += currentTicks / 1000;
 
   wifiBtn.loop();
-  notifyBtn.loop();
+  notifyPinTrigger.loop();
 
   if(wifiBtn.isPressed())
   {
@@ -253,10 +285,6 @@ void loop()
     WiFi.disconnect();
   }     
 
-  int httpCode = 200;
-  String statusMsg = F("OK");
-  RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
-
   const uint32_t &ticks = currentTicks - storeDataTicks;  
   if(storeDataTicks > 0 && ticks >= (_settings.storeDataTimeout == 0 ? STORE_DATA_TIMEOUT : _settings.storeDataTimeout)){
     storeDataTicks = currentTicks;
@@ -264,27 +292,58 @@ void loop()
     //INFO(F("Store data timeout: "), String(_settings.storeDataTimeout), F(" "), F("WiFi is: "), IsWiFiOn() ? F("On") : F("Off"));    
     //StoreData(ticks);        
 
-    //TRACE(TRACE_TAB, F("220V Status: "), getStatus());    
-  }
+    //TRACE(TRACE_TAB, F("Notify Pin Status: "), getNotifyPinStatus());   
+    //PrintNetworkStatToSerial(); 
 
-  if(isNotifyPinChanged()){      
-      if(_settings.notifyPinCountBefore == _settings.notifyPinCounter){
-        _settings.notifyPinCounter = 0;
-        _settings.notifyPinPrevValue = -1;
-        //SendMessages        
+    int httpCode = 200;
+    String statusMsg = F("OK");
+    RunAndHandleHttpApi(currentTicks, httpCode, statusMsg);
+  } 
+  
 
-        const auto &status = getStatus();
-        TRACE(TRACE_TAB, F("220V Status: "), status);
-
-        if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){        
-          sendToAllSubscribers(status);
-        }        
-        playNotify();
+  if(isNotifyPinChanged()){  
+    TRACE(F("isNotifyPinChanged"), F(" "), F("true"));    
+    if(_settings.notifyPinCountBefore == _settings.notifyPinCounter){
+      _settings.notifyPinCounter = 0;      
+      _settings.notifyPinPrevValue = -1;
+      
+      if(WiFi.status() == WL_CONNECTED){
+        now = GetCurrentTime(_settings.timeZone);
       }else{
-        //SendMessages
-      } 
-      SaveSettings();     
-    }
+        now = last + (currentTicks / 1000);
+      }
+
+      const auto &isOn = isNotifyPinOn();
+      const auto &duration = getDurationFromLast();
+      const auto &status = getNotifyPinStatus();
+      TRACE(TRACE_TAB, F("Notify Pin Status: "), status, F(" "), duration);
+
+      const auto msg = status + (!isOn ? String(F(" ")) + F("[") + duration + F("]") : String(F("")));
+      TRACE(F("Message: "), msg);
+
+      if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){        
+        sendToAllSubscribers(msg);
+      }        
+
+      _settings.dtLast = now;
+
+      if(isOn){
+        _settings.dtOn = now;
+        playNotifyOn();
+      }
+      else{
+        _settings.dtOff = now;
+        playNotifyOff();
+      }        
+    }else{
+      //SendMessages
+    } 
+    SaveSettings();
+
+    _settings.trace();
+
+    PrintNetworkStatToSerial();
+  }
 
   if(IsWiFiOn() && WiFi.status() == WL_CONNECTED){
     const uint32_t &syncTicks = currentTicks - syncTimeTicks;
@@ -314,14 +373,28 @@ void loop()
   HandleDebugSerialCommands();
 }
 
-const String getStatus(){
-  auto pinValue = notifyBtn.getState();//digitalRead(PIN_NOTIFY);
-  TRACE(F("pinValue: "), pinValue);
-  return pinValue == LOW ? F("ON") : F("OFF");
+const String getNotifyPinStatus(){  
+  return isNotifyPinOn() ? F("ON") : F("OFF");
 }
 
-void playNotify(){  
-  Buzz::PlayMelody(PIN_BUZZER, _settingsExt.Buzz);
+void playNotifyOn(){  
+  Buzz::PlayMelody(PIN_BUZZER, _settingsExt.BuzzOn);
+}
+
+void playNotifyOff(){  
+  Buzz::PlayMelody(PIN_BUZZER, _settingsExt.BuzzOff);
+}
+
+const String getDurationFromLast(const uint32_t &now){
+  auto current = now;
+  if(current == 0){
+    if(WiFi.status() == WL_CONNECTED){
+      current = GetCurrentTime(_settings.timeZone);
+    }else{
+      current = last + (millis() / 1000);
+    }    
+  }
+  return formatDuration(_settings.dtLast, current);
 }
 
 void StoreData(const uint32_t &ticks)
@@ -356,19 +429,13 @@ void HandleDebugSerialCommands()
     Restart();
   }
 
-  if(debugCommandFromSerial == 140) // Reset WiFi
-  { 
-    _settings.resetFlag = RESET_WIFI_FLAG;
-    SaveSettings();
-    Restart();
-  }
-
   if(debugCommandFromSerial == 2) // Show current status
   { 
-    TRACE(TRACE_TAB, F("220V Status: "), getStatus());
+    TRACE(TRACE_TAB, F("Notify Pin Status: "), getNotifyPinStatus());
     _settings.trace();
     _settingsExt.trace();
-
+    PrintNetworkStatToSerial();
+    TRACE(F("Duration: "), getDurationFromLast());
     String fsInfo; PrintFSInfo(fsInfo); TRACE(fsInfo);
   }
 
@@ -390,15 +457,41 @@ void HandleDebugSerialCommands()
     listDir(MFS, "/", 3);
   }
 
-  if(debugCommandFromSerial == 5) // Store 
+  if(debugCommandFromSerial == 5) // Trigger notify ON 
   { 
-   
+    // TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
+    // auto pinValue = _settings.inversePinLogic ? LOW : HIGH;
+    // digitalWrite(PIN_NOTIFY, pinValue);
+  }
+
+  if(debugCommandFromSerial == 6) // Trigger notify OFF
+  { 
+    // TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
+    // auto pinValue = _settings.inversePinLogic ? HIGH : LOW;
+    // digitalWrite(PIN_NOTIFY, pinValue);
+  }
+
+  if(debugCommandFromSerial == 7) // Change inverse Pin Logic
+  { 
+    _settings.inversePinLogic = !_settings.inversePinLogic;
+  }
+
+  if(debugCommandFromSerial == 8) // Change notifyPinCountBefore
+  { 
+    _settings.notifyPinCountBefore++;
   }
 
   if(debugCommandFromSerial == 130) // Format FS and reset WiFi and restart
   { 
     INFO(TRACE_TAB, F("Format..."));   
     MFS.format();
+    _settings.resetFlag = RESET_WIFI_FLAG;
+    SaveSettings();
+    Restart();
+  }
+
+  if(debugCommandFromSerial == 140) // Reset WiFi
+  { 
     _settings.resetFlag = RESET_WIFI_FLAG;
     SaveSettings();
     Restart();
@@ -515,6 +608,5 @@ void RunAndHandleHttpApi(const unsigned long &currentTicks, int &httpCode, Strin
       #endif
     }   
   }
-  FillNetworkStat(httpCode, statusMsg);
-  PrintNetworkStatToSerial();   
+  FillNetworkStat(httpCode, statusMsg);  
 }

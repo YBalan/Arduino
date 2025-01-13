@@ -266,7 +266,7 @@ namespace Buzz
 
       int noteDuration = melody[thisNote].duration < 50 ? (1000 / melody[thisNote].duration) : melody[thisNote].duration;
 
-      BUZZ_TRACE(F("\tDuration"), noteDuration);
+      BUZZ_TRACE(F("\tDuration: "), noteDuration);
 
       tone(pin, melody[thisNote].note, noteDuration);
 
@@ -276,7 +276,7 @@ namespace Buzz
 
       int pauseBetweenNotes = noteDuration * distinguishFactor;
 
-      BUZZ_TRACE(F("\tPause"), pauseBetweenNotes);
+      BUZZ_TRACE(F("\tPause: "), pauseBetweenNotes);
 
       delay(pauseBetweenNotes);
 
@@ -325,6 +325,7 @@ namespace Buzz
 
   const int PlayMelody(const uint8_t &pin, const String &s, const float &distinguishFactor = NOTES_MINIMUM_DISTINGUISH_SET)
   {
+    BUZZ_TRACE(F("Play Melody"), F(": "), s);
     const auto &melody = GetMelody(s);
     // BUZZ_TRACE(F("Melody vector:"));    
     // for(const auto &n : melody)

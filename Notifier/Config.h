@@ -18,13 +18,16 @@
 #endif
 #endif
 
+#define START_EPOCH_TIMESTAMP 1735689600 // 2025 01 01 00:00:00
+
 #define PRODUCT_NAME  F("Notifier")
 #define PORTAL_TITLE  String(PRODUCT_NAME) + F(" ") + F("WiFi Manager")
 #define AP_NAME       String(PRODUCT_NAME) + F("_AP")
 #define AP_PASS       F("password")
 
 #define ONLINE_MSG    F("Online")
-#define BUZZER_DEFAULT F("500_200")
+#define BUZZER_ON_DEFAULT F("500_200")
+#define BUZZER_OFF_DEFAULT F("300_1500")
 
 #define NOTIFY_WHEN_LOW true
 
