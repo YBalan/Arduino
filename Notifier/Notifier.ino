@@ -3,7 +3,7 @@
 #ifdef ESP8266
   #define VER F("1.10")
 #else //ESP32
-  #define VER F("1.11")
+  #define VER F("1.12")
 #endif
 
 //#define RELEASE
@@ -15,7 +15,13 @@
 
 #ifdef DEBUG
 
+#define DEBUG_EMULATE
+
+#ifndef DEBUG_EMULATE
 #define VER_POSTFIX F("D")
+#else
+#define VER_POSTFIX F("DE")
+#endif
 
 #define WM_DEBUG_LEVEL WM_DEBUG_NOTIFY
 
@@ -110,7 +116,12 @@ std::unique_ptr<WiFiOps::WiFiOps> wifiOps(new WiFiOps::WiFiOps(PORTAL_TITLE, AP_
 static uint8_t debugCommandFromSerial = 0;
 
 Button wifiBtn(PIN_WIFI_BTN);
-ezButton notifyPinTrigger(PIN_NOTIFY);
+
+#ifndef DEBUG_EMULATE
+  ezButton notifyPinTrigger(PIN_NOTIFY);
+#else
+  BtnEmulator notifyPinTrigger(PIN_NOTIFY);
+#endif
 
 uint32_t storeDataTicks = 0;
 uint32_t syncTimeTicks = 0;
@@ -246,14 +257,14 @@ const bool isNotifyPinOn(){
 }
 
 void setDebugPinValue(int &pinValue){
-  if(debugCommandFromSerial == 5){
+  /*if(debugCommandFromSerial == 5){
     TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
     pinValue = _settings.inversePinLogic ? LOW : HIGH;    
   }
   if(debugCommandFromSerial == 6){  
     TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
     pinValue = _settings.inversePinLogic ? HIGH : LOW;    
-  }
+  }*/
 }
 
 void loop()
@@ -458,17 +469,19 @@ void HandleDebugSerialCommands()
   }
 
   if(debugCommandFromSerial == 5) // Trigger notify ON 
-  { 
-    // TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
-    // auto pinValue = _settings.inversePinLogic ? LOW : HIGH;
-    // digitalWrite(PIN_NOTIFY, pinValue);
+  {     
+    #ifdef DEBUG_EMULATE
+    TRACE(F("debugCommandFromSerial: "), F("ON"));
+    notifyPinTrigger.setState(_settings.inversePinLogic ? LOW : HIGH);
+    #endif
   }
 
   if(debugCommandFromSerial == 6) // Trigger notify OFF
   { 
-    // TRACE(F("debugCommandFromSerial: "), debugCommandFromSerial);
-    // auto pinValue = _settings.inversePinLogic ? HIGH : LOW;
-    // digitalWrite(PIN_NOTIFY, pinValue);
+    #ifdef DEBUG_EMULATE
+    TRACE(F("debugCommandFromSerial: "), F("OFF"));
+    notifyPinTrigger.setState(_settings.inversePinLogic ? HIGH : LOW);
+    #endif
   }
 
   if(debugCommandFromSerial == 7) // Change inverse Pin Logic

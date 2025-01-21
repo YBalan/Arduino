@@ -7,6 +7,16 @@
 #define LONG_PRESS_VALUE_MS 2000
 #endif
 
+class BtnEmulator : public ezButton{
+  uint8_t currentState = LOW;
+  public:
+  BtnEmulator(const uint8_t &pin) : ezButton(pin) { }
+  int getState(void) { return currentState; }  
+  void setState(const uint8_t &state) { currentState = state; }
+  void loop() {}
+};
+
+
 class Button : public ezButton
 {
 private:
@@ -15,10 +25,7 @@ private:
   //uint16_t  _longPressValue;
 
 public:
-  Button(const uint8_t &pin) : ezButton(pin)
-  {
-
-  }
+  Button(const uint8_t &pin) : ezButton(pin) { }
   void loop(){ ezButton::loop();  }
 
   const bool isPressed() 
