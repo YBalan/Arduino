@@ -139,7 +139,7 @@ const String formatDuration(const uint32_t &start, const uint32_t &end, const St
   if (minutes > 0 || hours > 0 || days > 0) result += String(minutes) + " min, ";
   result += String(seconds) + " sec";
 
-  return result;
+  return std::move(result);
 }
 
 void PrintFSInfo(String &fsInfo)
