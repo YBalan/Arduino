@@ -510,7 +510,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
 
     auto regionId = value.toInt();
     String answer = String(F(" Region: ")) + String(regionId);
-    if(value.length() > 0 && regionId > 2 && regionId < 31)
+    if(value.length() > 0 && regionId > 2 && regionId <= 31)
     {      
       LedState state;
       state.Color = CRGB::Yellow;    
@@ -893,7 +893,9 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
   for(uint8_t regionIdx = 0; regionIdx < regionsCount; regionIdx++)
   {
     const auto &region = api->iotApiRegions[regionIdx];
+    #ifndef LARGE_MAP 
     if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
+    #endif
 
     String addCheck = learn ? String(F("")) : ((relayNumber == 1 ? IsRelay1Contains(region.Id) : IsRelay2Contains(region.Id)) ? checkSymbol : F(""));
     menu += addCheck + region.Name + (regionPlace != 0 && regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t "));//(isEndOfGoup ? F("") : (regionPlace % RegionsInLine == 0 ? F(" \n ") : F(" \t ")));

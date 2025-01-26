@@ -8,10 +8,11 @@
 #define USE_BOT_INLINE_MENU
 
 #define BRIGHTNESS_STEP 25
+#define LARGE_MAP
 
 #ifdef ESP32  
   #ifdef USE_BOT
-    #define USE_POWER_MONITOR
+    //#define USE_POWER_MONITOR
     #define SHOW_PM_FACTOR
     #define SHOW_PM_TIME
     #define USE_NOTIFY
@@ -48,7 +49,12 @@
 #define ALARMS_UPDATE_DEFAULT_TIMEOUT 25000
 #define ALARMS_CHECK_WITHOUT_STATUS false
 
-#define LED_STATUS_IDX 14 //Kyivska
+
+#ifndef LARGE_MAP
+#define LED_STATUS_IDX 14 //UARegion::Kyivska//
+#else
+#define LED_STATUS_IDX 27 //UARegion::Kyivska//
+#endif
 #define LED_STATUS_NO_CONNECTION_COLOR CRGB::White
 #define LED_STATUS_NO_CONNECTION_PERIOD 1000
 #define LED_STATUS_NO_CONNECTION_TOTALTIME -1 //infinite
@@ -119,6 +125,7 @@ enum UARegion : uint8_t
   Kyiv = 31,  
 };
 
+#ifndef LARGE_MAP
 #define MAX_LEDS_FOR_REGION 2
 typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
 typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
@@ -151,6 +158,43 @@ static AlarmsLedIndexesMap alarmsLedIndexesMap =
   { UARegion::Lvivska,              {24} },  
   { UARegion::Zakarpatska,          {25} },
 };
+#endif
+
+#ifdef LARGE_MAP
+#define MAX_LEDS_FOR_REGION 3
+typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
+typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
+static AlarmsLedIndexesMap alarmsLedIndexesMap =
+{
+  { UARegion::Sevastopol,           {0} },
+  { UARegion::Crimea,               {1} },  
+  { UARegion::Khersonska,           {2, 3} },
+  { UARegion::Zaporizka,            {4, 5} },
+  { UARegion::Donetska,             {6, 7} },
+  { UARegion::Luhanska,             {8, 9} },
+  { UARegion::Kharkivska,           {10, 11} },
+  { UARegion::Dnipropetrovska,      {12, 13} },
+  { UARegion::Mykolaivska,          {14, 15} },
+  { UARegion::Odeska,               {16, 17, 18} },
+  { UARegion::Kirovohradska,        {19, 20} },  
+  { UARegion::Poltavska,            {21, 22} },
+  { UARegion::Sumska,               {23, 24} },
+  { UARegion::Chernihivska,         {25, 26} },  
+  { UARegion::Kyiv,                 {27} },
+  { UARegion::Kyivska,              {28} },    
+  { UARegion::Cherkaska,            {29, 30} },
+  { UARegion::Vinnytska,            {31, 32} },  
+  { UARegion::Zhytomyrska,          {33, 34} },
+  { UARegion::Rivnenska,            {35, 36} },  
+  { UARegion::Khmelnitska,          {37, 38} },  
+  { UARegion::Chernivetska,         {39} },
+  { UARegion::Ivano_Frankivska,     {40} },
+  { UARegion::Ternopilska,          {41} }, 
+  { UARegion::Volynska,             {42} },
+  { UARegion::Lvivska,              {43, 44} },  
+  { UARegion::Zakarpatska,          {45, 46} },
+};
+#endif
 
 static const int getLedsCount()
 {
