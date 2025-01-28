@@ -81,6 +81,7 @@ typedef RegionInfo IotApiRegions[MAX_REGIONS_COUNT];
 class AlarmsApi
 {  
 public:  
+//https://devs.alerts.in.ua/#apiiot_active_air_raid_alerts
   #ifdef LANGUAGE_UA
 IotApiRegions iotApiRegions = 
 {

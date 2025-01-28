@@ -5,7 +5,11 @@
 #ifdef ESP8266
   #define VER F("1.35")
 #else //ESP32
-  #define VER F("1.42")
+  #ifdef LARGE_MAP
+    #define VER F("1.43L")
+  #else
+    #define VER F("1.43")
+  #endif
 #endif
 
 #define AVOID_FLICKERING

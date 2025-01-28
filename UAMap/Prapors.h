@@ -9,6 +9,7 @@ void SetRegionColor(const UARegion &region, const CRGB &color);
 void fill_ua_prapor2()
 { 
   SetRegionColor(UARegion::Crimea,            CRGB::Yellow);
+  SetRegionColor(UARegion::Sevastopol,        CRGB::Yellow);
   SetRegionColor(UARegion::Khersonska,        CRGB::Yellow);
   SetRegionColor(UARegion::Zaporizka,         CRGB::Yellow);
   SetRegionColor(UARegion::Donetska,          CRGB::Yellow);
@@ -31,6 +32,7 @@ void fill_ua_prapor2()
   SetRegionColor(UARegion::Sumska,            CRGB::Blue);
   SetRegionColor(UARegion::Chernihivska,      CRGB::Blue);
   SetRegionColor(UARegion::Kyivska,           CRGB::Blue);
+  SetRegionColor(UARegion::Kyiv,               CRGB::Blue);
   SetRegionColor(UARegion::Cherkaska,         CRGB::Blue);
   SetRegionColor(UARegion::Zhytomyrska,       CRGB::Blue);
   SetRegionColor(UARegion::Rivnenska,         CRGB::Blue);
@@ -47,6 +49,7 @@ void fill_bg_prapor()
   SetRegionColor(UARegion::Odeska,            CRGB::Red);
   SetRegionColor(UARegion::Mykolaivska,       CRGB::Red);
   SetRegionColor(UARegion::Crimea,            CRGB::Red);
+  SetRegionColor(UARegion::Sevastopol,        CRGB::Red);
   SetRegionColor(UARegion::Khersonska,        CRGB::Red);
   SetRegionColor(UARegion::Zaporizka,         CRGB::Red);
   SetRegionColor(UARegion::Donetska,          CRGB::Red);
@@ -68,6 +71,7 @@ void fill_bg_prapor()
   SetRegionColor(UARegion::Sumska,            CRGB::White);
   SetRegionColor(UARegion::Chernihivska,      CRGB::White);
   SetRegionColor(UARegion::Kyivska,           CRGB::White);
+  SetRegionColor(UARegion::Kyiv,              CRGB::White);
   SetRegionColor(UARegion::Cherkaska,         CRGB::White);
   SetRegionColor(UARegion::Zhytomyrska,       CRGB::White);
   SetRegionColor(UARegion::Rivnenska,         CRGB::White);
@@ -93,12 +97,14 @@ void fill_md_prapor()
   SetRegionColor(UARegion::Odeska,            CRGB::Yellow);
   SetRegionColor(UARegion::Chernihivska,      CRGB::Yellow);
   SetRegionColor(UARegion::Kyivska,           CRGB::Yellow);
+  SetRegionColor(UARegion::Kyiv,              CRGB::Yellow);
   SetRegionColor(UARegion::Cherkaska,         CRGB::Yellow);
   SetRegionColor(UARegion::Kirovohradska,     CRGB::Yellow);
   SetRegionColor(UARegion::Mykolaivska,       CRGB::Yellow);
 
   SetRegionColor(UARegion::Khersonska,        CRGB::Yellow);
   SetRegionColor(UARegion::Crimea,            CRGB::Yellow); 
+  SetRegionColor(UARegion::Sevastopol,        CRGB::Yellow);
 
   //Right
   SetRegionColor(UARegion::Zaporizka,         CRGB::Red);
