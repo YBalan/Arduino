@@ -893,8 +893,9 @@ void SendInlineRelayMenu(const String &relayName, const String &relayCommand, co
   for(uint8_t regionIdx = 0; regionIdx < regionsCount; regionIdx++)
   {
     const auto &region = api->iotApiRegions[regionIdx];
+    
     #ifndef LARGE_MAP 
-    if(region.Id == UARegion::Kyiv || region.Id == UARegion::Sevastopol) continue;
+    if(region.Id == UARegion::Sevastopol) continue;
     #endif
 
     String addCheck = learn ? String(F("")) : ((relayNumber == 1 ? IsRelay1Contains(region.Id) : IsRelay2Contains(region.Id)) ? checkSymbol : F(""));

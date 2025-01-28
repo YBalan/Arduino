@@ -8,7 +8,8 @@
 #define USE_BOT_INLINE_MENU
 
 #define BRIGHTNESS_STEP 25
-#define LARGE_MAP
+//#define LARGE_MAP
+#define KYIV_MAP
 
 #ifdef ESP32  
   #ifdef USE_BOT
@@ -145,7 +146,7 @@ static AlarmsLedIndexesMap alarmsLedIndexesMap =
   { UARegion::Sumska,               {12} },
   { UARegion::Chernihivska,         {13} },  
   { UARegion::Kyivska,              {14} },  
-  //{ UARegion::Kyiv,                 {14} },
+  { UARegion::Kyiv,                 {14} },
   { UARegion::Cherkaska,            {15} },
   { UARegion::Vinnytska,            {16} },  
   { UARegion::Zhytomyrska,          {17} },
