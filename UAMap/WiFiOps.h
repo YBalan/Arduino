@@ -106,9 +106,13 @@ class WiFiOps
       return *this;
     }
 
-    const String &GetParameterValueById(const String &id) const
-    {
+    const String &GetParameterValueById(const String &id) const {
       return _parameters.GetParameterById(id).GetValue();
+    }
+
+    const WiFiParameter &SetParameterValueById(const String &id, const String &value) {
+      WIFI_TRACE(F("SetParameterValueById: "), id, F(" value: "), value);
+      return _parameters.SetParameterValueById(id, value);
     }
 
   public:
@@ -236,6 +240,12 @@ class WiFiOps
       return _parameters;
     }
 
+    void SaveSettings(){
+      WiFiManagerCallBacks::_shouldSaveConfig = true;
+      SaveFSSettings(_parameters);
+      WiFiManagerCallBacks::_shouldSaveConfig = false;
+    }
+
     //save the custom parameters to FS
     void SaveFSSettings(WiFiParameters &parametersToSave)
     {  
@@ -337,4 +347,6 @@ class WiFiOps
 };
 
 }
+
+std::unique_ptr<WiFiOps::WiFiOps> wifiOps(new WiFiOps::WiFiOps(PORTAL_TITLE, AP_NAME, AP_PASS));
 #endif //WIFI_OPS_H

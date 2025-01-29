@@ -98,33 +98,29 @@ class WiFiParameter : public WiFiManagerParameter
 
   void SetValue(const char *const value)
   { 
+    WIFIP_TRACE(F("SetValue: "), _id, F(" value: "), value);
     _value = value;
     setValue(_value.c_str(), getValueLength());
   }
 
-  const String &ReadValue() 
-  { 
+  const String &ReadValue() { 
     _value = getValue();
     return _value;
   }
 
-  const String &GetValue() const
-  {     
+  const String &GetValue() const {     
     return _value;
-  }
+  }  
 
-  const String &GetId() const
-  {    
+  const String &GetId() const {    
     return _id;
   }
 
-  const String &GetJson() const
-  {
+  const String &GetJson() const {
     return _json;
   }
 
-  WiFiManagerParameter* GetParameter()
-  {
+  WiFiManagerParameter* GetParameter(){
     //return &Parameter;
     return this;
   }
@@ -151,27 +147,45 @@ public:
 
   void AddParameter(const WiFiParameter &param)
   {
-    WIFIP_TRACE("Start AddParameter...");
+    //WIFIP_TRACE(F("Start AddParameter..."));
     _parameters.push_back(param);    
-    WIFIP_TRACE("End AddParameter...");    
+    //WIFIP_TRACE(F("End AddParameter..."));    
   }
 
-  const WiFiParameter &GetParameterById(const String &value) const
-  {
-    for(uint8_t i = 0; i < Count(); i++)
-    {
+  const WiFiParameter &GetParameterById(const String &id) const {
+    for(uint8_t i = 0; i < Count(); i++){
       auto &p = _parameters[i];
-      if(p.GetId() == value)
+      if(p.GetId() == id)
         return p;
     }
     return NullParam;
   }
 
-  const WiFiParameter &GetParameterByJsonName(const String &value) const
-  {
-    for(auto &p : _parameters)
-    {
-      if(p.GetJson() == value)
+private:
+  WiFiParameter &GetParameterById(const String &id) {
+    WIFIP_TRACE(F("GetParameterById: "), id);
+    for(uint8_t i = 0; i < Count(); i++){
+      auto &p = _parameters[i];
+      if(p.GetId() == id){
+         WIFIP_TRACE(F("Found"));
+        return p;
+      }
+    }
+    WIFIP_TRACE(F("NOT Found"));
+    return NullParam;
+  }
+
+public:
+  const WiFiParameter &SetParameterValueById(const String &id, const String &value){
+    WIFIP_TRACE(F("SetParameterValueById: "), id, F(" value: "), value);
+    auto &p = GetParameterById(id);
+    p.SetValue(value.c_str());
+    return p;
+  }
+
+  const WiFiParameter &GetParameterByJsonName(const String &jsonName) const{
+    for(auto &p : _parameters){
+      if(p.GetJson() == jsonName)
         return p;
     }
     return NullParam;
