@@ -6,9 +6,9 @@
   #define VER F("1.35")
 #else //ESP32
   #ifdef LARGE_MAP
-    #define VER F("1.43L")
+    #define VER F("1.44L")
   #else
-    #define VER F("1.43")
+    #define VER F("1.44")
   #endif
 #endif
 
@@ -20,6 +20,7 @@
 #define NETWORK_STATISTIC
 //#define ENABLE_TRACE
 //#define ENABLE_INFO_MAIN
+//#define ENABLE_TRACE_WIFI
 
 #ifdef DEBUG
 
@@ -189,7 +190,7 @@ void setup() {
 
   FastLEDShow(1000);
   
-  WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
+  //WiFiOps::WiFiOps wifiOps(F("UAMap WiFi Manager"), F("UAMapAP"), F("password"));
 
   #ifdef WM_DEBUG_LEVEL
     INFO(F("WM_DEBUG_LEVEL: "), WM_DEBUG_LEVEL);    
@@ -198,7 +199,7 @@ void setup() {
   #endif
 
   wifiOps
-  .AddParameter(F("apiToken"), F("Alarms API Token"), F("api_token"), F("YOUR_ALARMS_API_TOKEN"), 47)  
+  ->AddParameter(API_TOKEN_ID, F("Alarms API Token"), F("api_token"), F("YOUR_ALARMS_API_TOKEN"), API_TOKEN_LENGTH)  
   #ifdef USE_BOT
   .AddParameter(F("telegramToken"), F("Telegram Bot Token"), F("telegram_token"), F("TELEGRAM_TOKEN"), 47)
   .AddParameter(F("telegramName"), F("Telegram Bot Name"), F("telegram_name"), F("@telegram_bot"), 50)
@@ -209,13 +210,13 @@ void setup() {
   auto resetButtonState = resetBtn.getState();
   INFO(F("ResetBtn: "), resetButtonState == HIGH ? F("Off") : F("On"));
   INFO(F("ResetFlag: "), _settings.resetFlag);
-  wifiOps.TryToConnectOrOpenConfigPortal(/*portalTimeout:*/60, /*restartAfterPortalTimeOut*/true, /*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
+  wifiOps->TryToConnectOrOpenConfigPortal(/*portalTimeout:*/60, /*restartAfterPortalTimeOut*/true, /*resetSettings:*/_settings.resetFlag == 1985 || resetButtonState == LOW);
   if(_settings.resetFlag == 1985)
   {
     _settings.resetFlag = 200;
     SaveSettings();
   }
-  api->setApiKey(wifiOps.GetParameterValueById(F("apiToken"))); 
+  api->setApiKey(wifiOps->GetParameterValueById(API_TOKEN_ID)); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
  
@@ -229,9 +230,9 @@ void setup() {
 
   #ifdef USE_BOT  
   LoadChannelIDs();
-  bot->setToken(wifiOps.GetParameterValueById(F("telegramToken")));  
-  _botSettings.SetBotName(wifiOps.GetParameterValueById(F("telegramName")));  
-  _botSettings.botSecure = wifiOps.GetParameterValueById(F("telegramSec"));
+  bot->setToken(wifiOps->GetParameterValueById(F("telegramToken")));  
+  _botSettings.SetBotName(wifiOps->GetParameterValueById(F("telegramName")));  
+  _botSettings.botSecure = wifiOps->GetParameterValueById(F("telegramSec"));
   bot->attach(HangleBotMessages);
   bot->setTextMode(FB_TEXT); 
   //bot->setPeriod(_settings.alarmsUpdateTimeout);

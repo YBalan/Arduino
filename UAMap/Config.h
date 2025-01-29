@@ -7,9 +7,13 @@
 #define USE_BOT_FAST_MENU 
 #define USE_BOT_INLINE_MENU
 
+#define PRODUCT_NAME  F("UAMap")
+#define PORTAL_TITLE  String(PRODUCT_NAME) + F(" ") + F("WiFi Manager")
+#define AP_NAME       String(PRODUCT_NAME) + F("_AP")
+#define AP_PASS       F("password")
+
 #define BRIGHTNESS_STEP 25
 //#define LARGE_MAP
-#define KYIV_MAP
 
 #ifdef ESP32  
   #ifdef USE_BOT
@@ -50,6 +54,8 @@
 #define ALARMS_UPDATE_DEFAULT_TIMEOUT 25000
 #define ALARMS_CHECK_WITHOUT_STATUS false
 
+#define API_TOKEN_LENGTH 47
+#define API_TOKEN_ID F("apiToken")
 
 #ifndef LARGE_MAP
 #define LED_STATUS_IDX 14 //UARegion::Kyivska//

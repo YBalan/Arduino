@@ -561,6 +561,11 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   }else
   if(GetCommandValue(BOT_COMMAND_TOKEN, filtered, value))
   {
+    if(!value.isEmpty() && value.length() >= API_TOKEN_LENGTH - 1){
+      wifiOps->SetParameterValueById(API_TOKEN_ID, value);
+      wifiOps->SaveSettings();
+      api->setApiKey(value); 
+    }
     value = String(F("Token: ")) + api->GetApiKey();
   }else
   if(GetCommandValue(BOT_COMMAND_NSTAT, filtered, value))
