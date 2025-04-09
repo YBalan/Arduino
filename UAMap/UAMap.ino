@@ -6,20 +6,20 @@
   #define VER F("1.35")
 #else //ESP32
   #ifdef LARGE_MAP
-    #define VER F("1.44L")
+    #define VER F("1.45L")
   #else
-    #define VER F("1.44")
+    #define VER F("1.45")
   #endif
 #endif
 
 #define AVOID_FLICKERING
 
 //#define RELEASE
-//#define DEBUG
+#define DEBUG
 
 #define NETWORK_STATISTIC
-//#define ENABLE_TRACE
-//#define ENABLE_INFO_MAIN
+#define ENABLE_TRACE
+#define ENABLE_INFO_MAIN
 //#define ENABLE_TRACE_WIFI
 
 #ifdef DEBUG
@@ -32,26 +32,26 @@
 
 #define ENABLE_TRACE_MAIN
 
-#define ENABLE_INFO_SETTINGS
-#define ENABLE_TRACE_SETTINGS
+//#define ENABLE_INFO_SETTINGS
+//#define ENABLE_TRACE_SETTINGS
 
-#define ENABLE_INFO_BOT
-#define ENABLE_TRACE_BOT
+//#define ENABLE_INFO_BOT
+//#define ENABLE_TRACE_BOT
 
-#define ENABLE_INFO_BOT_MENU
-#define ENABLE_TRACE_BOT_MENU
+//#define ENABLE_INFO_BOT_MENU
+//#define ENABLE_TRACE_BOT_MENU
 
-#define ENABLE_INFO_ALARMS
-#define ENABLE_TRACE_ALARMS
+//#define ENABLE_INFO_ALARMS
+//#define ENABLE_TRACE_ALARMS
 
-#define ENABLE_INFO_WIFI
-#define ENABLE_TRACE_WIFI
+//#define ENABLE_INFO_WIFI
+//#define ENABLE_TRACE_WIFI
 
 // #define ENABLE_INFO_PMONITOR
 // #define ENABLE_TRACE_PMONITOR
 
-#define ENABLE_INFO_BUZZ
-#define ENABLE_TRACE_BUZZ
+//#define ENABLE_INFO_BUZZ
+//#define ENABLE_TRACE_BUZZ
 
 #else
 
@@ -157,12 +157,28 @@ void setup() {
   pinMode(PIN_RELAY2, INPUT_PULLUP);
   pinMode(PIN_RELAY2, OUTPUT);
 
+  pinMode(PIN_RELAY1_LED, INPUT_PULLUP);
+  pinMode(PIN_RELAY1_LED, OUTPUT);
+  pinMode(PIN_RELAY2_LED, INPUT_PULLUP);
+  pinMode(PIN_RELAY2_LED, OUTPUT);
+
+  pinMode(PIN_PORTAL_LED, INPUT_PULLUP);
+  pinMode(PIN_PORTAL_LED, OUTPUT);
+  pinMode(PIN_PORTAL_LED2, INPUT_PULLUP);
+  pinMode(PIN_PORTAL_LED2, OUTPUT);
+
   pinMode(PIN_BUZZ, INPUT_PULLUP);
   pinMode(PIN_BUZZ, OUTPUT);
   digitalWrite(PIN_BUZZ, LOW);
 
   digitalWrite(PIN_RELAY1, RELAY_OFF);
-  digitalWrite(PIN_RELAY2, RELAY_OFF);    
+  digitalWrite(PIN_RELAY2, RELAY_OFF);
+  digitalWrite(PIN_RELAY1_LED, LOW);
+  digitalWrite(PIN_RELAY2_LED, LOW);    
+
+  digitalWrite(PIN_PORTAL_LED, LOW);
+
+  PortalLEDSwitch(false);
 
   resetBtn.setDebounceTime(DebounceTime);  
 
@@ -216,6 +232,7 @@ void setup() {
     _settings.resetFlag = 200;
     SaveSettings();
   }
+  PortalLEDSwitch(false);
   api->setApiKey(wifiOps->GetParameterValueById(API_TOKEN_ID)); 
   api->setBaseUri(_settings.BaseUri); 
   INFO(F("Base Uri: "), _settings.BaseUri);  
@@ -248,11 +265,17 @@ void setup() {
 void WiFiOps::WiFiManagerCallBacks::whenAPStarted(WiFiManager *manager)
 {
   INFO(F("Config Portal Started: "), manager->getConfigPortalSSID());
+  PortalLEDSwitch(true);
   FastLED.clear(); 
   leds[LED_STATUS_IDX] = _settings.PortalModeColor;
 
   FastLED.setBrightness(_settings.Brightness > 1 ? _settings.Brightness : 2);  
   FastLEDShow(1000);    
+}
+
+void PortalLEDSwitch(const bool &on){
+  digitalWrite(PIN_PORTAL_LED, on ? HIGH : LOW);
+  digitalWrite(PIN_PORTAL_LED2, on ? HIGH : LOW);  
 }
 
 void HandleButton(const uint32_t &currentTicks)
@@ -596,6 +619,7 @@ const bool CheckAndUpdateAlarms(const unsigned long &currentTicks, int &httpCode
     else
     {
       leds[LED_STATUS_IDX] = CRGB::Green;
+      PortalLEDSwitch(true);
       FastLEDShow(500);
       #ifdef ESP32      
       WiFi.disconnect();
@@ -696,39 +720,93 @@ void SetRelayStatus()
 
   if(found1)
   {
-    if(digitalRead(PIN_RELAY1) == RELAY_OFF)
-    {
+    TRACE(F("Relay1"), F(":"), F(" "), F("Alarmed"), F(":"), F(" "), _settings.isRelay1Alarmed ? F("true") : F("false"));
+    if(digitalRead(PIN_RELAY1) == RELAY_OFF || !_settings.isRelay1Alarmed) {
       DoStrobe(/*alarmedColorSchema:*/true);
       Buzz::AlarmStart(PIN_BUZZ, _settings.BuzzTime);      
     }
 
-    digitalWrite(PIN_RELAY1, RELAY_ON);    
-    TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), GetRelay1Str(nullptr));      
+    if(!_settings.isRelay1Alarmed) {
+      _settings.isRelay1Alarmed = true;
+      SaveSettings();    
+      if(!_settings.isRelay1PatternOnEmpty()){
+        const auto &playTime = PlayRelayPattern(PIN_RELAY1, PIN_RELAY1_LED, _settings.Relay1PatternOn, PIN_BUZZ);      
+      }else{
+        digitalWrite(PIN_RELAY1, RELAY_ON);
+        digitalWrite(PIN_RELAY1_LED, HIGH);
+      }
+      TRACE(F("Relay1"), F(": "), F("ON"), F(" Region: "), GetRelay1Str(nullptr));      
+    }
   }
   else
   {
-    if(digitalRead(PIN_RELAY1) == RELAY_ON)
+    TRACE(F("Relay1"), F(":"), F(" "), F("Alarmed"), F(":"), F(" "), _settings.isRelay1Alarmed ? F("true") : F("false"));
+    if(digitalRead(PIN_RELAY1) == RELAY_ON || _settings.isRelay1Alarmed)
     { 
-      digitalWrite(PIN_RELAY1, RELAY_OFF);
+      _settings.isRelay1Alarmed = false;  
+      SaveSettings();    
       Buzz::AlarmEnd(PIN_BUZZ, _settings.BuzzTime);
+      const auto &playTime = PlayRelayPattern(PIN_RELAY1, PIN_RELAY1_LED, _settings.Relay1PatternOff, PIN_BUZZ);
+      digitalWrite(PIN_RELAY1, RELAY_OFF);
+      digitalWrite(PIN_RELAY1_LED, LOW);
       TRACE(F("Relay1"), F(": "), F("Off"), F(" Region: "), GetRelay1Str(nullptr));
     }
   }
 
   if(found2)
   {
-    digitalWrite(PIN_RELAY2, RELAY_ON);
-    TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), GetRelay2Str(nullptr));      
+    TRACE(F("Relay2"), F(":"), F(" "), F("Alarmed"), F(":"), F(" "), _settings.isRelay2Alarmed ? F("true") : F("false"));
+    if(!_settings.isRelay2Alarmed) {
+      _settings.isRelay2Alarmed = true;
+      SaveSettings();    
+      if(!_settings.isRelay2PatternOnEmpty()){
+        const auto &playTime = PlayRelayPattern(PIN_RELAY2, PIN_RELAY2_LED, _settings.Relay2PatternOn, PIN_BUZZ);      
+      }else{
+        digitalWrite(PIN_RELAY2, RELAY_ON);
+        digitalWrite(PIN_RELAY2_LED, HIGH);
+      }
+      TRACE(F("Relay2"), F(": "), F("ON"), F(" Region: "), GetRelay2Str(nullptr));      
+    }    
   }
   else
   {
-    if(digitalRead(PIN_RELAY2) == RELAY_ON)
+    TRACE(F("Relay2"), F(":"), F(" "), F("Alarmed"), F(":"), F(" "), _settings.isRelay2Alarmed ? F("true") : F("false"));
+    if(digitalRead(PIN_RELAY2) == RELAY_ON || _settings.isRelay2Alarmed)
     {      
+      _settings.isRelay2Alarmed = false;
+      SaveSettings();
+      const auto &playTime = PlayRelayPattern(PIN_RELAY2, PIN_RELAY2_LED, _settings.Relay2PatternOff, PIN_BUZZ);
       digitalWrite(PIN_RELAY2, RELAY_OFF);
+      digitalWrite(PIN_RELAY2_LED, LOW);
       TRACE(F("Relay2"), F(": "), F("Off"), F(" Region: "), GetRelay2Str(nullptr));
     }
   }    
   
+}
+
+const uint16_t PlayRelayPattern(const uint8_t &relayPin, const uint8_t &ledPin, const String &pattern, const uint8_t &buzzPin){  
+  if(pattern.isEmpty()) return 0;
+  uint16_t size = 0;
+  const auto &values = Buzz::GetMelody(pattern, '_', ' ');   
+  for(const auto &value : values){
+    TRACE(F("Relay play"), F(" "), value.note, F(" "), F("["), value.duration, F("]"), F(" "), F("pin"), F(":"), F(" "), relayPin);
+    size += value.duration;
+    if(value.note > 0){
+      digitalWrite(relayPin, RELAY_ON);
+      digitalWrite(ledPin, HIGH);
+      if(buzzPin)
+        tone(buzzPin, 500);
+    }else{
+      digitalWrite(relayPin, RELAY_OFF);
+      digitalWrite(ledPin, LOW);
+      if(buzzPin)
+        noTone(buzzPin);
+    }
+    delay(value.duration);
+    if(buzzPin)
+      noTone(buzzPin);
+  }  
+  return size;
 }
 
 const uint8_t GetScaledBrightness(const uint8_t& brScale, const bool& scaleDown)
@@ -808,6 +886,7 @@ const bool SetStatusLED(const int &status, const String &msg)
         ledsState[LED_STATUS_IDX].StartBlink(LED_STATUS_NO_CONNECTION_PERIOD, LED_STATUS_NO_CONNECTION_TOTALTIME);
       break;
     }
+    PortalLEDSwitch(true);
     #ifdef USE_BOT
     //SendMessageToAllRegisteredChannels(BOT_CONNECTION_ISSUES_MSG);
     #endif
@@ -1184,12 +1263,14 @@ void HandleDebugSerialCommands()
   if(debugButtonFromSerial == 102)
   {
     digitalWrite(PIN_RELAY1, !digitalRead(PIN_RELAY1));
+    digitalWrite(PIN_RELAY1_LED, !digitalRead(PIN_RELAY1_LED));
     INFO(F("Realy1"), F(": "), digitalRead(PIN_RELAY1));
   }
 
   if(debugButtonFromSerial == 103)
   {
     digitalWrite(PIN_RELAY2, !digitalRead(PIN_RELAY2));
+    digitalWrite(PIN_RELAY2_LED, !digitalRead(PIN_RELAY2_LED));
     INFO(F("Realy2"), F(": "), digitalRead(PIN_RELAY2));
   }
 

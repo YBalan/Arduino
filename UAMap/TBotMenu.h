@@ -119,6 +119,8 @@ play - Play tones 500,800
 #define BOT_COMMAND_FS F("/fs")
 #define BOT_COMMAND_FILLRGB F("/fillrgb")
 #define BOT_COMMAND_PALETTE F("/palette")
+#define BOT_COMMAND_RELAY_PATTERN1 F("/patternrelay1")
+#define BOT_COMMAND_RELAY_PATTERN2 F("/patternrelay2")
 
 //Fast Menu
 #define BOT_MENU_UA_PRAPOR F("UA Prapor")
@@ -161,6 +163,7 @@ void SetAlarmedLedRegionInfo(const int &regionId, RegionInfo *const regionPtr);
 void SetRegionState(const UARegion &region, LedState &state);
 void SetRelayStatus();
 void PrintNetworkStatistic(String &str, const int& codeFilter);
+void HandleRelayPattern(const String &relayName, char *patternOn, char *patternOff, String &value);
 #ifdef USE_RELAY_EXT
 const bool HandleRelayMenu(const String &relayName, const String &relayCommand, String &value, uint8_t &relaySetting, const uint8_t &relayNumber, int32_t &relayMenuMessageId, const String& chatID);
 #else
@@ -653,7 +656,7 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
   if(GetCommandValue(BOT_COMMAND_BASEURI, filtered, value))
   {
     bot->sendTyping(msg.chatID);
-    if(value.startsWith(F("https://")) && value.length() < MAX_BASE_URI_LENGTH)
+    if((value.startsWith(F("https://")) || value.startsWith(F("http://"))) && value.length() < MAX_BASE_URI_LENGTH)
     {
       strcpy(_settings.BaseUri, value.c_str());
       api->setBaseUri(value);
@@ -740,6 +743,14 @@ const std::vector<String> HandleBotMenu(FB_msg& msg, String &filtered, const boo
     bot->inlineMenuCallback(_botSettings.botNameForMenu + F("Palette"), PaletteInlineMenu, PaletteInlineMenuCall, msg.chatID);  
     value.clear();  
     //#endif
+  }else
+  if(GetCommandValue(BOT_COMMAND_RELAY_PATTERN1, filtered, value)){
+    bot->sendTyping(msg.chatID);    
+    HandleRelayPattern(F("Relay1"), _settings.Relay1PatternOn, _settings.Relay1PatternOff, value);
+  }else
+  if(GetCommandValue(BOT_COMMAND_RELAY_PATTERN2, filtered, value)){
+    bot->sendTyping(msg.chatID);
+    HandleRelayPattern(F("Relay2"), _settings.Relay2PatternOn, _settings.Relay2PatternOff, value);
   }
   #ifdef USE_LEARN
   else if(GetCommandValue(BOT_COMMAND_LEARN, filtered, value))
@@ -804,6 +815,37 @@ static const String GetRegionNameById(const uint8_t &id)
 static const String GetRegionTestCommandById(const uint8_t &id)
 {
   return String(F(" (")) + BOT_COMMAND_TEST + String(id) + F(")");
+}
+
+void HandleRelayPattern(const String &relayName, char *patternOn, char *patternOff, String &value){
+  String pattern = F("Empty means off");
+  bool isOnPattern = false;
+  if(!value.isEmpty()){      
+    if(value.startsWith(F("on"))){
+      isOnPattern = true;
+      value = value.substring(2);
+      value.trim();
+    }
+    if(value.startsWith(F("off"))){
+      isOnPattern = false;
+      value = value.substring(3);
+      value.trim();
+    }
+    if(value == F("0")){        
+      pattern = F("Empty means off");
+      strcpy(isOnPattern ? patternOn : patternOff, "");     
+      SaveSettings();
+    }else{
+      if(!value.isEmpty()){
+        pattern = value;     
+        strcpy(isOnPattern ? patternOn : patternOff, pattern.substring(0, MAX_RELAY_PATTERN_LENGTH - 1).c_str());     
+        SaveSettings();
+      }
+    }
+    pattern = isOnPattern ? patternOn : patternOff; 
+  }
+   
+  value = relayName + F(" ") + F("Pattern") + F(" ") + (isOnPattern ? F("On") : F("Off")) + F(":") + F(" ") + pattern;
 }
 
 #ifdef USE_RELAY_EXT

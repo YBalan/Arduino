@@ -42,12 +42,12 @@
 #define ALARMS_TRACE(...) {}
 #endif
 
-#define ALARMS_API_OFFICIAL_BASE_URI "https://api.ukrainealarm.com/api/v3/"
-#define ALARMS_API_OFFICIAL_ALERTS "alerts"
-#define ALARMS_API_OFFICIAL_REGIONS "regions"
+#define ALARMS_API_OFFICIAL_BASE_URI F("https://api.ukrainealarm.com/api/v3/")
+#define ALARMS_API_OFFICIAL_ALERTS F("alerts")
+#define ALARMS_API_OFFICIAL_REGIONS F("regions")
 
 #define ALARMS_API_IOT_BASE_URI "https://api.alerts.in.ua/"
-#define ALARMS_API_IOT_ALERTS "v1/iot/active_air_raid_alerts_by_oblast.json"
+#define ALARMS_API_IOT_ALERTS F("v1/iot/active_air_raid_alerts_by_oblast.json")
 
 enum ApiAlarmStatus : uint8_t
 {
@@ -269,6 +269,7 @@ IotApiRegions iotApiRegions =
         https2->setTimeout(HTTP_TIMEOUT);
         #endif
 
+        //if(uri.startsWith(F("https://")))
         https2->addHeader("Authorization", (_isOfficialApi ? "" : "Bearer ") + _apiKey);        
         https2->addHeader("Accept", "application/json");      
 

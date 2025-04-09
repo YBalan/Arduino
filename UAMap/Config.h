@@ -91,6 +91,10 @@
   #define PIN_CLOCK         13
   #define PIN_RELAY1        18
   #define PIN_RELAY2        19
+  #define PIN_RELAY1_LED    12
+  #define PIN_RELAY2_LED    14
+  #define PIN_PORTAL_LED    13
+  #define PIN_PORTAL_LED2    2
   #define PIN_BUZZ          21
   #define PIN_RESET_BTN     22
   #define PIN_LED_STRIP     23 

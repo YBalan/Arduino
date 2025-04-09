@@ -8,3 +8,5 @@ UAMap/build/
 Charger/build/
 Notifier/build/
 Charger/.vscode/
+UAMapApiTester/bin/
+UAMapApiTester/obj/

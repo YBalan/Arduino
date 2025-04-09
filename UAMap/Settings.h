@@ -19,6 +19,7 @@
 
 #define MAX_BASE_URI_LENGTH 50
 #define MAX_CHAT_ID_LENGTH  20
+#define MAX_RELAY_PATTERN_LENGTH  100
 
 uint32_t effectStartTicks = 0;
 bool effectStarted = false;
@@ -120,6 +121,15 @@ namespace UAMap
 
     char BaseUri[MAX_BASE_URI_LENGTH]; // = ALARMS_API_IOT_BASE_URI;
 
+    bool isRelay1Alarmed = false;
+    bool isRelay2Alarmed = false;
+
+    char Relay1PatternOn[MAX_RELAY_PATTERN_LENGTH];
+    char Relay1PatternOff[MAX_RELAY_PATTERN_LENGTH];
+
+    char Relay2PatternOn[MAX_RELAY_PATTERN_LENGTH];
+    char Relay2PatternOff[MAX_RELAY_PATTERN_LENGTH];
+
     void init()
     {
       PortalModeColor = LED_PORTAL_MODE_COLOR;
@@ -143,7 +153,19 @@ namespace UAMap
       BuzzTime = 0;
 
       strcpy(BaseUri, ALARMS_API_IOT_BASE_URI);
+
+      strcpy(Relay1PatternOn, "");
+      strcpy(Relay1PatternOff, "");
+
+      strcpy(Relay2PatternOn, "");
+      strcpy(Relay2PatternOff, "");
     }
+
+    const bool isRelay1PatternOnEmpty() const { return strlen(Relay1PatternOn) == 0; }
+    const bool isRelay1PatternOffEmpty() const { return strlen(Relay1PatternOff) == 0; }
+
+    const bool isRelay2PatternOnEmpty() const { return strlen(Relay2PatternOn) == 0; }
+    const bool isRelay2PatternOffEmpty() const { return strlen(Relay2PatternOff) == 0; }
   };
 
   class SettingsExt
