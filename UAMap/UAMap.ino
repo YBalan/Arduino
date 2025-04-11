@@ -15,7 +15,7 @@
 #define AVOID_FLICKERING
 
 //#define RELEASE
-#define DEBUG
+//#define DEBUG
 
 #define NETWORK_STATISTIC
 #define ENABLE_TRACE
@@ -60,9 +60,6 @@
 //#define WM_DEBUG_LEVEL 0
 
 #endif
-
-#define RELAY_OFF HIGH
-#define RELAY_ON  LOW
 
 //DebounceTime
 #define DebounceTime 50
@@ -897,7 +894,8 @@ const bool SetStatusLED(const int &status, const String &msg)
     TRACE(F("STATUS OK STOP BLINK"));    
     led.SetColors(_settings);
     RecalculateBrightness(led, false);
-    led.StopBlink();   
+    led.StopBlink();  
+    PortalLEDSwitch(false); 
   }
 
   return changed;

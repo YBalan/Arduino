@@ -12,6 +12,16 @@
 #define AP_NAME       String(PRODUCT_NAME) + F("_AP")
 #define AP_PASS       F("password")
 
+//#define RELAY_LOW
+
+#ifdef RELAY_LOW
+#define RELAY_OFF HIGH
+#define RELAY_ON  LOW
+#else
+#define RELAY_OFF LOW
+#define RELAY_ON  HIGH
+#endif
+
 #define BRIGHTNESS_STEP 25
 //#define LARGE_MAP
 
