@@ -181,7 +181,7 @@ static AlarmsLedIndexesMap alarmsLedIndexesMap =
 };
 #endif
 
-#ifdef LARGE_MAP
+#ifdef LARGE_MAP //20 double leds 7 single leds
 #define MAX_LEDS_FOR_REGION 3
 typedef std::array<uint8_t, MAX_LEDS_FOR_REGION> LedRange;
 typedef std::map<UARegion, LedRange> AlarmsLedIndexesMap;
