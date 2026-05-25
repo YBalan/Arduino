@@ -2,7 +2,6 @@
 #ifndef TELEGRAM_BOT_H
 #define TELEGRAM_BOT_H
 
-#include "FastBot.h"
 #include <vector>
 
 #ifdef ENABLE_INFO_BOT
@@ -16,6 +15,8 @@
 #else
 #define BOT_TRACE(...) {}
 #endif
+
+#include "FastBot.h"
 
 class TelegramBot : public FastBot
 {  

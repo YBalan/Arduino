@@ -846,11 +846,13 @@ const int32_t sendUpdateMonitorMenu(const String &deviceName, const String &chat
   int32_t resMsgId = 0;
 
   if(messageId <= 0){
-    bot->inlineMenuCallback(_botSettings.botNameForMenu + deviceName, menu, call, chatId);
+    const auto status = bot->inlineMenuCallback(_botSettings.botNameForMenu + deviceName, menu, call, chatId);    
     resMsgId = bot->lastBotMsg(); 
+    BOT_MENU_TRACE(F("MENU STATUS: "), status, F("; "), F("lastMsgId: "), resMsgId);
   }
   else{
-    bot->editMenuCallback(messageId, menu, call, chatId);  
+    const auto status = bot->editMenuCallback(messageId, menu, call, chatId);  
+    BOT_MENU_TRACE(F("MENU STATUS: "), status, F("; "), F("lastMsgId: "), messageId);
     resMsgId = messageId;  
   }
   return resMsgId;
