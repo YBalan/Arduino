@@ -8,7 +8,7 @@
   #ifdef LARGE_MAP
     #define VER F("1.44L")
   #else
-    #define VER F("1.44")
+    #define VER F("1.45")
   #endif
 #endif
 

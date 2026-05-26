@@ -8,3 +8,6 @@ UAMap/build/
 Charger/build/
 Notifier/build/
 Charger/.vscode/
+*/bin/
+*/obj/
+*/.pio/
